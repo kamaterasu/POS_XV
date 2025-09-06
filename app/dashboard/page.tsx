@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
 import { BiTransferAlt } from "react-icons/bi";
 import { LiaListAlt } from "react-icons/lia";
 import { FaArrowRotateLeft } from "react-icons/fa6";
@@ -9,39 +9,60 @@ import { VscGraph } from "react-icons/vsc";
 import { FaRegUser } from "react-icons/fa";
 import { IoExitOutline } from "react-icons/io5";
 import type { IconType } from "react-icons";
-import { supabase } from '@/lib/supabaseClient';
-import { Loading } from '@/components/Loading';
+import { supabase } from "@/lib/supabaseClient";
+import { Loading } from "@/components/Loading";
+import {
+  getUserRole,
+  canAccessFeature,
+  type Role,
+} from "@/lib/helper/getUserRole";
 // import { getTenant, getTenantWithStore, createTenant, updateTenant, deleteTenant } from '@/lib/tenant/tenantApi';
 // const tenant = await getTenant();
 // const tenantStore = await getTenantWithStore(tenant.items?.[0]?.id);
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [userRole, setUserRole] = useState<Role | null>(null);
+
   useEffect(() => {
     async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      console.log("Session:", session);
+
       if (!session) {
-        router.replace('/login');
+        router.replace("/login");
+        return;
       }
+
+      // Get user role
+      const role = await getUserRole();
+      setUserRole(role);
+      console.log("User role:", role);
+
+      // Debug: Print the token and user data as requested
+      console.log("Token:", session.access_token);
+      console.log("User data:", session.user);
     }
     checkAuth();
   }, [router]);
 
   const [loading, setLoading] = useState(true);
 
-  const goTocheckout = () => router.push('/checkout');
-  const goToInventory = () => router.push('/inventory');
-  const goToReport = () => router.push('/report');
-  const goToManagement = () => router.push('/management');
-  const goToProductReturn = () => router.push('/productreturn');
+  const goTocheckout = () => router.push("/checkout");
+  const goToInventory = () => router.push("/inventory");
+  const goToReport = () => router.push("/report");
+  const goToManagement = () => router.push("/management");
+  const goToProductReturn = () => router.push("/productreturn");
 
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.error('signOut failed:', e);
+      console.error("signOut failed:", e);
     } finally {
-      router.replace('/login');
+      router.replace("/login");
       router.refresh();
     }
   };
@@ -63,18 +84,46 @@ export default function DashboardPage() {
     <div className="min-h-dvh bg-[#F7F7F5]">
       <div className="mx-auto max-w-screen-xl p-4 sm:p-6 lg:p-8 min-h-dvh flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          <button
-            className="w-fit rounded-xl border border-neutral-200 bg-white shadow px-4 py-2 text-sm hover:shadow-md active:scale-[0.99] transition"
-          >
-            Солдат
-          </button>
+          <div className="flex items-center justify-between">
+            <button className="w-fit rounded-xl border border-neutral-200 bg-white shadow px-4 py-2 text-sm hover:shadow-md active:scale-[0.99] transition">
+              Солдат
+            </button>
+            {userRole && (
+              <div className="rounded-xl border border-neutral-200 bg-white shadow px-4 py-2 text-sm">
+                Эрх: {userRole}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <CardBtn onClick={goTocheckout} Icon={BiTransferAlt} label="Борлуулалт" />
-            <CardBtn onClick={goToInventory} Icon={LiaListAlt} label="Агуулах" />
-            <CardBtn onClick={goToProductReturn} Icon={FaArrowRotateLeft} label="Буцаалт" disabled />
-            <CardBtn onClick={goToReport} Icon={VscGraph} label="Тайлан" disabled />
-            <CardBtn onClick={goToManagement} Icon={FaRegUser} label="Хяналт" />
+            <CardBtn
+              onClick={goTocheckout}
+              Icon={BiTransferAlt}
+              label="Борлуулалт"
+            />
+            <CardBtn
+              onClick={goToInventory}
+              Icon={LiaListAlt}
+              label="Агуулах"
+            />
+            <CardBtn
+              onClick={goToProductReturn}
+              Icon={FaArrowRotateLeft}
+              label="Буцаалт"
+              disabled={!canAccessFeature(userRole, "productReturn")}
+            />
+            <CardBtn
+              onClick={goToReport}
+              Icon={VscGraph}
+              label="Тайлан"
+              disabled={!canAccessFeature(userRole, "report")}
+            />
+            <CardBtn
+              onClick={goToManagement}
+              Icon={FaRegUser}
+              label="Хяналт"
+              disabled={!canAccessFeature(userRole, "management")}
+            />
           </div>
         </div>
 
@@ -115,7 +164,7 @@ function CardBtn({
       type="button"
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
-      title={disabled ? 'Тун удахгүй' : undefined}
+      title={disabled ? "Тун удахгүй" : undefined}
       className={`group w-full rounded-2xl border border-neutral-200 bg-white shadow-sm px-5 py-4 sm:py-5
                   flex items-center gap-4 hover:shadow-md active:scale-[0.99] transition
                   disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm disabled:active:scale-100`}

@@ -1,54 +1,71 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 // API
-import { listStores, createStore } from '@/lib/store/storeApi';
-import { listUsers, createUser as createUserApi, updateUser, deleteUser } from '@/lib/user/userApi';
-import { getTenantId } from '@/lib/helper/getTenantId';
+import { listStores, createStore } from "@/lib/store/storeApi";
+import {
+  listUsers,
+  createUser as createUserApi,
+  updateUser,
+  deleteUser,
+} from "@/lib/user/userApi";
+import { getTenantId } from "@/lib/helper/getTenantId";
 
-type Role = 'Admin' | 'Manager' | 'Cashier';
+type Role = "Admin" | "Manager" | "Cashier";
 type Branch = { id: string; name: string };
-type UserRow = { id: string; name: string; email: string; role: Role; store_ids: string[] };
+type UserRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  store_ids: string[];
+};
 
-function uid(prefix = '') {
-  return `${prefix}${(globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 11))}`;
+function uid(prefix = "") {
+  return `${prefix}${
+    globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 11)
+  }`;
 }
 
 export default function ManagementPage() {
-
-  
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [activeTenantId, setActiveTenantId] = useState<string>('');
+  const [activeTenantId, setActiveTenantId] = useState<string>("");
   const [branches, setBranches] = useState<Branch[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
-  const [branchQuery, setBranchQuery] = useState('');
+  const [branchQuery, setBranchQuery] = useState("");
 
   // modal
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'Cashier' as Role,
+    name: "",
+    email: "",
+    password: "",
+    role: "Cashier" as Role,
     storeIds: [] as string[],
   });
 
   const pwOk = editing
     ? true
-    : form.password.length >= 8 && /[A-Za-z]/.test(form.password) && /\d/.test(form.password);
+    : form.password.length >= 8 &&
+      /[A-Za-z]/.test(form.password) &&
+      /\d/.test(form.password);
 
   /** Auth listener */
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => active && setAuthed(!!data.session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (active) setAuthed(!!session);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => active && setAuthed(!!data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_e, session) => {
+        if (active) setAuthed(!!session);
+      }
+    );
     return () => {
       active = false;
       listener?.subscription.unsubscribe();
@@ -62,7 +79,7 @@ export default function ManagementPage() {
     (async () => {
       setLoadingBranches(true);
       try {
-        const tid = (await getTenantId()) ?? '';
+        const tid = (await getTenantId()) ?? "";
         if (cancelled) return;
         setActiveTenantId(tid);
 
@@ -73,7 +90,7 @@ export default function ManagementPage() {
         }
 
         const [stores, remoteUsers] = await Promise.all([
-          listStores(),  // ⬅️ одоо массив буцаана
+          listStores(), // ⬅️ одоо массив буцаана
           listUsers(tid),
         ]);
         if (cancelled) return;
@@ -81,7 +98,7 @@ export default function ManagementPage() {
         setBranches(stores);
         setUsers(remoteUsers);
       } catch (e) {
-        console.warn('[init] failed:', e);
+        console.warn("[init] failed:", e);
       } finally {
         if (!cancelled) setLoadingBranches(false);
       }
@@ -92,43 +109,59 @@ export default function ManagementPage() {
   }, [authed]);
 
   const branchesById = useMemo(
-    () => Object.fromEntries(branches.map(b => [b.id, b.name] as const)),
+    () => Object.fromEntries(branches.map((b) => [b.id, b.name] as const)),
     [branches]
   );
 
   /** Branch create */
   const addBranch = async () => {
-    const nm = prompt('Шинэ салбарын нэр?')?.trim();
+    const nm = prompt("Шинэ салбарын нэр?")?.trim();
     if (!nm) return;
-    const tempId = uid('tmp_');
-    setBranches(prev => [{ id: tempId, name: nm }, ...prev]);
+    const tempId = uid("tmp_");
+    setBranches((prev) => [{ id: tempId, name: nm }, ...prev]);
     try {
       const store = await createStore(nm); // ⬅️ tenant-аа дотроосоо авна
-      setBranches(prev => prev.map(b => (b.id === tempId ? { id: store.id, name: store.name } : b)));
+      setBranches((prev) =>
+        prev.map((b) =>
+          b.id === tempId ? { id: store.id, name: store.name } : b
+        )
+      );
       if (!activeTenantId) {
-        const tid = (await getTenantId()) ?? '';
+        const tid = (await getTenantId()) ?? "";
         setActiveTenantId(tid);
       }
     } catch (e: any) {
-      setBranches(prev => prev.filter(b => b.id !== tempId));
-      alert('Салбар нэмэхэд алдаа: ' + (e?.message || 'Unknown'));
+      setBranches((prev) => prev.filter((b) => b.id !== tempId));
+      alert("Салбар нэмэхэд алдаа: " + (e?.message || "Unknown"));
     }
   };
 
   /** Users CRUD */
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', email: '', password: '', role: 'Cashier', storeIds: [] });
+    setForm({
+      name: "",
+      email: "",
+      password: "",
+      role: "Cashier",
+      storeIds: [],
+    });
     setOpen(true);
   };
   const openEdit = (u: UserRow) => {
     setEditing(u);
-    setForm({ name: u.name, email: u.email, password: '', role: u.role, storeIds: [...(u.store_ids || [])] });
+    setForm({
+      name: u.name,
+      email: u.email,
+      password: "",
+      role: u.role,
+      storeIds: [...(u.store_ids || [])],
+    });
     setOpen(true);
   };
 
   const saveUser = async () => {
-    if (!activeTenantId) return alert('Tenant алга.');
+    if (!activeTenantId) return alert("Tenant алга.");
     try {
       if (editing) {
         await updateUser({
@@ -138,14 +171,21 @@ export default function ManagementPage() {
           storeIds: form.storeIds,
           name: form.name,
         });
-        setUsers(prev =>
-          prev.map(u =>
-            u.id === editing.id ? { ...u, name: form.name, role: form.role, store_ids: [...form.storeIds] } : u
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === editing.id
+              ? {
+                  ...u,
+                  name: form.name,
+                  role: form.role,
+                  store_ids: [...form.storeIds],
+                }
+              : u
           )
         );
       } else {
-        if (!form.email.trim()) return alert('И-мэйлээ бөглөнө үү.');
-        if (!pwOk) return alert('Нууц үг 8+, үсэг ба тоо агуулсан байх ёстой.');
+        if (!form.email.trim()) return alert("И-мэйлээ бөглөнө үү.");
+        if (!pwOk) return alert("Нууц үг 8+, үсэг ба тоо агуулсан байх ёстой.");
         const res = await createUserApi({
           tenantId: activeTenantId,
           email: form.email.trim().toLowerCase(),
@@ -157,42 +197,44 @@ export default function ManagementPage() {
         });
         const newRow: UserRow = {
           id: String(res.id || res.user_id),
-          name: form.name || form.email.split('@')[0],
+          name: form.name || form.email.split("@")[0],
           email: form.email.trim().toLowerCase(),
           role: form.role,
           store_ids: [...form.storeIds],
         };
-        setUsers(prev => [newRow, ...prev]);
+        setUsers((prev) => [newRow, ...prev]);
       }
       setOpen(false);
     } catch (e: any) {
-      alert(e?.message || 'Хэрэглэгч хадгалах явцад алдаа гарлаа.');
+      alert(e?.message || "Хэрэглэгч хадгалах явцад алдаа гарлаа.");
     }
   };
 
   const confirmDelete = async (u: UserRow) => {
-    if (!activeTenantId) return alert('Tenant алга.');
+    if (!activeTenantId) return alert("Tenant алга.");
     if (!confirm(`"${u.name}" хэрэглэгчийг устгах уу?`)) return;
     try {
       await deleteUser({ tenantId: activeTenantId, userId: u.id, hard: false });
-      setUsers(prev => prev.filter(x => x.id !== u.id));
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
     } catch (e: any) {
-      alert(e?.message || 'Устгах явцад алдаа гарлаа.');
+      alert(e?.message || "Устгах явцад алдаа гарлаа.");
     }
   };
 
   /** UI */
   const router = useRouter();
-  const goToDashboard = () => router.push('/dashboard');
+  const goToDashboard = () => router.push("/dashboard");
 
   useEffect(() => {
-  async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      router.replace('/login');
+    async function checkAuth() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        router.replace("/login");
+      }
     }
-  }
-  checkAuth();
+    checkAuth();
   }, [router]);
 
   return (
@@ -205,7 +247,7 @@ export default function ManagementPage() {
           Агуулах
         </button>
         <div className="text-sm text-black/60">
-          Tenant: <span className="font-medium">{activeTenantId || '—'}</span>
+          Tenant: <span className="font-medium">{activeTenantId || "—"}</span>
         </div>
       </header>
 
@@ -213,7 +255,10 @@ export default function ManagementPage() {
       <section className="bg-white rounded-xl shadow p-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Хэрэглэгчид</h2>
-          <button onClick={openCreate} className="h-10 px-4 rounded-md bg-[#5AA6FF] text-white shadow">
+          <button
+            onClick={openCreate}
+            className="h-10 px-4 rounded-md bg-[#5AA6FF] text-white shadow"
+          >
             + Хэрэглэгч үүсгэх
           </button>
         </div>
@@ -230,13 +275,17 @@ export default function ManagementPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
+              {users.map((u) => (
                 <tr key={u.id} className="border-b last:border-0">
                   <td className="py-2 pr-3 font-medium">{u.name}</td>
                   <td className="py-2 pr-3">{u.email}</td>
                   <td className="py-2 pr-3">{u.role}</td>
                   <td className="py-2 pr-3">
-                    {u.store_ids?.length ? u.store_ids.map(id => branchesById[id] || id).join(', ') : '—'}
+                    {u.store_ids?.length
+                      ? u.store_ids
+                          .map((id) => branchesById[id] || id)
+                          .join(", ")
+                      : "—"}
                   </td>
                   <td className="py-2 pr-3">
                     <div className="flex gap-2">
@@ -277,22 +326,27 @@ export default function ManagementPage() {
               placeholder="Хайх…"
               className="h-9 rounded-md border border-[#E6E6E6] px-3"
               value={branchQuery}
-              onChange={e => setBranchQuery(e.target.value)}
+              onChange={(e) => setBranchQuery(e.target.value)}
             />
             <button
               onClick={() => {
                 setLoadingBranches(true);
                 listStores()
-                  .then(stores => setBranches(stores))
-                  .catch(err => alert('[listStores] ' + (err?.message || err)))
+                  .then((stores) => setBranches(stores))
+                  .catch((err) =>
+                    alert("[listStores] " + (err?.message || err))
+                  )
                   .finally(() => setLoadingBranches(false));
               }}
               disabled={loadingBranches}
               className="h-9 px-3 rounded-md bg-black/80 text-white disabled:opacity-50"
             >
-              {loadingBranches ? 'Уншиж байна…' : 'Шинэчлэх'}
+              {loadingBranches ? "Уншиж байна…" : "Шинэчлэх"}
             </button>
-            <button onClick={addBranch} className="h-9 px-4 rounded-md bg-[#5AA6FF] text-white">
+            <button
+              onClick={addBranch}
+              className="h-9 px-4 rounded-md bg-[#5AA6FF] text-white"
+            >
               + Нэмэх
             </button>
           </div>
@@ -300,8 +354,12 @@ export default function ManagementPage() {
 
         <ul className="divide-y">
           {branches
-            .filter(b => !branchQuery.trim() || b.name.toLowerCase().includes(branchQuery.toLowerCase()))
-            .map(b => (
+            .filter(
+              (b) =>
+                !branchQuery.trim() ||
+                b.name.toLowerCase().includes(branchQuery.toLowerCase())
+            )
+            .map((b) => (
               <li key={b.id} className="py-2 flex justify-between">
                 <span>{b.name}</span>
                 <span className="text-xs text-black/50">ID: {b.id}</span>
@@ -318,8 +376,13 @@ export default function ManagementPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="w-full max-w-xl bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">{editing ? 'Хэрэглэгч засах' : 'Хэрэглэгч үүсгэх'}</h3>
-              <button onClick={() => setOpen(false)} className="text-black/60 hover:text-black">
+              <h3 className="text-lg font-semibold">
+                {editing ? "Хэрэглэгч засах" : "Хэрэглэгч үүсгэх"}
+              </h3>
+              <button
+                onClick={() => setOpen(false)}
+                className="text-black/60 hover:text-black"
+              >
                 ✕
               </button>
             </div>
@@ -329,7 +392,9 @@ export default function ManagementPage() {
                 className="h-10 rounded-md border px-3"
                 placeholder="Нэр"
                 value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
               />
               <input
                 className="h-10 rounded-md border px-3"
@@ -337,7 +402,9 @@ export default function ManagementPage() {
                 type="email"
                 disabled={!!editing}
                 value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, email: e.target.value }))
+                }
               />
               {!editing && (
                 <input
@@ -345,15 +412,19 @@ export default function ManagementPage() {
                   placeholder="Нууц үг (8+, үсэг+тоо)"
                   type="password"
                   value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, password: e.target.value }))
+                  }
                 />
               )}
               <select
                 className="h-10 rounded-md border px-2"
                 value={form.role}
-                onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, role: e.target.value as Role }))
+                }
               >
-                {(['Admin', 'Manager', 'Cashier'] as Role[]).map(r => (
+                {(["Admin", "Manager", "Cashier"] as Role[]).map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -364,18 +435,23 @@ export default function ManagementPage() {
               <div className="md:col-span-2">
                 <div className="text-sm font-medium mb-1">Салбарууд</div>
                 <div className="max-h-40 overflow-auto rounded-md border p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                  {branches.map(s => {
+                  {branches.map((s) => {
                     const checked = form.storeIds.includes(s.id);
                     return (
-                      <label key={s.id} className="inline-flex items-center gap-2 text-sm">
+                      <label
+                        key={s.id}
+                        className="inline-flex items-center gap-2 text-sm"
+                      >
                         <input
                           type="checkbox"
                           className="accent-blue-600"
                           checked={checked}
                           onChange={() =>
-                            setForm(f => ({
+                            setForm((f) => ({
                               ...f,
-                              storeIds: checked ? f.storeIds.filter(x => x !== s.id) : [...f.storeIds, s.id],
+                              storeIds: checked
+                                ? f.storeIds.filter((x) => x !== s.id)
+                                : [...f.storeIds, s.id],
                             }))
                           }
                         />
@@ -383,29 +459,38 @@ export default function ManagementPage() {
                       </label>
                     );
                   })}
-                  {branches.length === 0 && <div className="text-black/50 text-sm">Салбар алга</div>}
+                  {branches.length === 0 && (
+                    <div className="text-black/50 text-sm">Салбар алга</div>
+                  )}
                 </div>
               </div>
             </div>
 
             {!editing && (
               <ul className="mt-2 text-xs text-black/70 grid grid-cols-2 gap-y-1">
-                <li>{form.password.length >= 8 ? '✓' : '✗'} 8+ тэмдэгт</li>
-                <li>{/[A-Za-z]/.test(form.password) ? '✓' : '✗'} Үсэг агуулсан</li>
-                <li>{/\d/.test(form.password) ? '✓' : '✗'} Тоо агуулсан</li>
+                <li>{form.password.length >= 8 ? "✓" : "✗"} 8+ тэмдэгт</li>
+                <li>
+                  {/[A-Za-z]/.test(form.password) ? "✓" : "✗"} Үсэг агуулсан
+                </li>
+                <li>{/\d/.test(form.password) ? "✓" : "✗"} Тоо агуулсан</li>
               </ul>
             )}
 
             <div className="mt-6 flex justify-end gap-2">
-              <button onClick={() => setOpen(false)} className="h-10 px-4 rounded-md bg-white border">
+              <button
+                onClick={() => setOpen(false)}
+                className="h-10 px-4 rounded-md bg-white border"
+              >
                 Болих
               </button>
               <button
                 onClick={saveUser}
                 className="h-10 px-5 rounded-md bg-[#5AA6FF] text-white disabled:opacity-50"
-                disabled={!activeTenantId || (!editing && (!form.email || !pwOk))}
+                disabled={
+                  !activeTenantId || (!editing && (!form.email || !pwOk))
+                }
               >
-                {editing ? 'Хадгалах' : 'Үүсгэх'}
+                {editing ? "Хадгалах" : "Үүсгэх"}
               </button>
             </div>
           </div>
