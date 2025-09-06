@@ -1,5 +1,3 @@
-import { get } from "http";
-import { getAccessToken } from "../helper/getAccessToken";
 import { getTenantId } from "../helper/getTenantId";
 import { jwtDecode } from "jwt-decode";
 // export async function getStore(store_id?: string) {
@@ -35,7 +33,6 @@ export async function getStoredID(token: string) {
 
 export async function getStore(token: string) {
   const decoded: any = jwtDecode(token);
-  console.log("Decoded token:", decoded);
   const tenant_id = decoded.app_metadata.tenants?.[0];
   const role = decoded.app_metadata.role;
   if (role !== 'OWNER' && role !== 'MANAGER') {
@@ -63,9 +60,9 @@ export async function getStore(token: string) {
   return { ...data, role };
   }
 }
-export async function createStore(names: string[]){
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
+export async function createStore(names: string[],token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded.app_metadata.tenants?.[0];
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`);
   const res = await fetch(url.toString(),{
     method: "POST",
@@ -78,9 +75,9 @@ export async function createStore(names: string[]){
   return res.json();
 }
 
-export async function updateStore( id: string, name: string){
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
+export async function updateStore( id: string, name: string,token: string){
+    const decoded: any = jwtDecode(token);
+  const tenant_id = decoded.app_metadata.tenants?.[0];
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`);
   const res = await fetch(url.toString(),{
     method: "PATCH",
@@ -93,9 +90,9 @@ export async function updateStore( id: string, name: string){
   return res.json();
 }
 
-export async function deleteStore( id: string){
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
+export async function deleteStore( id: string,token: string){
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded.app_metadata.tenants?.[0];
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`);
   const res = await fetch(url.toString(),{
     method: "DELETE",
