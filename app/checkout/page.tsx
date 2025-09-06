@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 import { Item, QuickActions } from '@/lib/sales/salesType';
-import  { listProducts } from '@/lib/product/productApi';
+import { listProducts } from '@/lib/product/productApi';
 import { fmt, calcTotals } from '@/lib/sales/salesUtils';
 
 import CartFooter from '@/components/checkoutComponents/CartFooter';
