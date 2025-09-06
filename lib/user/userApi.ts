@@ -3,7 +3,8 @@ import { jwtDecode } from "jwt-decode";
 export async function getUser(user_id: string, token: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
-
+  const role = decoded.app_metadata.role;
+  if (role !== 'OWNER' && role !== 'MANAGER') {
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/user?tenant_id=${tenant_id}&user_id=${user_id || ''}`);
   const res = await fetch(url.toString(), {
     method: "GET",
@@ -11,7 +12,18 @@ export async function getUser(user_id: string, token: string) {
       Authorization: `Bearer ${token}`,
     },
   });
-  return res.json();
+  return res.json();    
+  } else{
+    const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/user?tenant_id=${tenant_id}`);
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return res.json();
+  }
+
 }
 
 export async function createUser(email: string, password: string, role: string, store_ids: string[], name: string, token: string) {
