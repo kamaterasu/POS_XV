@@ -23,6 +23,7 @@ import {
 export default function DashboardPage() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<Role | null>(null);
+  const [userName, setUserName] = useState<string>("");
 
   useEffect(() => {
     async function checkAuth() {
@@ -40,6 +41,13 @@ export default function DashboardPage() {
       const role = await getUserRole();
       setUserRole(role);
       console.log("User role:", role);
+
+      // Get user name from user_metadata
+      const displayName =
+        session.user.user_metadata?.display_name ||
+        session.user.email ||
+        "Нэргүй хэрэглэгч";
+      setUserName(displayName);
 
       // Debug: Print the token and user data as requested
       console.log("Token:", session.access_token);
@@ -86,7 +94,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <button className="w-fit rounded-xl border border-neutral-200 bg-white shadow px-4 py-2 text-sm hover:shadow-md active:scale-[0.99] transition">
-              Солдат
+              Нэр: {userName || "Нэргүй хэрэглэгч"}
             </button>
             {userRole && (
               <div className="rounded-xl border border-neutral-200 bg-white shadow px-4 py-2 text-sm">
