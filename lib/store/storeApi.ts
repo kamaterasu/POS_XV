@@ -1,17 +1,5 @@
-import { getTenantId } from "../helper/getTenantId";
 import { jwtDecode } from "jwt-decode";
-// export async function getStore(store_id?: string) {
-//   const token = await getAccessToken();
-//   const tenant_id = await getTenantId();
-//   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}&id=${store_id || ''}`);
-//   const res = await fetch(url.toString(), {
-//     method: "GET",
-//     headers: {
-//       Authorization: `Bearer ${token}`,
-//     },
-//   });zz
-//   return res.json();
-// }
+
 export async function getStoredID(token: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
@@ -42,9 +30,7 @@ export async function getStore(token: string) {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
-    console.log("Response status:", res);
-    const data = await res.json();
-    return { ...data, role };
+    return res.json();
   } else {
     const url = new URL(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}`
@@ -54,10 +40,7 @@ export async function getStore(token: string) {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
-  console.log("Response status:", res);
-
-  const data = await res.json();
-  return { ...data, role };
+  return res.json();
   }
 }
 export async function createStore(names: string[],token: string) {

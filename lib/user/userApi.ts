@@ -1,9 +1,9 @@
-import { getAccessToken } from "../helper/getAccessToken";
-import { getTenantId } from "../helper/getTenantId";
+import { jwtDecode } from "jwt-decode";
 
-export async function getUser(user_id?: string) {
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
+export async function getUser(user_id: string, token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/user?tenant_id=${tenant_id}&user_id=${user_id || ''}`);
   const res = await fetch(url.toString(), {
     method: "GET",
@@ -14,9 +14,9 @@ export async function getUser(user_id?: string) {
   return res.json();
 }
 
-export async function createUser(email: string, password: string, role: string, store_ids: string[], name: string) {
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
+export async function createUser(email: string, password: string, role: string, store_ids: string[], name: string, token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/user`);
   const res = await fetch(url.toString(), {
     method: "POST",
@@ -29,9 +29,9 @@ export async function createUser(email: string, password: string, role: string, 
   return res.json();
 }
 
-export async function updateUser(user_id: string, role?: string, store_ids?: string[], name?: string) {
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
+export async function updateUser(user_id: string, role: string, store_ids: string[], name: string, token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/user`);
   const res = await fetch(url.toString(), {
     method: "PATCH",
@@ -44,9 +44,9 @@ export async function updateUser(user_id: string, role?: string, store_ids?: str
   return res.json();
 }
 
-export async function deleteUser(user_id: string) {
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
+export async function deleteUser(user_id: string, token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/user`);
   const res = await fetch(url.toString(), {
     method: "DELETE",
