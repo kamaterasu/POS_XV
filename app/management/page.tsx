@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 // API
-import { listStores, createStore } from "@/lib/store/storeApi";
+import { getStore, createStore } from "@/lib/store/storeApi";
+import { getAccessToken } from "@/lib/helper/getAccessToken";
 import {
-  listUsers,
+  getUser,
   createUser as createUserApi,
   updateUser,
   deleteUser,
@@ -89,14 +90,99 @@ export default function ManagementPage() {
           return;
         }
 
-        const [stores, remoteUsers] = await Promise.all([
-          listStores(), // ⬅️ одоо массив буцаана
-          listUsers(tid),
-        ]);
+        const token = await getAccessToken();
+
+        // Try both store API and tenant API approaches
+        let storesResponse;
+        let remoteUsers;
+
+        try {
+          [storesResponse, remoteUsers] = await Promise.all([
+            getStore(token), // Try store API first
+            getUser("", token), // Get all users for tenant
+          ]);
+        } catch (storeError) {
+          console.log(
+            "Store API failed, might need different approach:",
+            storeError
+          );
+          // If store API fails, you might need to implement a different approach
+          // For now, set empty response
+          storesResponse = [];
+          remoteUsers = [];
+        }
         if (cancelled) return;
 
-        setBranches(stores);
-        setUsers(remoteUsers);
+        // Debug: Log the actual response format
+        console.log("storesResponse:", storesResponse);
+        console.log("remoteUsers:", remoteUsers);
+
+        // Handle different response formats based on user role
+        let stores = [];
+
+        if (Array.isArray(storesResponse)) {
+          // Direct array response
+          console.log("Response is array:", storesResponse);
+          stores = storesResponse;
+        } else if (
+          storesResponse?.stores &&
+          Array.isArray(storesResponse.stores)
+        ) {
+          // Response with stores property (tenant API format)
+          console.log("Response has stores property:", storesResponse.stores);
+          stores = storesResponse.stores;
+        } else if (storesResponse?.id && storesResponse?.name) {
+          // Single store object (non-OWNER/MANAGER response)
+          console.log("Response is single store:", storesResponse);
+          stores = [storesResponse];
+        } else if (storesResponse?.data && Array.isArray(storesResponse.data)) {
+          // Response wrapped in data property
+          console.log("Response has data property:", storesResponse.data);
+          stores = storesResponse.data;
+        } else {
+          // Fallback - log what we actually got
+          console.log(
+            "Unknown response format, using fallback:",
+            storesResponse
+          );
+          stores = [];
+        }
+
+        console.log("Final stores array:", stores);
+
+        const validStores = stores.filter((store: any) => {
+          const isValid = store && store.id && store.name;
+          if (!isValid) {
+            console.log("Invalid store filtered out:", store);
+          }
+          return isValid;
+        });
+
+        console.log("Valid stores after filtering:", validStores);
+        setBranches(validStores);
+
+        // Handle users response - the backend returns different formats
+        console.log("remoteUsers response type:", typeof remoteUsers);
+        console.log("remoteUsers content:", remoteUsers);
+
+        let finalUsers = [];
+        if (Array.isArray(remoteUsers)) {
+          // Direct array of users
+          finalUsers = remoteUsers;
+        } else if (remoteUsers?.items && Array.isArray(remoteUsers.items)) {
+          // Backend returns { items: [...] } where items are membership records
+          finalUsers = remoteUsers.items;
+        } else if (remoteUsers?.data && Array.isArray(remoteUsers.data)) {
+          // Wrapped in data property
+          finalUsers = remoteUsers.data;
+        } else {
+          // Unknown format
+          console.log("Unknown user response format:", remoteUsers);
+          finalUsers = [];
+        }
+
+        console.log("Final users array:", finalUsers);
+        setUsers(finalUsers);
       } catch (e) {
         console.warn("[init] failed:", e);
       } finally {
@@ -109,7 +195,12 @@ export default function ManagementPage() {
   }, [authed]);
 
   const branchesById = useMemo(
-    () => Object.fromEntries(branches.map((b) => [b.id, b.name] as const)),
+    () =>
+      Object.fromEntries(
+        (Array.isArray(branches) ? branches : []).map(
+          (b) => [b.id, b.name] as const
+        )
+      ),
     [branches]
   );
 
@@ -120,17 +211,43 @@ export default function ManagementPage() {
     const tempId = uid("tmp_");
     setBranches((prev) => [{ id: tempId, name: nm }, ...prev]);
     try {
-      const store = await createStore(nm); // ⬅️ tenant-аа дотроосоо авна
-      setBranches((prev) =>
-        prev.map((b) =>
-          b.id === tempId ? { id: store.id, name: store.name } : b
-        )
-      );
+      const token = await getAccessToken();
+      const storeResponse = await createStore([nm], token);
+
+      console.log("createStore response:", storeResponse); // Debug the response
+
+      // Handle the response format
+      let newStore;
+      if (Array.isArray(storeResponse)) {
+        // If the response is an array of stores
+        newStore = storeResponse[0];
+      } else if (storeResponse?.stores && Array.isArray(storeResponse.stores)) {
+        // If wrapped in stores property
+        newStore = storeResponse.stores[0];
+      } else if (storeResponse?.id && storeResponse?.name) {
+        // If it's a single store object
+        newStore = storeResponse;
+      } else {
+        // If all else fails, show error
+        throw new Error("Invalid response format from server");
+      }
+
+      if (newStore && newStore.id && newStore.name) {
+        setBranches((prev) =>
+          prev.map((b) =>
+            b.id === tempId ? { id: newStore.id, name: newStore.name } : b
+          )
+        );
+      } else {
+        throw new Error("Created store missing id or name");
+      }
+
       if (!activeTenantId) {
         const tid = (await getTenantId()) ?? "";
         setActiveTenantId(tid);
       }
     } catch (e: any) {
+      console.error("Create store error:", e);
       setBranches((prev) => prev.filter((b) => b.id !== tempId));
       alert("Салбар нэмэхэд алдаа: " + (e?.message || "Unknown"));
     }
@@ -164,13 +281,14 @@ export default function ManagementPage() {
     if (!activeTenantId) return alert("Tenant алга.");
     try {
       if (editing) {
-        await updateUser({
-          tenantId: activeTenantId,
-          userId: editing.id,
-          role: form.role,
-          storeIds: form.storeIds,
-          name: form.name,
-        });
+        const token = await getAccessToken();
+        await updateUser(
+          editing.id,
+          form.role,
+          form.storeIds,
+          form.name,
+          token
+        );
         setUsers((prev) =>
           prev.map((u) =>
             u.id === editing.id
@@ -186,15 +304,15 @@ export default function ManagementPage() {
       } else {
         if (!form.email.trim()) return alert("И-мэйлээ бөглөнө үү.");
         if (!pwOk) return alert("Нууц үг 8+, үсэг ба тоо агуулсан байх ёстой.");
-        const res = await createUserApi({
-          tenantId: activeTenantId,
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          name: form.name.trim(),
-          role: form.role,
-          storeIds: form.storeIds,
-          invite: false,
-        });
+        const token = await getAccessToken();
+        const res = await createUserApi(
+          form.email.trim().toLowerCase(),
+          form.password,
+          form.role,
+          form.storeIds,
+          form.name.trim(),
+          token
+        );
         const newRow: UserRow = {
           id: String(res.id || res.user_id),
           name: form.name || form.email.split("@")[0],
@@ -214,7 +332,8 @@ export default function ManagementPage() {
     if (!activeTenantId) return alert("Tenant алга.");
     if (!confirm(`"${u.name}" хэрэглэгчийг устгах уу?`)) return;
     try {
-      await deleteUser({ tenantId: activeTenantId, userId: u.id, hard: false });
+      const token = await getAccessToken();
+      await deleteUser(u.id, token);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
     } catch (e: any) {
       alert(e?.message || "Устгах явцад алдаа гарлаа.");
@@ -331,10 +450,40 @@ export default function ManagementPage() {
             <button
               onClick={() => {
                 setLoadingBranches(true);
-                listStores()
-                  .then((stores) => setBranches(stores))
-                  .catch((err) =>
-                    alert("[listStores] " + (err?.message || err))
+                getAccessToken()
+                  .then((token) => getStore(token))
+                  .then((storesResponse: any) => {
+                    console.log("Refresh - storesResponse:", storesResponse);
+
+                    // Handle different response formats based on user role
+                    let stores = [];
+
+                    if (Array.isArray(storesResponse)) {
+                      stores = storesResponse;
+                    } else if (
+                      storesResponse?.stores &&
+                      Array.isArray(storesResponse.stores)
+                    ) {
+                      stores = storesResponse.stores;
+                    } else if (storesResponse?.id && storesResponse?.name) {
+                      stores = [storesResponse];
+                    } else if (
+                      storesResponse?.data &&
+                      Array.isArray(storesResponse.data)
+                    ) {
+                      stores = storesResponse.data;
+                    } else {
+                      stores = [];
+                    }
+
+                    const validStores = stores.filter(
+                      (store: any) => store && store.id && store.name
+                    );
+                    console.log("Refresh - final stores:", validStores);
+                    setBranches(validStores);
+                  })
+                  .catch((err: any) =>
+                    alert("[getStore] " + (err?.message || err))
                   )
                   .finally(() => setLoadingBranches(false));
               }}
@@ -357,12 +506,17 @@ export default function ManagementPage() {
             .filter(
               (b) =>
                 !branchQuery.trim() ||
-                b.name.toLowerCase().includes(branchQuery.toLowerCase())
+                b.name?.toLowerCase().includes(branchQuery.toLowerCase())
             )
-            .map((b) => (
-              <li key={b.id} className="py-2 flex justify-between">
-                <span>{b.name}</span>
-                <span className="text-xs text-black/50">ID: {b.id}</span>
+            .map((b, index) => (
+              <li
+                key={b.id || `branch-${index}`}
+                className="py-2 flex justify-between"
+              >
+                <span>{b.name || "Нэргүй"}</span>
+                <span className="text-xs text-black/50">
+                  ID: {b.id || "No ID"}
+                </span>
               </li>
             ))}
           {branches.length === 0 && !loadingBranches && (
@@ -435,11 +589,11 @@ export default function ManagementPage() {
               <div className="md:col-span-2">
                 <div className="text-sm font-medium mb-1">Салбарууд</div>
                 <div className="max-h-40 overflow-auto rounded-md border p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                  {branches.map((s) => {
+                  {branches.map((s, index) => {
                     const checked = form.storeIds.includes(s.id);
                     return (
                       <label
-                        key={s.id}
+                        key={s.id || `store-${index}`}
                         className="inline-flex items-center gap-2 text-sm"
                       >
                         <input
@@ -455,7 +609,7 @@ export default function ManagementPage() {
                             }))
                           }
                         />
-                        <span>{s.name}</span>
+                        <span>{s.name || "Unnamed"}</span>
                       </label>
                     );
                   })}

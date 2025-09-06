@@ -22,68 +22,69 @@ export async function getStoredID(token: string) {
 export async function getStore(token: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded.app_metadata.tenants?.[0];
-  const role = decoded.app_metadata.role;
-  if (role !== 'OWNER' && role !== 'MANAGER') {
-    const store_id = await getStoredID(token);
-    const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}&id=${store_id}`);
-    const res = await fetch(url.toString(), {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return res.json();
-  } else {
-    const url = new URL(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}`
+
+  // Use the tenant API to get stores (same as getStoredID)
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/tenant?id=${tenant_id}&withStores=true`
   );
 
   const res = await fetch(url.toString(), {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
-  return res.json();
-  }
+
+  const response = await res.json();
+
+  // Return the stores array directly
+  return response?.stores || [];
 }
-export async function createStore(names: string[],token: string) {
+export async function createStore(names: string[], token: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded.app_metadata.tenants?.[0];
-  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`);
-  const res = await fetch(url.toString(),{
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`
+  );
+  const res = await fetch(url.toString(), {
     method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({tenant_id, names})
+    body: JSON.stringify({ tenant_id, names }),
   });
   return res.json();
 }
 
-export async function updateStore( id: string, name: string,token: string){
-    const decoded: any = jwtDecode(token);
-  const tenant_id = decoded.app_metadata.tenants?.[0];
-  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`);
-  const res = await fetch(url.toString(),{
-    method: "PATCH",
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({tenant_id, id, name})
-  });
-  return res.json();
-}
-
-export async function deleteStore( id: string,token: string){
+export async function updateStore(id: string, name: string, token: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded.app_metadata.tenants?.[0];
-  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`);
-  const res = await fetch(url.toString(),{
-    method: "DELETE",
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`
+  );
+  const res = await fetch(url.toString(), {
+    method: "PATCH",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({tenant_id, id, confirm: "DELETE"})
+    body: JSON.stringify({ tenant_id, id, name }),
+  });
+  return res.json();
+}
+
+export async function deleteStore(id: string, token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded.app_metadata.tenants?.[0];
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store`
+  );
+  const res = await fetch(url.toString(), {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ tenant_id, id, confirm: "DELETE" }),
   });
   return res.json();
 }
