@@ -1,30 +1,61 @@
-import { getAccessToken } from '@/lib/helper/getAccessToken';
-import { getTenantId } from '@/lib/helper/getTenantId';
+import { jwtDecode } from "jwt-decode"
 
-const BASE = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-export type Category = { id: string; name: string; parent_id: string | null };
+export async function getCategories(token: string){
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
 
-export async function listCategories({ limit = 1000 } = {}): Promise<Category[]> {
-  let token: string;
-  try { token = await getAccessToken(); } catch { return []; }
-
-  const tenantId = await getTenantId();
-  if (!tenantId) return [];
-
-  const url = new URL(`${BASE}/functions/v1/category`);
-  url.searchParams.set('limit', String(limit));
-  url.searchParams.set('tenant_id', tenantId);
+  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/category?tenant_id=${tenant_id}`);
 
   const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${token}`, apikey: ANON, Accept: 'application/json' },
-    cache: 'no-store',
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
   });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`listCategories failed: ${res.status} ${text}`);
+  return res.json();
+}
+export async function createCategory(name: string, token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
 
-  const json = text ? JSON.parse(text) : {};
-  const rows: any[] = Array.isArray(json) ? json : (json.items ?? json.data ?? json.categories ?? []);
-  return rows.map(r => ({ id: String(r.id), name: String(r.name), parent_id: r.parent_id ?? null }));
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/category`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ tenant_id, name }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Category create failed: ${res.status} ${err}`);
+  }
+
+  return res.json();
+}
+export async function createSubcategory(parent_id: string, name: string, token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/category`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ tenant_id, name, parent_id }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Subcategory create failed: ${res.status} ${err}`);
+  }
+
+  return res.json();
 }

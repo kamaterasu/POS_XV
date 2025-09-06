@@ -1,35 +1,72 @@
-'use client';
-import { getAccessToken } from '@/lib/helper/getAccessToken';
-import { getTenantId } from '@/lib/helper/getTenantId';
+import { jwtDecode } from "jwt-decode";
 
-const BASE = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export type Product = { id: string; name: string; qty: number; price: number; imgPath?: string };
-
-export async function listProducts(_opts: {
-  storeId?: string;
-  categoryId?: string;
-  categoryIds?: string[];
-  q?: string;
-}): Promise<Product[]> {
-  let token: string;
-  try { token = await getAccessToken(); } catch { return []; }
-
-  const tenantId = await getTenantId();
-  if (!tenantId) return [];
-
-  const url = new URL(`${BASE}/functions/v1/product?tenant_id=${tenantId}&search=&limit=20&offset=0`);
-  url.searchParams.set('tenant_id', tenantId);
+export async function getProduct(token: string, order_id: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&search=&limit=20&offset=0`);
 
   const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${token}`, apikey: ANON, Accept: 'application/json' },
-    cache: 'no-store',
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
   });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`listProducts failed: ${res.status} ${text}`);
 
-  const json = text ? JSON.parse(text) : {};
-  const rows: any[] = Array.isArray(json) ? json : (json.items ?? json.data ?? []);
-  return rows.map(r => ({ id: String(r.id), name: String(r.name), qty: r.qty, price: r.price, imgPath: r.imgPath }));
+  return res.json();
 }
+
+export async function getProductByVariant(token: string, product_id: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&id=${product_id}&withVariants=true}`);
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  return res.json();
+}
+
+export async function getProductByCategory(token: string, category_id: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&category_id=${category_id}&subtree=true`);
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  return res.json();
+}
+type VariantInput = {
+  name: string;
+  sku: string;
+  price: number;
+  cost: number;
+  attrs?: Record<string, string>;
+};
+
+type ProductInput = {
+  name: string;
+  category_id: string;
+  variants: VariantInput[];
+  img?: string;
+};
+export async function createProduct(token: string, product: ProductInput) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`;
+  const payload = { ...product, tenant_id };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return res.json();
+}
+

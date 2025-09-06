@@ -1,52 +1,335 @@
 // app/inventory/detail/page.tsx
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { Loading } from '../../components/Loading';
-import { supabase } from '@/lib/supabaseClient';
 
-import ModeSwitcher from '@/components/inventoryComponents/ModeSwitcher';
-import ProductList from '@/components/inventoryComponents/ProductList';
-import TransferReceive from '@/components/inventoryComponents/TransferReceive';
-import ProductCreateForm from '@/components/inventoryComponents/ProductCreateForm';
+/** ----------------------------- TOAST MOCK ----------------------------- */
+const toast = {
+  message: (m: string) => console.log('[toast]', m),
+  success: (m: string) => console.log('[toast:success]', m),
+  error: (m: string) => console.error('[toast:error]', m),
+};
 
-import { listProducts, type ProductStockSummary, toProducts } from '@/lib/product/productSummary';
-import {listCategories, type Category } from '@/lib/category/categoryApi';
-import { getStore } from '@/lib/store/storeApi';
+/** ---------------------------- LOADING MOCK ---------------------------- */
+function Loading({ open, label = 'Уншиж байна…', subLabel }: { open: boolean; label?: string; subLabel?: string }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
+      <div className="rounded-2xl bg-white shadow-xl border border-neutral-200 px-5 py-4">
+        <div className="font-medium">{label}</div>
+        {subLabel ? <div className="text-sm text-neutral-600 mt-1">{subLabel}</div> : null}
+      </div>
+    </div>
+  );
+}
 
-import {
-  listIncomingTransfers,
-  apiCountSubmit,
-  apiTransferSubmit,
-  apiReceiveSubmit,
-  apiCategoryCreate,
-  buildCategoryHelpers,
-} from '@/lib/inventory/inventoryApi';
+/** ----------------------------- MOCK “APIs” ---------------------------- */
+// Жижиг саатал оруулах helper
+async function mockDelay<T>(v: T, ms = 250) { await new Promise(r => setTimeout(r, ms)); return v; }
 
+type StoreRow = { id: string; name: string };
+type Category = { id: string; name: string; parentId: string | null };
+type ProductRow = { id: string; name: string; code: string; stock: number; price: number; categoryId?: string };
 
-import { getTenantId } from '@/lib/helper/getTenantId';
+async function listStores(): Promise<StoreRow[]> {
+  return mockDelay([
+    { id: 's1', name: 'Салбар 1' },
+    { id: 's2', name: 'Салбар 2' },
+  ]);
+}
 
+async function listCategories(): Promise<Category[]> {
+  return mockDelay([
+    { id: 'c-root-a', name: 'Гутал', parentId: null },
+    { id: 'c-root-b', name: 'Цамц', parentId: null },
+    { id: 'c-a-1', name: 'Спорт', parentId: 'c-root-a' },
+    { id: 'c-b-1', name: 'Hoodie', parentId: 'c-root-b' },
+  ]);
+}
+
+async function getProduct(_token?: string): Promise<ProductRow[]> {
+  // filter-уудыг доорх useEffect дотроо client талаас хийж байна.
+  return mockDelay([
+    { id: 'p1', name: 'Sneaker Alpha', code: 'SN-ALP', stock: 12, price: 120000, categoryId: 'c-a-1' },
+    { id: 'p2', name: 'Sneaker Beta',  code: 'SN-BET', stock:  4, price: 135000, categoryId: 'c-a-1' },
+    { id: 'p3', name: 'Hoodie Black',  code: 'HD-BLK', stock: 21, price:  65000, categoryId: 'c-b-1' },
+    { id: 'p4', name: 'Hoodie Gray',   code: 'HD-GRY', stock:  7, price:  65000, categoryId: 'c-b-1' },
+  ]);
+}
+
+async function listIncomingTransfers(_storeId: string) {
+  return mockDelay([
+    {
+      id: 't1',
+      from: 'Салбар 1',
+      to: 'Салбар 2',
+      items: [
+        { lineId: 't1-l1', productId: 'p3', name: 'Hoodie Black', expectedQty: 5 },
+        { lineId: 't1-l2', productId: 'p4', name: 'Hoodie Gray', expectedQty: 2 },
+      ],
+    },
+  ]);
+}
+
+async function apiCountSubmit(_arg: any) { return mockDelay(true, 400); }
+async function apiTransferSubmit(_arg: any) { return mockDelay(true, 400); }
+async function apiReceiveSubmit(_arg: any) { return mockDelay(true, 400); }
+async function apiCategoryCreate({ name }: { tenantId: string; name: string; parentId: string | null }) {
+  // Шинэ category id үүсгээд буцаана
+  return mockDelay({ id: `cat_${Math.random().toString(36).slice(2, 8)}`, name });
+}
+async function getTenantId() { return mockDelay('tenant_mock'); }
+
+/** ----------------------- CATEGORY HELPER (mock) ----------------------- */
+function buildCategoryHelpers(cats: Category[]) {
+  const byId = new Map<string, Category>();
+  cats.forEach(c => byId.set(c.id, c));
+  function getChildren(parentId: string | null) {
+    return cats.filter(c => c.parentId === parentId);
+  }
+  function getAncestors(id: string | null): { id: string; name: string }[] {
+    if (!id) return [];
+    const path: { id: string; name: string }[] = [];
+    let cur: Category | undefined = byId.get(id);
+    while (cur) {
+      path.unshift({ id: cur.id, name: cur.name });
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return path;
+  }
+  function getDescendantIds(id: string) {
+    const out: string[] = [];
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      out.push(cur);
+      getChildren(cur).forEach(child => stack.push(child.id));
+    }
+    return out;
+  }
+  return { byId, getChildren, getAncestors, getDescendantIds };
+}
+
+/** ----------------------------- UI HELPERS ----------------------------- */
 type Mode = 'view' | 'count' | 'transfer' | 'receive' | 'create';
 
 function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-neutral-200 ${className}`} />;
 }
 
-// localStorage keys
+// Sticky дээрх горим солигч – энгийн хувилбар
+function ModeSwitcher({ mode, setMode }: { mode: Mode; setMode: (m: Mode) => void }) {
+  const modes: Mode[] = ['view', 'count', 'transfer', 'receive', 'create'];
+  return (
+    <div className="flex gap-1 bg-white border border-neutral-200 rounded-lg p-1">
+      {modes.map((m) => (
+        <button
+          key={m}
+          onClick={() => setMode(m)}
+          className={`px-3 py-1 rounded-md text-xs ${mode === m ? 'bg-[#5AA6FF] text-white' : ''}`}
+          title={m}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Жагсаалт харах/тоо оруулах/шилжүүлэхэд ашиглах энгийн жагсаалт
+function ProductList({
+  mode,
+  products,
+  countMap,
+  setCountMap,
+  transferMap,
+  setTransferMap,
+}: {
+  mode: Mode;
+  products: { id: string; name: string; code: string; stock: number; price: number }[];
+  countMap: Record<string, number>;
+  setCountMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  transferMap: Record<string, number>;
+  setTransferMap: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+}) {
+  return (
+    <div className="space-y-2">
+      {products.map((p) => (
+        <div key={p.id} className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 border rounded-md">
+          <div className="flex items-start gap-2">
+            <div className="h-10 w-10 rounded-md bg-neutral-100" />
+            <div className="leading-tight">
+              <div className="font-medium">{p.name}</div>
+              <div className="text-xs text-neutral-500">{p.code}</div>
+              <div className="text-xs text-neutral-700">Нөөц: {p.stock}</div>
+            </div>
+          </div>
+
+          {mode === 'view' ? (
+            <div className="self-center text-sm font-medium">{p.price.toLocaleString()}₮</div>
+          ) : (
+            <div />
+          )}
+
+          {(mode === 'count' || mode === 'transfer') && (
+            <div className="flex items-center gap-2 justify-self-end">
+              <button
+                onClick={() =>
+                  (mode === 'count'
+                    ? setCountMap((m) => ({ ...m, [p.id]: Math.max(0, (m[p.id] || 0) - 1) }))
+                    : setTransferMap((m) => ({ ...m, [p.id]: Math.max(0, (m[p.id] || 0) - 1) })))
+                }
+                className="h-7 w-7 rounded-md border"
+              >
+                -
+              </button>
+              <input
+                type="number"
+                value={mode === 'count' ? (countMap[p.id] || 0) : (transferMap[p.id] || 0)}
+                onChange={(e) =>
+                  (mode === 'count'
+                    ? setCountMap((m) => ({ ...m, [p.id]: Math.max(0, Number(e.target.value || 0)) }))
+                    : setTransferMap((m) => ({ ...m, [p.id]: Math.max(0, Number(e.target.value || 0)) })))
+                }
+                className="h-7 w-16 border rounded-md px-2"
+              />
+              <button
+                onClick={() =>
+                  (mode === 'count'
+                    ? setCountMap((m) => ({ ...m, [p.id]: (m[p.id] || 0) + 1 }))
+                    : setTransferMap((m) => ({ ...m, [p.id]: (m[p.id] || 0) + 1 })))
+                }
+                className="h-7 w-7 rounded-md border"
+              >
+                +
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Хүлээн авах хэсгийн энгийн загвар
+function TransferReceive({
+  transfers,
+  openTransfers,
+  setOpenTransfers,
+  receiveChecked,
+  setReceiveChecked,
+  receiveQty,
+  setReceiveQty,
+}: any) {
+  if (!transfers?.length) return <div className="text-sm text-neutral-600">Ирэх шилжүүлэг алга.</div>;
+  return (
+    <div className="space-y-2">
+      {transfers.map((tr: any) => {
+        const opened = !!openTransfers[tr.id];
+        return (
+          <div key={tr.id} className="border rounded-md">
+            <button
+              onClick={() => setOpenTransfers((m: any) => ({ ...m, [tr.id]: !opened }))}
+              className="w-full text-left px-3 py-2 bg-neutral-50 border-b"
+            >
+              {tr.from} → {tr.to} • {tr.items.length} мөр
+            </button>
+            {opened && (
+              <div className="p-3 space-y-2">
+                {tr.items.map((it: any) => (
+                  <label key={it.lineId} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!!receiveChecked[it.lineId]}
+                      onChange={(e) => setReceiveChecked((m: any) => ({ ...m, [it.lineId]: e.target.checked }))}
+                    />
+                    <span className="flex-1 text-sm">
+                      {it.name} • Төлөвлөсөн: {it.expectedQty}
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={it.expectedQty}
+                      value={receiveQty[it.lineId] ?? it.expectedQty}
+                      onChange={(e) =>
+                        setReceiveQty((m: any) => ({ ...m, [it.lineId]: Math.max(0, Number(e.target.value || 0)) }))
+                      }
+                      className="h-8 w-20 border rounded-md px-2"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Бараа үүсгэх формын энгийн mock
+function ProductCreateForm({ cats, branches }: { cats: Category[]; branches: string[] }) {
+  const [name, setName] = useState('');
+  const [sku, setSku] = useState('');
+  const [price, setPrice] = useState<number | ''>('');
+  const [cat, setCat] = useState<string>(cats[0]?.id || '');
+  const [branch, setBranch] = useState<string>(branches[0] || '');
+  return (
+    <form
+      className="grid gap-3 max-w-xl"
+      onSubmit={(e) => {
+        e.preventDefault();
+        toast.success(`Mock: "${name}" (${sku}) үнэ ${price || 0} — ${branch} / ${cat}`);
+        setName(''); setSku(''); setPrice('');
+      }}
+    >
+      <div className="grid gap-1">
+        <label className="text-sm">Нэр</label>
+        <input className="h-10 border rounded-md px-3" value={name} onChange={e => setName(e.target.value)} required />
+      </div>
+      <div className="grid gap-1">
+        <label className="text-sm">SKU</label>
+        <input className="h-10 border rounded-md px-3" value={sku} onChange={e => setSku(e.target.value)} required />
+      </div>
+      <div className="grid gap-1">
+        <label className="text-sm">Үнэ</label>
+        <input className="h-10 border rounded-md px-3" type="number" value={price} onChange={e => setPrice(Number(e.target.value))} required />
+      </div>
+      <div className="grid gap-1">
+        <label className="text-sm">Ангилал</label>
+        <select className="h-10 border rounded-md px-3" value={cat} onChange={e => setCat(e.target.value)}>
+          {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <div className="grid gap-1">
+        <label className="text-sm">Салбар</label>
+        <select className="h-10 border rounded-md px-3" value={branch} onChange={e => setBranch(e.target.value)}>
+          {branches.map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
+      </div>
+      <button className="h-10 rounded-md bg-[#5AA6FF] text-white">Mock хадгалах</button>
+    </form>
+  );
+}
+
+/** ---------------------------- LOCAL HELPERS --------------------------- */
+function toProducts(rows: ProductRow[]) { return rows; }
+
+/** ------------------------------ CONSTANTS ----------------------------- */
 const K_STORE = 'inv_store';
 const K_MODE  = 'inv_mode';
 const K_CAT   = 'inv_cat';
 const K_Q     = 'inv_q';
 
+/** ========================= MAIN PAGE (MOCKED) ========================= */
 export default function InventoryDetailPage() {
   const router = useRouter();
 
   // DATA
-  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
+  const [stores, setStores] = useState<StoreRow[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
-  const [products, setProducts] = useState<ProductStockSummary[]>([]);
+  const [products, setProducts] = useState<ProductRow[]>([]);
   const [incoming, setIncoming] = useState<any[]>([]);
 
   // SELECTION
@@ -65,11 +348,11 @@ export default function InventoryDetailPage() {
   const [receiveQty, setReceiveQty] = useState<Record<string, number>>({});
 
   // UX
-  const [booting, setBooting] = useState(true);             // stores + categories
+  const [booting, setBooting] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingIncoming, setLoadingIncoming] = useState(false);
-  const [busy, setBusy] = useState(false);                  // submit/create-cat
-  const [catDialogOpen, setCatDialogOpen] = useState(false);// ⬅️ шинэ
+  const [busy, setBusy] = useState(false);
+  const [catDialogOpen, setCatDialogOpen] = useState(false);
 
   const searchRef = useRef<HTMLInputElement | null>(null);
 
@@ -81,8 +364,17 @@ export default function InventoryDetailPage() {
     () => (activeCatId ? catHelpers.getDescendantIds(activeCatId) : undefined),
     [catHelpers, activeCatId]
   );
-  const currentCat = activeCatId ? catHelpers.byId.get(activeCatId) || null : null;
-  const productsForList = useMemo(() => toProducts(products), [products]);
+  const currentCat = activeCatId ? (catHelpers.byId.get(activeCatId) ?? null) : null;
+  const productsForList = useMemo(() => {
+    // Client талын filter — search & category
+    let rows = toProducts(products);
+    if (filterCatIds) rows = rows.filter(r => r.categoryId && filterCatIds.includes(r.categoryId));
+    if (debouncedQ) {
+      const ql = debouncedQ.toLowerCase();
+      rows = rows.filter(r => r.name.toLowerCase().includes(ql) || r.code.toLowerCase().includes(ql));
+    }
+    return rows;
+  }, [products, filterCatIds, debouncedQ]);
 
   // RESTORE
   useEffect(() => {
@@ -104,14 +396,15 @@ export default function InventoryDetailPage() {
     (async () => {
       try {
         setBooting(true);
-        const [s, c] = await Promise.all([getStore(), listCategories()]);
+        const [s, c, p] = await Promise.all([listStores(), listCategories(), getProduct()]);
         if (cancelled) return;
         setStores(s);
         setCats(c);
+        setProducts(p);
         setStoreId((prev) => prev || s[0]?.id || '');
         setTransferToStoreId(s[1]?.id || s[0]?.id || '');
       } catch {
-        toast.error('Салбар/Ангилал ачааллахад алдаа гарлаа');
+        toast.error('Mock: Салбар/Ангилал/Бараа ачааллахад алдаа гарлаа');
       } finally {
         if (!cancelled) setBooting(false);
       }
@@ -131,30 +424,23 @@ export default function InventoryDetailPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  // LOAD PRODUCTS
-useEffect(() => {
-  if (!storeId) return;
-  let cancelled = false;
-  (async () => {
-    try {
-      setLoadingProducts(true);
-      const rows = await listProducts({
-        storeId,
-        categoryIds: filterCatIds,
-        q: debouncedQ || undefined
-      }); // rows: ProductStockSummary[]
-      if (!cancelled) {
-        console.log('product rows', rows);
-        setProducts(rows); // raw хэлбэрээр хадгалж байна
+  // LOAD PRODUCTS (mock — p already loaded; re-filter only)
+  useEffect(() => {
+    if (!storeId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingProducts(true);
+        const rows = await getProduct(); // real API-д token, filters г.м дамжуулна
+        if (!cancelled) setProducts(rows);
+      } catch {
+        toast.error('Mock: Бүтээгдэхүүн ачааллахад алдаа гарлаа');
+      } finally {
+        if (!cancelled) setLoadingProducts(false);
       }
-    } catch {
-      toast.error('Бүтээгдэхүүн ачааллахад алдаа гарлаа');
-    } finally {
-      if (!cancelled) setLoadingProducts(false);
-    }
-  })();
-  return () => { cancelled = true; };
-}, [storeId, filterCatIds, debouncedQ]);
+    })();
+    return () => { cancelled = true; };
+  }, [storeId, filterCatIds, debouncedQ]);
 
   // LOAD INCOMING (receive)
   useEffect(() => {
@@ -166,7 +452,7 @@ useEffect(() => {
         const rows = await listIncomingTransfers(storeId);
         if (!cancelled) setIncoming(rows);
       } catch {
-        toast.error('Шилжүүлэг ачааллахад алдаа гарлаа');
+        toast.error('Mock: Шилжүүлэг ачааллахад алдаа гарлаа');
       } finally {
         if (!cancelled) setLoadingIncoming(false);
       }
@@ -222,9 +508,7 @@ useEffect(() => {
   }, [incoming, receiveChecked, receiveQty]);
 
   // ACTIONS
-  function openCategoryDialog() {
-    setCatDialogOpen(true);
-  }
+  function openCategoryDialog() { setCatDialogOpen(true); }
 
   async function handleSubmit() {
     if (!storeId || storeId === 'all') {
@@ -241,7 +525,7 @@ useEffect(() => {
         if (!items.length) { toast.message('Тоолох бараа оруулна уу'); return; }
         await apiCountSubmit({ storeId, items });
         setCountMap({});
-        toast.success('Тооллого илгээгдлээ');
+        toast.success('Mock: Тооллого илгээгдлээ');
       }
 
       if (mode === 'transfer') {
@@ -252,7 +536,7 @@ useEffect(() => {
         if (!transferToStoreId || transferToStoreId === storeId) { toast.error('Өөр салбар сонгоно уу'); return; }
         await apiTransferSubmit({ fromStoreId: storeId, toStoreId: transferToStoreId, items });
         setTransferMap({});
-        toast.success('Шилжүүлэг үүсгэгдлээ');
+        toast.success('Mock: Шилжүүлэг үүсгэгдлээ');
       }
 
       if (mode === 'receive') {
@@ -274,10 +558,10 @@ useEffect(() => {
         setReceiveChecked({}); setReceiveQty({}); setOpenTransfers({});
         const rows = await listIncomingTransfers(storeId);
         setIncoming(rows);
-        toast.success('Хүлээн авалт бүртгэгдлээ');
+        toast.success('Mock: Хүлээн авалт бүртгэгдлээ');
       }
     } catch {
-      toast.error('Үйлдэл амжилтгүй боллоо');
+      toast.error('Mock: Үйлдэл амжилтгүй боллоо');
     } finally {
       setBusy(false);
     }
@@ -285,17 +569,7 @@ useEffect(() => {
 
   const goToDashboard = () => router.back();
 
-  useEffect(() => {
-    async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.replace('/login');
-      }
-    }
-    checkAuth();
-  }, [router]);
-
-  // ---------- UI ----------
+  /** ------------------------------- UI ------------------------------- */
   return (
     <div className="min-h-svh bg-[#F7F7F5] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8 min-h-svh flex flex-col gap-3">
@@ -404,7 +678,7 @@ useEffect(() => {
         {/* Column headers */}
         {mode !== 'receive' && mode !== 'create' && (
           <div className="px-1 sm:px-5 text-sm font-medium flex justify-between">
-            <span>Бүтээгдэхүүн {(!loadingProducts && products.length) ? `(${products.length})` : ''}</span>
+            <span>Бүтээгдэхүүн {(!loadingProducts && productsForList.length) ? `(${productsForList.length})` : ''}</span>
             <span>{mode === 'view' ? 'Нөөц' : mode === 'count' ? 'Тоо' : mode === 'transfer' ? 'Шилж.тоо' : ''}</span>
           </div>
         )}
@@ -447,7 +721,7 @@ useEffect(() => {
                   </div>
                 ))}
               </div>
-            ) : products.length === 0 ? (
+            ) : productsForList.length === 0 ? (
               <div className="text-center py-16 text-sm text-black/60">
                 Илэрц олдсонгүй. Шүүлтээ өөрчилж үзнэ үү, эсвэл
                 <button onClick={() => setMode('create')} className="ml-2 underline underline-offset-4">
@@ -467,8 +741,6 @@ useEffect(() => {
           )}
 
           {mode === 'create' && (
-            console.log("cats in create",cats),
-            console.log("stores in create",stores),
             <ProductCreateForm cats={cats} branches={stores.map((s) => s.name)} />
           )}
         </div>
@@ -537,7 +809,7 @@ useEffect(() => {
             const c = await listCategories();
             setCats(c);
             setActiveCatId(newCatId ?? activeCatId ?? null);
-            toast.success('Ангилал нэмэгдлээ');
+            toast.success('Ангилал нэмэгдлээ (mock)');
           }}
         />
       )}
@@ -549,6 +821,7 @@ useEffect(() => {
   );
 }
 
+/** ------------------------- CATEGORY RAIL / DIALOG ------------------------- */
 function CategoryRail({
   breadcrumb,
   currentCat,
@@ -639,7 +912,6 @@ function CategoryRail({
   );
 }
 
-
 function CategoryCreateDialog({
   open,
   onClose,
@@ -661,16 +933,14 @@ function CategoryCreateDialog({
   async function submit() {
     try {
       const tenantId = await getTenantId();
-      if (!tenantId) {
-        throw new Error('TENANT_ID_MISSING');
-}
-      setSaving(true);
+      if (!tenantId) throw new Error('TENANT_ID_MISSING');
 
+      setSaving(true);
       if (mode === 'single') {
         const created = await apiCategoryCreate({ tenantId, name: name.trim(), parentId });
         onCreated(created.id);
       } else {
-        const segs = path.split('/').map(s => s.trim()).filter(Boolean);
+        const segs = path.split('/').map((s) => s.trim()).filter(Boolean);
         if (!segs.length) { toast.message('Замыг зөв оруулна уу (A/B/C)'); setSaving(false); return; }
         let parent = parentId ?? null;
         let lastId: string | undefined;
@@ -685,8 +955,9 @@ function CategoryCreateDialog({
       setName('');
       setPath('');
       onClose();
+      toast.success('Mock: Ангилал нэмэгдлээ');
     } catch (e: any) {
-      toast.error(e?.message || 'Ангилал нэмэхэд алдаа гарлаа');
+      toast.error(e?.message || 'Mock: Ангилал нэмэхэд алдаа гарлаа');
     } finally {
       setSaving(false);
     }
