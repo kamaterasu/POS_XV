@@ -1,18 +1,68 @@
+import { get } from "http";
 import { getAccessToken } from "../helper/getAccessToken";
 import { getTenantId } from "../helper/getTenantId";
-export async function getStore(store_id?: string) {
-  const token = await getAccessToken();
-  const tenant_id = await getTenantId();
-  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}&id=${store_id || ''}`);
+import { jwtDecode } from "jwt-decode";
+// export async function getStore(store_id?: string) {
+//   const token = await getAccessToken();
+//   const tenant_id = await getTenantId();
+//   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}&id=${store_id || ''}`);
+//   const res = await fetch(url.toString(), {
+//     method: "GET",
+//     headers: {
+//       Authorization: `Bearer ${token}`,
+//     },
+//   });zz
+//   return res.json();
+// }
+export async function getStoredID(token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/tenant?id=${tenant_id}&withStores=true`
+  );
+
   const res = await fetch(url.toString(), {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
-  return res.json();
+
+  const response = await res.json();
+  const store_id = response?.stores?.[0]?.id;
+
+  return store_id;
 }
 
+export async function getStore(token: string) {
+  const decoded: any = jwtDecode(token);
+  console.log("Decoded token:", decoded);
+  const tenant_id = decoded.app_metadata.tenants?.[0];
+  const role = decoded.app_metadata.role;
+  if (role !== 'OWNER' && role !== 'MANAGER') {
+    const store_id = await getStoredID(token);
+    const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}&id=${store_id}`);
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log("Response status:", res);
+    const data = await res.json();
+    return { ...data, role };
+  } else {
+    const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/store?tenant_id=${tenant_id}`
+  );
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  console.log("Response status:", res);
+
+  const data = await res.json();
+  return { ...data, role };
+  }
+}
 export async function createStore(names: string[]){
   const token = await getAccessToken();
   const tenant_id = await getTenantId();

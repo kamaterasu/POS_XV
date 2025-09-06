@@ -14,7 +14,7 @@ import ProductCreateForm from '@/components/inventoryComponents/ProductCreateFor
 
 import { listProducts, type ProductStockSummary, toProducts } from '@/lib/product/productSummary';
 import {listCategories, type Category } from '@/lib/category/categoryApi';
-import { listStores, type StoreRow } from '@/lib/store/storeApi';
+import { getStore } from '@/lib/store/storeApi';
 
 import {
   listIncomingTransfers,
@@ -104,7 +104,7 @@ export default function InventoryDetailPage() {
     (async () => {
       try {
         setBooting(true);
-        const [s, c] = await Promise.all([listStores(), listCategories()]);
+        const [s, c] = await Promise.all([getStore(), listCategories()]);
         if (cancelled) return;
         setStores(s);
         setCats(c);
