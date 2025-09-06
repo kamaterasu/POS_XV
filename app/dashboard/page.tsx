@@ -11,11 +11,13 @@ import { IoExitOutline } from "react-icons/io5";
 import type { IconType } from "react-icons";
 import { supabase } from '@/lib/supabaseClient';
 import { Loading } from '@/components/Loading';
+// import { getTenant, getTenantWithStore, createTenant, updateTenant, deleteTenant } from '@/lib/tenant/tenantApi';
+// const tenant = await getTenant();
+// const tenantStore = await getTenantWithStore(tenant.items?.[0]?.id);
 
 export default function DashboardPage() {
   const router = useRouter();
-
-    useEffect(() => {
+  useEffect(() => {
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -26,8 +28,6 @@ export default function DashboardPage() {
   }, [router]);
 
   const [loading, setLoading] = useState(true);
-
-  
 
   const goTocheckout = () => router.push('/checkout');
   const goToInventory = () => router.push('/inventory');
@@ -51,7 +51,14 @@ export default function DashboardPage() {
     const t = setTimeout(() => setLoading(false), 1200);
     return () => clearTimeout(t);
   }, []);
-
+  // useEffect(() => {
+  //   // console.log("Tenant API:");
+  //   // console.log(token);
+  //   // console.log(tenant);
+  //   // console.log(tenantStore);
+  //   // updateTenant(tenant.items?.[0]?.id, "New Name").then(res => console.log(res));
+  //   // deleteTenant(tenant.items?.[0]?.id).then(res => console.log(res));
+  // })
   return (
     <div className="min-h-dvh bg-[#F7F7F5]">
       <div className="mx-auto max-w-screen-xl p-4 sm:p-6 lg:p-8 min-h-dvh flex flex-col gap-6">
@@ -63,11 +70,11 @@ export default function DashboardPage() {
           </button>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <CardBtn onClick={goTocheckout}         Icon={BiTransferAlt}     label="Борлуулалт" />
-            <CardBtn onClick={goToInventory}   Icon={LiaListAlt}        label="Агуулах" />
+            <CardBtn onClick={goTocheckout} Icon={BiTransferAlt} label="Борлуулалт" />
+            <CardBtn onClick={goToInventory} Icon={LiaListAlt} label="Агуулах" />
             <CardBtn onClick={goToProductReturn} Icon={FaArrowRotateLeft} label="Буцаалт" disabled />
-            <CardBtn onClick={goToReport}        Icon={VscGraph}          label="Тайлан"  disabled />
-            <CardBtn onClick={goToManagement}       Icon={FaRegUser}         label="Хяналт" />
+            <CardBtn onClick={goToReport} Icon={VscGraph} label="Тайлан" disabled />
+            <CardBtn onClick={goToManagement} Icon={FaRegUser} label="Хяналт" />
           </div>
         </div>
 

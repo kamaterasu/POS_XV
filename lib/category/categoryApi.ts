@@ -1,4 +1,3 @@
-'use client';
 import { getAccessToken } from '@/lib/helper/getAccessToken';
 import { getTenantId } from '@/lib/helper/getTenantId';
 
