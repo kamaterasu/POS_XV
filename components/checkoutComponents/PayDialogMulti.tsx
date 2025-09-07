@@ -8,6 +8,7 @@ export default function PayDialogMulti({
   onClose,
   total,
   onPaidMulti,
+  disabled = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -17,6 +18,7 @@ export default function PayDialogMulti({
     totalReceived: number,
     change: number
   ) => void;
+  disabled?: boolean;
 }) {
   const [rows, setRows] = useState<PaymentRow[]>([
     { method: "cash", amount: 0 },
@@ -38,6 +40,7 @@ export default function PayDialogMulti({
   const change = Math.max(0, totalReceived - total);
   const remaining = Math.max(0, total - totalReceived);
   const canConfirm =
+    !disabled &&
     totalReceived >= total &&
     rows.length > 0 &&
     rows.every((r) => (r.amount ?? 0) >= 0);
@@ -75,10 +78,17 @@ export default function PayDialogMulti({
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white text-black w-full max-w-md rounded-xl shadow-xl p-4">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-base font-semibold">Төлбөр төлөх (олон төрөл)</h2>
+          <h2 className="text-base font-semibold">
+            {disabled
+              ? "Захиалга боловсруулж байна..."
+              : "Төлбөр төлөх (олон төрөл)"}
+          </h2>
           <button
             onClick={onClose}
-            className="text-black/60 hover:text-black text-sm"
+            disabled={disabled}
+            className={`text-black/60 hover:text-black text-sm ${
+              disabled ? "cursor-not-allowed opacity-50" : ""
+            }`}
           >
             ✕
           </button>
@@ -93,6 +103,7 @@ export default function PayDialogMulti({
               <select
                 className="h-9 border rounded px-2 bg-white"
                 value={r.method}
+                disabled={disabled}
                 onChange={(e) =>
                   setRow(i, { method: e.target.value as PaymentRow["method"] })
                 }
@@ -110,6 +121,7 @@ export default function PayDialogMulti({
                 inputMode="numeric"
                 className="h-9 border rounded px-3 bg-white"
                 value={r.amount ?? 0}
+                disabled={disabled}
                 onChange={(e) =>
                   setRow(i, { amount: Number(e.target.value || 0) })
                 }
@@ -121,6 +133,7 @@ export default function PayDialogMulti({
               <button
                 className="h-9 border rounded bg-[#F4F4F4] hover:bg-[#ececec]"
                 onClick={() => removeRow(i)}
+                disabled={disabled}
                 title="Remove"
               >
                 –
@@ -132,18 +145,21 @@ export default function PayDialogMulti({
             <button
               className="h-9 px-3 border rounded bg-[#F4F4F4] hover:bg-[#ececec]"
               onClick={() => addRow("card")}
+              disabled={disabled}
             >
               + Карт
             </button>
             <button
               className="h-9 px-3 border rounded bg-[#F4F4F4] hover:bg-[#ececec]"
               onClick={() => addRow("qpay")}
+              disabled={disabled}
             >
               + QPay
             </button>
             <button
               className="h-9 px-3 border rounded bg-[#F4F4F4] hover:bg-[#ececec]"
               onClick={() => addRow("cash")}
+              disabled={disabled}
             >
               + Бэлэн
             </button>
@@ -163,7 +179,7 @@ export default function PayDialogMulti({
                   return copy;
                 });
               }}
-              disabled={remaining === 0}
+              disabled={remaining === 0 || disabled}
             >
               Үлдэгдэл {fmt(remaining)}
             </button>
@@ -195,6 +211,7 @@ export default function PayDialogMulti({
           <button
             className="h-9 px-4 border rounded bg-white hover:bg-[#fafafa]"
             onClick={onClose}
+            disabled={disabled}
           >
             Болих
           </button>
@@ -207,7 +224,7 @@ export default function PayDialogMulti({
             disabled={!canConfirm}
             onClick={handleConfirm}
           >
-            Батлах
+            {disabled ? "Хүлээнэ үү..." : "Батлах"}
           </button>
         </div>
       </div>

@@ -9,17 +9,21 @@ export type Item = {
 };
 
 export type Draft = {
-  id: string;         // timestamp эсвэл uuid
-  title: string;      // ж: "Захиалга - 12:30"
+  id: string; // timestamp эсвэл uuid
+  title: string; // ж: "Захиалга - 12:30"
   items: Item[];
-  createdAt: string;  // ISO
+  createdAt: string; // ISO
   notes?: string;
 };
 
-export type PaymentRow = { method: 'cash' | 'card' | 'qpay'; amount: number; ref?: string };
+export type PaymentRow = {
+  method: "cash" | "card" | "qpay" | "wallet" | "other";
+  amount: number;
+  ref?: string;
+};
 
 export type QuickActions = {
   discountPercent: number; // 0..100
-  includeVAT: boolean;     // НӨАТ 10%
-  deliveryFee: number;     // хүргэлт
-}
+  includeVAT: boolean; // НӨАТ 10%
+  deliveryFee: number; // хүргэлт
+};

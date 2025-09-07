@@ -3,9 +3,13 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-import { Item, QuickActions } from "@/lib/sales/salesTypes";
+import { Item, QuickActions, PaymentRow } from "@/lib/sales/salesTypes";
 import { listProducts } from "@/lib/product/productApi";
 import { fmt, calcTotals } from "@/lib/sales/salesUtils";
+import {
+  createCheckoutOrder,
+  getCheckoutOrders,
+} from "@/lib/checkout/checkoutApi";
 
 /** ===== Product type for API response ===== */
 type ProductFromAPI = {
@@ -21,6 +25,7 @@ import AddItemModal from "@/components/checkoutComponents/AddItemModal";
 import QuickActionsSheet from "@/components/checkoutComponents/QuickActionsSheet";
 import SaveDraftDialog from "@/components/checkoutComponents/SaveDraftDialog";
 import PayDialogMulti from "@/components/checkoutComponents/PayDialogMulti";
+import CheckoutHistoryDialog from "@/components/checkoutComponents/CheckoutHistoryDialog";
 
 /** ===== Favorites types (энд локалд барина) ===== */
 type FavVariant = {
@@ -57,6 +62,11 @@ export default function CheckoutPage() {
   const [openQuick, setOpenQuick] = useState(false);
   const [openSave, setOpenSave] = useState(false);
   const [openPay, setOpenPay] = useState(false);
+  const [openHistory, setOpenHistory] = useState(false);
+
+  // checkout states
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
 
   // favorites (түр listProducts-оос үүсгэнэ)
   const [favorites, setFavorites] = useState<FavoriteProduct[]>([]);
@@ -115,6 +125,80 @@ export default function CheckoutPage() {
 
   const goToDashboard = () => router.push("/dashboard");
 
+  /** Handle successful payment */
+  const handleCheckout = async (
+    paymentRows: PaymentRow[],
+    totalReceived: number,
+    change: number
+  ) => {
+    if (items.length === 0) {
+      alert("Захиалгад бүтээгдэхүүн нэмнэ үү");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      // Calculate tax and discount
+      const tax = qa.includeVAT ? Math.round(totals.grand * 0.1) : 0;
+      const discount = Math.round(totals.discount);
+
+      // Create the order
+      const result = await createCheckoutOrder(items, paymentRows, {
+        tax,
+        discount,
+      });
+
+      if (result) {
+        setLastOrderId(result.order.id);
+
+        // Clear the cart
+        setItems([]);
+
+        // Reset quick actions
+        setQa({
+          discountPercent: 0,
+          deliveryFee: 0,
+          includeVAT: false,
+        });
+
+        // Close pay dialog
+        setOpenPay(false);
+
+        // Show success message and redirect to receipt
+        alert(
+          `Захиалга амжилттай хадгалагдлаа! Order ID: ${result.order.id.slice(
+            -8
+          )}`
+        );
+
+        // Redirect to receipt page
+        router.push(`/receipt?orderId=${result.order.id}`);
+      }
+    } catch (error) {
+      console.error("Checkout error:", error);
+
+      let errorMessage = "Тодорхойгүй алдаа";
+
+      if (error instanceof Error) {
+        if (error.message.includes("tenant_id")) {
+          errorMessage =
+            "Танд байгууллагын эрх байхгүй байна. Дахин нэвтэрнэ үү.";
+        } else if (error.message.includes("store_id")) {
+          errorMessage =
+            "Танд дэлгүүрийн эрх байхгүй байна. Админтай холбогдоно уу.";
+        } else if (error.message.includes("NOT_AUTHENTICATED")) {
+          errorMessage = "Нэвтрэх шаардлагатай. Дахин нэвтэрнэ үү.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      alert(`Захиалга үүсгэхэд алдаа гарлаа: ${errorMessage}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 flex flex-col gap-4">
       <header>
@@ -137,8 +221,7 @@ export default function CheckoutPage() {
           </svg>
           <span className="font-medium text-gray-900">Борлуулалт</span>
         </button>
-      </header>
-
+      </header>{" "}
       <main className="flex-1 flex flex-col text-black">
         <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-6 py-3 mb-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm text-sm text-gray-900 font-medium">
           <span>Бүтээгдэхүүн</span>
@@ -254,16 +337,15 @@ export default function CheckoutPage() {
           </div>
         </div>
       </main>
-
       <footer>
         <CartFooter
           onQuick={() => setOpenQuick(true)}
           onAdd={() => setOpenAdd(true)}
           onSave={() => setOpenSave(true)}
           onPay={() => setOpenPay(true)}
+          onHistory={() => setOpenHistory(true)}
         />
       </footer>
-
       {/* Add item */}
       <AddItemModal
         open={openAdd}
@@ -286,7 +368,6 @@ export default function CheckoutPage() {
           })
         }
       />
-
       {/* Quick actions + favorites */}
       {/* <QuickActionsSheet
         open={openQuick}
@@ -318,14 +399,21 @@ export default function CheckoutPage() {
         onClose={() => setOpenSave(false)}
         items={items}
       />
-
       {/* Pay */}
       <PayDialogMulti
         open={openPay}
-        onClose={() => setOpenPay(false)}
+        onClose={() => !isProcessing && setOpenPay(false)}
         total={totals.grand}
-        onPaidMulti={(rows, totalReceived, change) => {
-          console.log("PAID", rows, totalReceived, change);
+        onPaidMulti={handleCheckout}
+        disabled={isProcessing}
+      />
+      {/* Checkout History */}
+      <CheckoutHistoryDialog
+        open={openHistory}
+        onClose={() => setOpenHistory(false)}
+        onSelectOrder={(order) => {
+          // Optionally redirect to receipt page for selected order
+          router.push(`/receipt?orderId=${order.id}`);
         }}
       />
     </div>

@@ -132,6 +132,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              Эрх:
               {userRole && (
                 <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium shadow-lg">
                   {userRole}
@@ -139,13 +140,14 @@ export default function DashboardPage() {
               )}
               <button
                 onClick={handleLogout}
-                className="group p-2 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200 shadow-sm hover:shadow-md hover:bg-red-50 transition-all duration-200 active:scale-95"
+                className="group p-2 rounded-xl flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-sm hover:shadow-md hover:bg-red-50 transition-all duration-200 active:scale-95"
                 title="Системээс гарах"
               >
                 <IoExitOutline
                   size={20}
                   className="text-gray-600 group-hover:text-red-600 transition-colors"
                 />
+                <span className="text-sm text-gray-600">Гарах</span>
               </button>
             </div>
           </div>
