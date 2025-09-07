@@ -6,15 +6,23 @@ import Image from 'next/image';
 export type ProductStockSummary = {
   id: string;
   name: string;
+  sku?: string;
   qty?: number;
-  variants: Array<{
-    variantId: string;
+  price?: number;
+  cost?: number;
+  category?: string;
+  description?: string;
+  image?: string;
+  variants?: Array<{
+    id: string;
     name: string;
     sku: string;
-    attrs: Record<string, string>;
     price: number;
-    qty: number;
+    cost: number;
+    stock: number;
+    attrs?: Record<string, string>;
   }>;
+  totalStock?: number;
 };
 
 type Movement = { ts: string; text: string; delta: number };
