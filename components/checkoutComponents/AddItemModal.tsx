@@ -1,9 +1,9 @@
-'use client';
-import { useMemo, useState } from 'react';
-import { Item } from '@/lib/sales/salesType';
-import { FiHeart } from 'react-icons/fi';
-import { FaShoppingCart } from 'react-icons/fa';
-import Image from 'next/image';
+"use client";
+import { useMemo, useState } from "react";
+import { Item } from "@/lib/sales/salesTypes";
+import { FiHeart } from "react-icons/fi";
+import { FaShoppingCart } from "react-icons/fa";
+import Image from "next/image";
 
 type Variant = { color: string; size: string; stock: number; price: number };
 type Product = {
@@ -15,15 +15,15 @@ type Product = {
 
 const defaultCatalog: Product[] = [
   {
-    id: 'p1',
-    name: 'Бараа 1',
-    img: '',
+    id: "p1",
+    name: "Бараа 1",
+    img: "",
     variants: [
-      { color: 'Цэнхэр', size: '3XL', stock: 2, price: 200000 },
-      { color: 'Цэнхэр', size: '2XL', stock: 1, price: 200000 },
-      { color: 'Хар', size: 'XL', stock: 5, price: 200000 },
-      { color: 'Цайвар', size: 'L', stock: 0, price: 200000 },
-      { color: 'Хар', size: 'M', stock: 3, price: 200000 },
+      { color: "Цэнхэр", size: "3XL", stock: 2, price: 200000 },
+      { color: "Цэнхэр", size: "2XL", stock: 1, price: 200000 },
+      { color: "Хар", size: "XL", stock: 5, price: 200000 },
+      { color: "Цайвар", size: "L", stock: 0, price: 200000 },
+      { color: "Хар", size: "M", stock: 3, price: 200000 },
     ],
   },
 ];
@@ -39,8 +39,10 @@ export default function AddItemModal({
   onAdd: (it: Item) => void;
   catalog?: Product[];
 }) {
-  const [query, setQuery] = useState('');
-  const [activeId, setActiveId] = useState<string | null>(catalog[0]?.id ?? null);
+  const [query, setQuery] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(
+    catalog[0]?.id ?? null
+  );
 
   const active = useMemo(
     () => catalog.find((p) => p.id === activeId) ?? null,
@@ -60,8 +62,15 @@ export default function AddItemModal({
   const [selSize, setSelSize] = useState<string | null>(null);
   const [qty, setQty] = useState<number>(1);
 
-  const resetSelection = () => { setSelColor(null); setSelSize(null); setQty(1); };
-  const selectProduct = (id: string) => { setActiveId(id); resetSelection(); };
+  const resetSelection = () => {
+    setSelColor(null);
+    setSelSize(null);
+    setQty(1);
+  };
+  const selectProduct = (id: string) => {
+    setActiveId(id);
+    resetSelection();
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -71,7 +80,10 @@ export default function AddItemModal({
 
   const selectedVariant: Variant | null = useMemo(() => {
     if (!active || !selColor || !selSize) return null;
-    return active.variants.find((v) => v.color === selColor && v.size === selSize) ?? null;
+    return (
+      active.variants.find((v) => v.color === selColor && v.size === selSize) ??
+      null
+    );
   }, [active, selColor, selSize]);
 
   const remaining = selectedVariant?.stock ?? 0;
@@ -80,13 +92,15 @@ export default function AddItemModal({
   const handleAdd = () => {
     if (!canAdd || !active || !selectedVariant) return;
     onAdd({
-      id: `${active.id}-${selectedVariant.color}-${selectedVariant.size}-${Date.now()}`,
+      id: `${active.id}-${selectedVariant.color}-${
+        selectedVariant.size
+      }-${Date.now()}`,
       name: active.name,
       qty,
       price: selectedVariant.price,
       size: selectedVariant.size,
       color: selectedVariant.color,
-      imgPath: active.img || '/default.png',
+      imgPath: active.img || "/default.png",
     });
   };
 
@@ -94,87 +108,198 @@ export default function AddItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-end md:items-center justify-center p-0 overscroll-contain text-black"
+      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/40 via-blue-900/40 to-indigo-900/40 backdrop-blur-sm flex items-end md:items-center justify-center p-0 overscroll-contain text-black"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
         className="
-          w-full max-w-5xl bg-white
+          w-full max-w-5xl bg-white/95 backdrop-blur-md
           h-[90dvh] md:h-auto md:max-h-[90vh]
-          rounded-t-2xl md:rounded-2xl
-          shadow-lg flex flex-col overflow-hidden
+          rounded-t-3xl md:rounded-3xl
+          shadow-2xl border border-white/20 flex flex-col overflow-hidden
         "
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-3 md:p-4 border-b shrink-0">
-          <div className="text-lg font-semibold">Борлуулалт — Бүтээгдэхүүн</div>
+        <div className="p-6 border-b border-gray-200/50 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                  />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Бүтээгдэхүүн сонгох
+              </h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+            >
+              <svg
+                className="w-5 h-5 text-gray-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* LEFT */}
-            <div className="border rounded-lg overflow-hidden flex flex-col h-full">
-              <div className="p-3 border-b shrink-0">
-                <input
-                  className="h-10 w-full border rounded px-3"
-                  placeholder="Хайх: нэр, код"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <div className="flex flex-wrap gap-2 mt-2 text-[12px]">
-                  {['Бүгд', 'Гутал', 'Амал драк хүргэв', 'Цамц', 'Цүнх'].map((t, i) => (
-                    <span
-                      key={t}
-                      className={
-                        'px-2 py-1 rounded border ' +
-                        (i === 0 ? 'bg-[#EAF2FF] border-[#CFE3FF] text-[#1A274F]' : 'bg-white')
-                      }
-                    >
-                      {t}
-                    </span>
-                  ))}
+            <div className="bg-white/60 backdrop-blur-sm border border-white/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-sm">
+              <div className="p-4 border-b border-gray-200/50 shrink-0">
+                <div className="relative">
+                  <input
+                    className="h-12 w-full border-2 border-gray-200 rounded-xl px-4 pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                    placeholder="Хайх: нэр, код"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <svg
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {["Бүгд", "Гутал", "Амал драк хүргэв", "Цамц", "Цүнх"].map(
+                    (t, i) => (
+                      <button
+                        key={t}
+                        className={
+                          "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 " +
+                          (i === 0
+                            ? "bg-blue-500 text-white shadow-md hover:bg-blue-600"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200")
+                        }
+                      >
+                        {t}
+                      </button>
+                    )
+                  )}
                 </div>
               </div>
 
               <div className="flex-1 overflow-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-[#FAFAFA] border-b">
+                  <thead className="sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium">Брэнд</th>
-                      <th className="text-right px-3 py-2 font-medium">Ширхэг</th>
+                      <th className="text-left px-4 py-3 font-semibold text-gray-700">
+                        Брэнд
+                      </th>
+                      <th className="text-right px-4 py-3 font-semibold text-gray-700">
+                        Ширхэг
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-gray-100">
                     {filtered.map((p) => {
-                      const totalStock = p.variants.reduce((s, v) => s + v.stock, 0);
+                      const totalStock = p.variants.reduce(
+                        (s, v) => s + v.stock,
+                        0
+                      );
                       const activeRow = p.id === active?.id;
                       return (
                         <tr
                           key={p.id}
                           className={
-                            'cursor-pointer hover:bg-[#F7F7F5] ' +
-                            (activeRow ? 'bg-[#F7F7F5]' : '')
+                            "cursor-pointer transition-all duration-200 " +
+                            (activeRow
+                              ? "bg-blue-50 border-l-4 border-blue-500"
+                              : "hover:bg-gray-50")
                           }
                           onClick={() => selectProduct(p.id)}
                         >
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded bg-[#EEE] overflow-hidden" />
-                              <span className="truncate">{p.name}</span>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 overflow-hidden flex items-center justify-center">
+                                <svg
+                                  className="w-4 h-4 text-blue-600"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                                  />
+                                </svg>
+                              </div>
+                              <span className="font-medium text-gray-900 truncate">
+                                {p.name}
+                              </span>
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-right">{totalStock}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                totalStock > 0
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {totalStock}
+                            </span>
+                          </td>
                         </tr>
                       );
                     })}
                     {filtered.length === 0 && (
                       <tr>
-                        <td className="px-3 py-6 text-sm text-black/60" colSpan={2}>
-                          Илэрц олдсонгүй.
+                        <td
+                          className="px-4 py-8 text-center text-gray-500"
+                          colSpan={2}
+                        >
+                          <div className="flex flex-col items-center gap-2">
+                            <svg
+                              className="w-8 h-8 text-gray-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33"
+                              />
+                            </svg>
+                            <span>Илэрц олдсонгүй.</span>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -182,14 +307,14 @@ export default function AddItemModal({
                 </table>
               </div>
 
-              <div className="p-3 shrink-0">
+              <div className="p-4 shrink-0 flex justify-center">
                 <button
                   type="button"
-                  className="relative h-12 w-12 rounded-full border shadow bg-white flex items-center justify-center"
+                  className="relative w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-200"
                   title="Сагс"
                 >
-                  <FaShoppingCart />
-                  <span className="absolute -top-1 -right-1 text-[11px] rounded-full bg-[#5AA6FF] text-white px-1">
+                  <FaShoppingCart className="w-6 h-6 text-white" />
+                  <span className="absolute -top-2 -right-2 w-6 h-6 text-xs rounded-full bg-red-500 text-white flex items-center justify-center font-bold shadow-lg">
                     1
                   </span>
                 </button>
@@ -197,29 +322,67 @@ export default function AddItemModal({
             </div>
 
             {/* RIGHT */}
-            <div className="border rounded-lg overflow-hidden flex flex-col h-full">
-              <div className="p-3 border-b shrink-0 flex items-start gap-3">
-                <div className="w-16 h-16 rounded bg-[#EFEFEF] flex items-center justify-center text-xs text-black/50 overflow-hidden">
+            <div className="bg-white/60 backdrop-blur-sm border border-white/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-sm">
+              <div className="p-6 border-b border-gray-200/50 shrink-0 flex items-start gap-4">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-sm text-gray-500 overflow-hidden shadow-sm">
                   {active?.img ? (
-                    <Image src={active.img} alt={active.name} className="object-cover w-full h-full" />
+                    <Image
+                      src={active.img}
+                      alt={active.name}
+                      className="object-cover w-full h-full"
+                      width={80}
+                      height={80}
+                    />
                   ) : (
-                    <span>Зураг</span>
+                    <svg
+                      className="w-8 h-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold">Нэр: {active?.name ?? '—'}</div>
-                  <div className="text-sm text-black/60">
-                    Нөөц: {active ? active.variants.reduce((s, v) => s + v.stock, 0) : 0}
+                  <h3 className="font-bold text-lg text-gray-900">
+                    {active?.name ?? "—"}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm text-gray-600">Нөөц:</span>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        (active
+                          ? active.variants.reduce((s, v) => s + v.stock, 0)
+                          : 0) > 0
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {active
+                        ? active.variants.reduce((s, v) => s + v.stock, 0)
+                        : 0}
+                    </span>
                   </div>
                 </div>
-                <button type="button" className="h-8 w-8 rounded-full border flex items-center justify-center">
-                  <FiHeart />
+                <button
+                  type="button"
+                  className="w-10 h-10 rounded-full bg-gray-100 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-all duration-200"
+                >
+                  <FiHeart className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-3 border-b shrink-0">
-                <div className="text-sm font-medium mb-2">Өнгө:</div>
-                <div className="flex gap-2">
+              <div className="p-6 border-b border-gray-200/50 shrink-0">
+                <div className="text-sm font-semibold mb-4 text-gray-900">
+                  Өнгө:
+                </div>
+                <div className="flex flex-wrap gap-3">
                   {colors.map((c) => {
                     const activeChip = selColor === c;
                     return (
@@ -228,25 +391,33 @@ export default function AddItemModal({
                         key={c}
                         onClick={() => setSelColor(c)}
                         className={
-                          'h-8 px-3 rounded-full border text-sm ' +
+                          "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 " +
                           (activeChip
-                            ? 'bg-[#1A274F] text-white border-[#1A274F]'
-                            : 'bg-white')
+                            ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-105"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200")
                         }
                       >
                         {c}
                       </button>
                     );
                   })}
-                  {colors.length === 0 && <span className="text-sm text-black/50">—</span>}
+                  {colors.length === 0 && (
+                    <span className="text-sm text-gray-500 italic">
+                      Өнгө байхгүй
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className="p-3 border-b shrink-0">
-                <div className="text-sm font-medium mb-2">Хэмжээ:</div>
-                <div className="flex flex-wrap gap-2">
+              <div className="p-6 border-b border-gray-200/50 shrink-0">
+                <div className="text-sm font-semibold mb-4 text-gray-900">
+                  Хэмжээ:
+                </div>
+                <div className="flex flex-wrap gap-3">
                   {sizes.map((s) => {
-                    const v = active?.variants.find((v) => v.size === s && (!selColor || v.color === selColor));
+                    const v = active?.variants.find(
+                      (v) => v.size === s && (!selColor || v.color === selColor)
+                    );
                     const disabled = !v || v.stock <= 0;
                     const activeChip = selSize === s;
                     return (
@@ -255,12 +426,12 @@ export default function AddItemModal({
                         key={s}
                         onClick={() => !disabled && setSelSize(s)}
                         className={
-                          'h-8 px-3 rounded-full border text-sm ' +
+                          "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 " +
                           (disabled
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
                             : activeChip
-                            ? 'bg-[#EAF2FF] border-[#CFE3FF] text-[#1A274F]'
-                            : 'bg-white')
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg scale-105"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200")
                         }
                         disabled={disabled}
                       >
@@ -268,65 +439,108 @@ export default function AddItemModal({
                       </button>
                     );
                   })}
-                  {sizes.length === 0 && <span className="text-sm text-black/50">—</span>}
+                  {sizes.length === 0 && (
+                    <span className="text-sm text-gray-500 italic">
+                      Хэмжээ байхгүй
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className="p-3 border-b shrink-0 text-sm">
-                <div className="text-black/60">Сонгосон хувилбар:</div>
-                <div className="font-medium">
-                  {selColor && selSize ? `${selColor} / ${selSize}` : '—'}
-                </div>
-                {selectedVariant && (
-                  <div className="mt-1">
-                    <a className="text-[#5AA6FF]" href="#!" onClick={(e)=>e.preventDefault()}>
-                      Боломжит: {remaining}
-                    </a>
+              <div className="p-6 border-b border-gray-200/50 shrink-0">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
+                  <div className="text-sm font-semibold text-gray-900 mb-2">
+                    Сонгосон хувилбар:
                   </div>
-                )}
+                  <div className="font-medium text-gray-800">
+                    {selColor && selSize
+                      ? `${selColor} / ${selSize}`
+                      : "Өнгө болон хэмжээ сонгоно уу"}
+                  </div>
+                  {selectedVariant && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span className="text-sm text-green-700 font-medium">
+                        Боломжит: {remaining} ширхэг
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* optional scrollable middle segment */}
-              <div className="flex-1 overflow-y-auto p-3">
+              <div className="flex-1 overflow-y-auto p-6">
                 {/* энд хүсвэл урт тайлбар/metadata байрлуулж болно */}
               </div>
 
-              <div className="p-3 shrink-0">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm text-black/60">Тоо</div>
-                  <div className="flex items-center gap-2">
+              <div className="p-6 shrink-0 bg-gradient-to-r from-gray-50 to-gray-100">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="text-sm font-semibold text-gray-900">
+                    Тоо ширхэг
+                  </div>
+                  <div className="flex items-center gap-3 bg-white rounded-full p-1 shadow-sm">
                     <button
                       type="button"
-                      className="w-8 h-8 rounded bg-[#EDEDED]"
+                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 flex items-center justify-center transition-colors duration-200"
                       onClick={() => setQty((q) => Math.max(1, q - 1))}
                     >
-                      –
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M20 12H4"
+                        />
+                      </svg>
                     </button>
-                    <span className="min-w-[28px] text-center text-sm border border-[#CFE3FF] bg-[#F2F7FF] rounded px-2 py-1">
+                    <span className="min-w-12 text-center text-lg font-bold text-gray-900 px-3">
                       {qty}
                     </span>
                     <button
                       type="button"
-                      className="w-8 h-8 rounded bg-[#5AA6FF] text-white disabled:opacity-50"
+                      className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors duration-200"
                       onClick={() => setQty((q) => Math.min(9999, q + 1))}
                       disabled={!selectedVariant || qty >= remaining}
                     >
-                      +
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
                     </button>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <button type="button" onClick={onClose} className="h-10 px-4 rounded border">Болих</button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 h-12 px-6 rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+                  >
+                    Болих
+                  </button>
                   <button
                     type="button"
                     onClick={handleAdd}
                     disabled={!canAdd}
                     className={
-                      'h-10 px-4 rounded ' +
+                      "flex-1 h-12 px-6 rounded-xl font-semibold transition-all duration-200 " +
                       (!canAdd
-                        ? 'bg-gray-300 text-white cursor-not-allowed'
-                        : 'bg-[#5AA6FF] text-white hover:opacity-90')
+                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl active:scale-95")
                     }
                   >
                     Сагс руу нэмэх
@@ -334,15 +548,18 @@ export default function AddItemModal({
                 </div>
 
                 {canAdd && selColor && selSize && (
-                  <div className="mt-3 text-[12px] text-black/60">
-                    Бараа {qty} ширхэг, Хэмжээ: {selSize}. Өнгө: {selColor}
+                  <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
+                    <div className="text-sm text-blue-800">
+                      <span className="font-medium">{qty} ширхэг</span> •
+                      <span className="ml-1">Хэмжээ: {selSize}</span> •
+                      <span className="ml-1">Өнгө: {selColor}</span>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

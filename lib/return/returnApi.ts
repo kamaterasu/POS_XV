@@ -75,6 +75,7 @@ export async function createReturn(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
     },
     body: JSON.stringify(request),
   });
@@ -113,6 +114,7 @@ export async function getReturns(
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
+      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
     },
   });
 

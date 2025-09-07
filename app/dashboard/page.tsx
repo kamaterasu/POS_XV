@@ -8,6 +8,7 @@ import { FaArrowRotateLeft } from "react-icons/fa6";
 import { VscGraph } from "react-icons/vsc";
 import { FaRegUser } from "react-icons/fa";
 import { IoExitOutline } from "react-icons/io5";
+import { MdDashboard } from "react-icons/md";
 import type { IconType } from "react-icons";
 import { supabase } from "@/lib/supabaseClient";
 import { Loading } from "@/components/Loading";
@@ -77,7 +78,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setLoading(true);
-    const t = setTimeout(() => setLoading(false), 1200);
+    const t = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(t);
   }, []);
   // useEffect(() => {
@@ -89,82 +90,152 @@ export default function DashboardPage() {
   //   // deleteTenant(tenant.items?.[0]?.id).then(res => console.log(res));
   // })
   return (
-    <div className="min-h-dvh bg-[#F7F7F5]">
-      <div className="mx-auto max-w-screen-xl p-4 sm:p-6 lg:p-8 min-h-dvh flex flex-col gap-6">
-        <div className="flex flex-col gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Header with glassmorphism effect */}
+      <div className="sticky top-0 z-10 backdrop-blur-md bg-white/80 border-b border-white/20 shadow-sm">
+        <div className="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <button className="w-fit rounded-xl border border-neutral-200 bg-white shadow px-4 py-2 text-sm hover:shadow-md active:scale-[0.99] transition">
-              Нэр: {userName || "Нэргүй хэрэглэгч"}
-            </button>
-            {userRole && (
-              <div className="rounded-xl border border-neutral-200 bg-white shadow px-4 py-2 text-sm">
-                Эрх: {userRole}
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg">
+                <MdDashboard size={24} />
               </div>
-            )}
-          </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  Удирдлагын самбар
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Тавтай морилно уу, {userName || "Хэрэглэгч"}
+                </p>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <CardBtn
+            <div className="flex items-center gap-3">
+              {userRole && (
+                <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-medium shadow-lg">
+                  {userRole}
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="group p-2 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200 shadow-sm hover:shadow-md hover:bg-red-50 transition-all duration-200 active:scale-95"
+                title="Системээс гарах"
+              >
+                <IoExitOutline
+                  size={20}
+                  className="text-gray-600 group-hover:text-red-600 transition-colors"
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome section */}
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 backdrop-blur-sm border border-white/40 shadow-sm mb-4">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            <span className="text-sm text-gray-600">
+              Системд амжилттай холбогдлоо
+            </span>
+          </div>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Борлуулалтын цэгийн системийн удирдлагын самбар. Дараах үйл
+            ажиллагааг гүйцэтгэх боломжтой.
+          </p>
+        </div>
+
+        {/* Feature cards grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="fade-in-up stagger-1">
+            <FeatureCard
               onClick={goTocheckout}
               Icon={BiTransferAlt}
               label="Борлуулалт"
+              description="Бараа борлуулах, тооцоо хийх"
+              gradient="from-blue-500 to-cyan-500"
+              iconBg="bg-blue-50"
+              iconColor="text-blue-600"
             />
-            <CardBtn
+          </div>
+          <div className="fade-in-up stagger-2">
+            <FeatureCard
               onClick={goToInventory}
               Icon={LiaListAlt}
               label="Агуулах"
+              description="Бараа материалын бүртгэл"
+              gradient="from-emerald-500 to-teal-500"
+              iconBg="bg-emerald-50"
+              iconColor="text-emerald-600"
             />
-            <CardBtn
+          </div>
+          <div className="fade-in-up stagger-3">
+            <FeatureCard
               onClick={goToProductReturn}
               Icon={FaArrowRotateLeft}
               label="Буцаалт"
+              description="Бараа буцаах үйл ажиллагаа"
+              gradient="from-orange-500 to-red-500"
+              iconBg="bg-orange-50"
+              iconColor="text-orange-600"
               disabled={!canAccessFeature(userRole, "productReturn")}
             />
-            <CardBtn
+          </div>
+          <div className="fade-in-up stagger-4">
+            <FeatureCard
               onClick={goToReport}
               Icon={VscGraph}
               label="Тайлан"
+              description="Борлуулалтын тайлан статистик"
+              gradient="from-purple-500 to-pink-500"
+              iconBg="bg-purple-50"
+              iconColor="text-purple-600"
               disabled={!canAccessFeature(userRole, "report")}
             />
-            <CardBtn
+          </div>
+          <div className="fade-in-up stagger-5">
+            <FeatureCard
               onClick={goToManagement}
               Icon={FaRegUser}
               label="Хяналт"
+              description="Хэрэглэгч, эрхийн удирдлага"
+              gradient="from-indigo-500 to-purple-500"
+              iconBg="bg-indigo-50"
+              iconColor="text-indigo-600"
               disabled={!canAccessFeature(userRole, "management")}
             />
           </div>
-        </div>
-
-        <div className="mt-auto flex justify-end">
-          <button
-            onClick={handleLogout}
-            className="rounded-xl border border-neutral-200 bg-white shadow px-5 py-2.5 flex items-center gap-2 hover:shadow-md active:scale-[0.99] transition"
-          >
-            <IoExitOutline size={20} />
-            Гарах
-          </button>
         </div>
       </div>
 
       <Loading
         open={loading}
-        label="Уншиж байна…"
-        subLabel="Дашбоардын мэдээллийг бэлдэж байна"
+        label="Уншиж байна"
+        subLabel="Системийн мэдээллийг бэлдэж байна. Түр хүлээнэ үү..."
       />
     </div>
   );
 }
 
-/** Нэг маягийн карт товч – disabled үед бүдгэрч, дарж болохгүй */
-function CardBtn({
+/** Enhanced feature card with modern design */
+function FeatureCard({
   onClick,
   Icon,
   label,
+  description,
+  gradient,
+  iconBg,
+  iconColor,
   disabled = false,
 }: {
   onClick: () => void;
   Icon: IconType;
   label: string;
+  description: string;
+  gradient: string;
+  iconBg: string;
+  iconColor: string;
   disabled?: boolean;
 }) {
   return (
@@ -173,15 +244,73 @@ function CardBtn({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       title={disabled ? "Тун удахгүй" : undefined}
-      className={`group w-full rounded-2xl border border-neutral-200 bg-white shadow-sm px-5 py-4 sm:py-5
-                  flex items-center gap-4 hover:shadow-md active:scale-[0.99] transition
-                  disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-sm disabled:active:scale-100`}
+      className={`group relative w-full rounded-2xl bg-white/60 backdrop-blur-sm border border-white/40 shadow-sm 
+                  p-6 text-left transition-all duration-300 overflow-hidden
+                  ${
+                    disabled
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:shadow-xl hover:scale-[1.02] hover:bg-white/80 active:scale-[0.98]"
+                  }`}
       aria-disabled={disabled}
     >
-      <span className="grid h-10 w-10 place-items-center rounded-xl border border-neutral-200 bg-[#F7F7F5]">
-        <Icon size={22} />
-      </span>
-      <span className="text-base sm:text-lg font-medium">{label}</span>
+      {/* Gradient overlay on hover */}
+      {!disabled && (
+        <div
+          className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
+        />
+      )}
+
+      {/* Icon container */}
+      <div
+        className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mb-4 
+                      ${
+                        !disabled && "group-hover:scale-110"
+                      } transition-transform duration-300`}
+      >
+        <Icon size={24} className={iconColor} />
+      </div>
+
+      {/* Content */}
+      <div className="space-y-2">
+        <h3 className="text-lg font-semibold text-gray-900 group-hover:text-gray-800">
+          {label}
+        </h3>
+        <p className="text-sm text-gray-600 group-hover:text-gray-700">
+          {description}
+        </p>
+      </div>
+
+      {/* Arrow indicator */}
+      {!disabled && (
+        <div
+          className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center
+                        opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 
+                        transition-all duration-300"
+        >
+          <svg
+            className="w-3 h-3 text-gray-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </div>
+      )}
+
+      {/* Disabled overlay */}
+      {disabled && (
+        <div className="absolute inset-0 bg-gray-100/50 backdrop-blur-[1px] rounded-2xl flex items-center justify-center">
+          <span className="text-xs text-gray-500 bg-white/80 px-2 py-1 rounded-full">
+            Тун удахгүй
+          </span>
+        </div>
+      )}
     </button>
   );
 }

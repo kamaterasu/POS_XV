@@ -116,56 +116,70 @@ export default function CheckoutPage() {
   const goToDashboard = () => router.push("/dashboard");
 
   return (
-    <div className="bg-[#F7F7F5] min-h-dvh w-screen p-5 flex flex-col gap-2.5">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 flex flex-col gap-4">
       <header>
         <button
           onClick={goToDashboard}
-          className="bg-white rounded-md border border-[#E6E6E6] shadow-md h-10 px-10 text-black inline-flex items-center justify-center"
+          className="group flex items-center gap-3 px-6 py-3 bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm rounded-xl hover:shadow-md hover:bg-white/90 transition-all duration-200 active:scale-95"
         >
-          Борлуулалт
+          <svg
+            className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          <span className="font-medium text-gray-900">Борлуулалт</span>
         </button>
       </header>
 
       <main className="flex-1 flex flex-col text-black">
-        <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-5 text-sm text-black font-medium mb-1">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-6 py-3 mb-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm text-sm text-gray-900 font-medium">
           <span>Бүтээгдэхүүн</span>
           <span className="text-right">Ширхэг/Үнэ</span>
         </div>
 
-        <div className="flex-1 bg-white rounded-md shadow-sm overflow-y-auto p-3">
-          <ul className="divide-y divide-[#E6E6E6]">
+        <div className="flex-1 bg-white/70 backdrop-blur-sm border border-white/40 rounded-2xl shadow-sm overflow-y-auto p-4">
+          <ul className="space-y-3">
             {items.map((it, idx) => {
               const line = it.qty * it.price;
               return (
                 <li
                   key={it.id}
-                  className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 items-center"
+                  className="p-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm hover:shadow-md hover:bg-white/80 transition-all duration-200"
                 >
-                  <div className="flex items-start gap-2 w-full">
-                    <div className="flex items-start gap-2">
-                      <Image
-                        src={it.imgPath || "/default.png"}
-                        alt={it.name}
-                        width={40}
-                        height={40}
-                        className="w-10 h-10 rounded-sm object-cover bg-[#EFEFEF]"
-                        onError={() => {
-                          // Next/Image дээр шууд src солих боломжгүй тул fallback-д анхнаасаа default.png өгсөн
-                          console.debug("image load failed for", it.imgPath);
-                        }}
-                      />
-                      <div className="leading-tight flex flex-col">
-                        <div className="text-[12px] font-semibold text-black">
-                          {idx + 1}. {it.name}
-                        </div>
-                        <div className="text-[10px] text-black/60">
-                          Хэмжээ: {it.size || "—"}
-                        </div>
-                        <div className="text-[10px] text-black/60">
-                          Өнгө: {it.color || "—"}
-                        </div>
-                        <div className="text-[12px] text-black/40">
-                          {fmt(it.price)} × {it.qty}
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                    <div className="flex items-start gap-2 w-full">
+                      <div className="flex items-start gap-2">
+                        <Image
+                          src={it.imgPath || "/default.png"}
+                          alt={it.name}
+                          width={40}
+                          height={40}
+                          className="w-12 h-12 rounded-xl object-cover bg-gray-100 shadow-sm"
+                          onError={() => {
+                            console.debug("image load failed for", it.imgPath);
+                          }}
+                        />
+                        <div className="leading-tight flex flex-col">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {idx + 1}. {it.name}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            Хэмжээ: {it.size || "—"}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            Өнгө: {it.color || "—"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {fmt(it.price)} × {it.qty}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -173,20 +187,20 @@ export default function CheckoutPage() {
                     <div className="flex flex-col place-content-end gap-2 items-center max-w-full justify-center">
                       {/* Qty control */}
                       <div className="flex justify-center w-20">
-                        <div className="inline-flex items-center gap-1">
+                        <div className="inline-flex items-center gap-1 bg-gray-50 rounded-full p-1">
                           <button
                             onClick={() => dec(it.id)}
-                            className="w-6 h-6 rounded bg-[#EDEDED] hover:bg-[#e3e3e3] text-black text-sm leading-none"
+                            className="w-7 h-7 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 text-sm leading-none flex items-center justify-center transition-colors duration-200"
                             aria-label="Буурах"
                           >
                             –
                           </button>
-                          <span className="min-w-7 text-center text-sm border border-[#CFE3FF] bg-[#F2F7FF] rounded px-2 py-1">
+                          <span className="min-w-8 text-center text-sm font-medium text-gray-900 px-2">
                             {it.qty}
                           </span>
                           <button
                             onClick={() => inc(it.id)}
-                            className="w-6 h-6 rounded bg-[#5AA6FF] hover:opacity-90 text-white text-sm leading-none"
+                            className="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-sm leading-none flex items-center justify-center transition-colors duration-200"
                             aria-label="Нэмэгдэх"
                           >
                             +
@@ -194,7 +208,7 @@ export default function CheckoutPage() {
                         </div>
                       </div>
 
-                      <div className="w-24 text-right font-semibold text-black">
+                      <div className="w-24 text-right font-semibold text-gray-900">
                         {fmt(line)}
                       </div>
                     </div>
@@ -205,32 +219,38 @@ export default function CheckoutPage() {
           </ul>
         </div>
 
-        <div className="mt-2 mx-2.5 bg-white rounded-md border p-3 text-sm text-black space-y-1">
-          <div className="flex justify-between">
-            <span>Дүн</span>
-            <span>{fmt(totalRaw)}</span>
+        <div className="mt-4 bg-white/70 backdrop-blur-sm border border-white/40 rounded-2xl shadow-sm p-6 text-sm space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-700">Дүн</span>
+            <span className="font-medium text-gray-900">{fmt(totalRaw)}</span>
           </div>
           {!!qa.discountPercent && (
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center text-red-600">
               <span>Хөнгөлөлт ({qa.discountPercent}%)</span>
-              <span>- {fmt(totals.discount)}</span>
+              <span className="font-medium">- {fmt(totals.discount)}</span>
             </div>
           )}
           {qa.includeVAT && (
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center text-amber-600">
               <span>НӨАТ (10%)</span>
-              <span>{fmt(totals.vat)}</span>
+              <span className="font-medium">{fmt(totals.vat)}</span>
             </div>
           )}
           {!!qa.deliveryFee && (
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center text-blue-600">
               <span>Хүргэлт</span>
-              <span>{fmt(totals.deliveryFee)}</span>
+              <span className="font-medium">{fmt(totals.deliveryFee)}</span>
             </div>
           )}
-          <div className="flex justify-between font-semibold text-base">
-            <span>Нийт төлөх</span>
-            <span>{fmt(totals.grand)}</span>
+          <div className="border-t border-gray-200 pt-3">
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-lg text-gray-900">
+                Нийт төлөх
+              </span>
+              <span className="font-bold text-xl text-blue-600">
+                {fmt(totals.grand)}
+              </span>
+            </div>
           </div>
         </div>
       </main>
@@ -268,7 +288,7 @@ export default function CheckoutPage() {
       />
 
       {/* Quick actions + favorites */}
-      <QuickActionsSheet
+      {/* <QuickActionsSheet
         open={openQuick}
         onClose={() => setOpenQuick(false)}
         value={qa}
@@ -291,8 +311,7 @@ export default function CheckoutPage() {
             return [it, ...prev];
           })
         }
-      />
-
+      /> */}
       {/* Save draft */}
       <SaveDraftDialog
         open={openSave}
