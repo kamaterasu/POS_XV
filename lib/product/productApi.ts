@@ -28,7 +28,7 @@ export async function listProducts(params: { storeId: string }) {
   }
 }
 
-export async function getProduct(token: string, order_id: string) {
+export async function getProduct(token: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(

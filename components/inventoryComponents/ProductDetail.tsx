@@ -1,21 +1,28 @@
-// apps/web/src/components/inventoryComponents/ProductDetail.tsx
 'use client';
 
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 
 export type ProductStockSummary = {
-  productId: string;
-  productName: string;
-  totalQty: number;
-  variants: Array<{
-    variantId: string;
+  id: string;
+  name: string;
+  sku?: string;
+  qty?: number;
+  price?: number;
+  cost?: number;
+  category?: string;
+  description?: string;
+  image?: string;
+  variants?: Array<{
+    id: string;
     name: string;
     sku: string;
-    attrs: Record<string, string>;
     price: number;
-    qty: number;
+    cost: number;
+    stock: number;
+    attrs?: Record<string, string>;
   }>;
+  totalStock?: number;
 };
 
 type Movement = { ts: string; text: string; delta: number };
@@ -105,7 +112,7 @@ export default function ProductDetail({
           <div className="relative h-24 w-24 rounded-md border bg-[#EFEFEF] overflow-hidden">
             <Image
               src="/default.png"
-              alt={product.productName}
+              alt={product.name}
               fill
               sizes="120px"
               className="object-cover"
@@ -114,8 +121,8 @@ export default function ProductDetail({
           </div>
           <div className="flex-1">
             <div className="text-xs text-black/60 mb-1">Агуулах</div>
-            <div className="text-base font-semibold">{product.productName}</div>
-            <div className="text-sm">Нөөц: <b>{product.totalQty}</b></div>
+            <div className="text-base font-semibold">{product.name}</div>
+            <div className="text-sm">Нөөц: <b>{product.qty}</b></div>
             <div className="text-sm">
               Үнэ: <b>
                 {selected
@@ -144,9 +151,8 @@ export default function ProductDetail({
                     .filter(Boolean)[0] ?? null;
                   setPickedSize(firstSize);
                 }}
-                className={`h-8 px-3 rounded-full border text-sm flex items-center gap-2 ${
-                  pickedColor === c ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
-                }`}
+                className={`h-8 px-3 rounded-full border text-sm flex items-center gap-2 ${pickedColor === c ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
+                  }`}
                 title={c}
               >
                 <span
@@ -158,9 +164,8 @@ export default function ProductDetail({
             ))}
             <button
               onClick={() => setPickedColor(null)}
-              className={`h-8 px-3 rounded-full border text-sm ${
-                pickedColor === null ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
-              }`}
+              className={`h-8 px-3 rounded-full border text-sm ${pickedColor === null ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
+                }`}
             >
               +
             </button>
@@ -177,18 +182,16 @@ export default function ProductDetail({
               <button
                 key={s}
                 onClick={() => setPickedSize(s)}
-                className={`h-8 px-3 rounded-full border text-sm ${
-                  pickedSize === s ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
-                }`}
+                className={`h-8 px-3 rounded-full border text-sm ${pickedSize === s ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
+                  }`}
               >
                 {s}
               </button>
             ))}
             <button
               onClick={() => setPickedSize(null)}
-              className={`h-8 px-3 rounded-full border text-sm ${
-                pickedSize === null ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
-              }`}
+              className={`h-8 px-3 rounded-full border text-sm ${pickedSize === null ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'bg-white'
+                }`}
             >
               +
             </button>
