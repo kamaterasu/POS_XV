@@ -1,6 +1,6 @@
 import { jwtDecode } from "jwt-decode";
 
-export async function getProduct(token: string, order_id: string) {
+export async function getProduct(token: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&search=&limit=20&offset=0`);
