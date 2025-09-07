@@ -6,7 +6,7 @@ import Image from 'next/image';
 export type ProductStockSummary = {
   id: string;
   name: string;
-  qty: number;
+  qty?: number;
   variants: Array<{
     variantId: string;
     name: string;
