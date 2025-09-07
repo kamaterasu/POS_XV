@@ -9,7 +9,15 @@ import { getStore } from '@/lib/store/storeApi';
 
 // --- Types (UI-д хэрэгтэй талбарууд)
 type StoreRow = { id: string; name: string };
-type Product = { id: string; name: string; qty?: number; code?: string; storeId?: string };
+type Product = { 
+  id: string; 
+  name: string; 
+  qty?: number; 
+  code?: string; 
+  storeId?: string;
+  img?: string; // зураг нэмнэ
+};
+
 
 // --- Жижиг туслах функцууд
 const toArray = (v: any, keys: string[] = []) => {
@@ -35,6 +43,7 @@ const mapProduct = (item: any): Product | null => {
       name: item.product.name ?? '(нэргүй)',
       qty: item.qty ?? 0,
       storeId: item.store_id ?? undefined,
+      img: item.product.img ?? item.product.image ?? undefined, // зураг
     };
   }
   // getProduct response: шууд product
@@ -45,6 +54,7 @@ const mapProduct = (item: any): Product | null => {
     name: item?.name ?? item?.product_name ?? item?.title ?? '(нэргүй)',
     code: item?.code ?? item?.sku ?? item?.barcode ?? undefined,
     storeId: item?.storeId ?? item?.store_id ?? item?.store?.id ?? undefined,
+    img: item?.img ?? item?.image ?? undefined, // зураг
   };
 };
 
@@ -239,7 +249,7 @@ export default function InventoryPage() {
             Барааны жагсаалт {loadingProducts ? '…' : `(${mergedProducts.length})`}
           </div>
 
-          <div className="divide-y divide-neutral-100">
+           <div className="divide-y divide-neutral-100">
             {loadingProducts ? (
               <>
                 <Skeleton className="h-10" />
@@ -249,26 +259,48 @@ export default function InventoryPage() {
             ) : mergedProducts.length === 0 ? (
               <div className="px-4 py-6 text-center text-sm text-neutral-400">Бараа олдсонгүй.</div>
             ) : (
-              mergedProducts.map(p => (
-                <div key={p.id} className="flex items-center gap-4 px-4 py-3">
-                  <div className="flex-1">
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-xs text-neutral-500">{p.code ? `Код: ${p.code}` : ''}</div>
+              mergedProducts.map(p => {
+                // Зураг шалгах функц
+                let imgSrc = '/default.png';
+                if (p.img && typeof p.img === 'string' && /\.(jpe?g|png|gif|webp|svg)$/i.test(p.img)) {
+                  imgSrc = p.img.startsWith('/') ? p.img : `/uploads/${p.img}`;
+                }
+                // Absolute path-тай бол шууд хэрэглэнэ
+                if (p.img && typeof p.img === 'string' && (p.img.startsWith('http://') || p.img.startsWith('https://'))) {
+                  imgSrc = p.img;
+                }
+                // public/default.png руу зөв зам
+                if (imgSrc === '/default.png') {
+                  imgSrc = '/default.png';
+                }
+
+                return (
+                  <div key={p.id} className="flex items-center gap-4 px-4 py-3">
+                    <img
+                      src={imgSrc}
+                      alt={p.name}
+                      className="w-12 h-12 object-cover rounded border border-neutral-200 bg-neutral-100 flex-shrink-0"
+                      onError={e => { (e.target as HTMLImageElement).src = '/default.png'; }}
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{p.name}</div>
+                      <div className="text-xs text-neutral-500">{p.code ? `Код: ${p.code}` : ''}</div>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {typeof p.qty === 'number'
+                        ? storeId === 'all'
+                          ? `Нийт: ${p.qty}`
+                          : `Тоо: ${p.qty}`
+                        : ''}
+                    </div>
+                    <div className="text-xs text-neutral-400">
+                      {storeId === 'all'
+                        ? ''
+                        : stores.find(s => s.id === p.storeId)?.name || ''}
+                    </div>
                   </div>
-                  <div className="text-xs text-neutral-500">
-                    {typeof p.qty === 'number'
-                      ? storeId === 'all'
-                        ? `Нийт: ${p.qty}`
-                        : `Тоо: ${p.qty}`
-                      : ''}
-                  </div>
-                  <div className="text-xs text-neutral-400">
-                    {storeId === 'all'
-                      ? ''
-                      : stores.find(s => s.id === p.storeId)?.name || ''}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

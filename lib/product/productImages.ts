@@ -34,3 +34,11 @@ export async function uploadProductImageOnly(
 
   return { path, signedUrl: data.signedUrl };
 }
+export async function getImageShowUrl(path: string) {
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, 60 * 60 * 24 * 7); // 7 хоног
+
+  if (error) throw error;
+  return data.signedUrl;
+}
