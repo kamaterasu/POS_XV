@@ -262,7 +262,7 @@ export default function ManagementPage() {
       email: "",
       password: "",
       role: "Cashier",
-      storeIds: [],
+      storeIds: [], // Default to empty - admins don't need specific branch assignments
     });
     setOpen(true);
   };
@@ -476,11 +476,17 @@ export default function ManagementPage() {
                   <td className="py-2 pr-3">{u.email}</td>
                   <td className="py-2 pr-3">{u.role}</td>
                   <td className="py-2 pr-3">
-                    {u.store_ids?.length
-                      ? u.store_ids
-                          .map((id) => branchesById[id] || "Тодорхойгүй салбар")
-                          .join(", ")
-                      : "—"}
+                    {u.role === "Admin" || u.role === "Manager" ? (
+                      <span className="text-sm text-green-600 font-medium">
+                        -
+                      </span>
+                    ) : u.store_ids?.length ? (
+                      u.store_ids
+                        .map((id) => branchesById[id] || "Тодорхойгүй салбар")
+                        .join(", ")
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="py-2 pr-3">
                     {userRole !== "CASHIER" ? (
@@ -690,9 +696,18 @@ export default function ManagementPage() {
               <select
                 className="h-10 rounded-md border px-2"
                 value={form.role}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, role: e.target.value as Role }))
-                }
+                onChange={(e) => {
+                  const newRole = e.target.value as Role;
+                  setForm((f) => ({
+                    ...f,
+                    role: newRole,
+                    // Clear store assignments for Admin/Manager roles
+                    storeIds:
+                      newRole === "Admin" || newRole === "Manager"
+                        ? []
+                        : f.storeIds,
+                  }));
+                }}
               >
                 {(["Admin", "Manager", "Cashier"] as Role[]).map((r) => (
                   <option key={r} value={r}>
@@ -704,35 +719,44 @@ export default function ManagementPage() {
               {/* multi-select stores */}
               <div className="md:col-span-2">
                 <div className="text-sm font-medium mb-1">Салбарууд</div>
-                <div className="max-h-40 overflow-auto rounded-md border p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                  {branches.map((s, index) => {
-                    const checked = form.storeIds.includes(s.id);
-                    return (
-                      <label
-                        key={s.id || `store-${index}`}
-                        className="inline-flex items-center gap-2 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          className="accent-blue-600"
-                          checked={checked}
-                          onChange={() =>
-                            setForm((f) => ({
-                              ...f,
-                              storeIds: checked
-                                ? f.storeIds.filter((x) => x !== s.id)
-                                : [...f.storeIds, s.id],
-                            }))
-                          }
-                        />
-                        <span>{s.name || "Unnamed"}</span>
-                      </label>
-                    );
-                  })}
-                  {branches.length === 0 && (
-                    <div className="text-black/50 text-sm">Салбар алга</div>
-                  )}
-                </div>
+                {form.role === "Admin" || form.role === "Manager" ? (
+                  <div className="rounded-md border p-3 bg-blue-50 text-blue-700">
+                    <p className="text-sm">
+                      {form.role} хэрэглэгч бүх салбарт автоматаар хандах
+                      эрхтэй. Тусгай салбар сонгох шаардлагагүй.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="max-h-40 overflow-auto rounded-md border p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    {branches.map((s, index) => {
+                      const checked = form.storeIds.includes(s.id);
+                      return (
+                        <label
+                          key={s.id || `store-${index}`}
+                          className="inline-flex items-center gap-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            className="accent-blue-600"
+                            checked={checked}
+                            onChange={() =>
+                              setForm((f) => ({
+                                ...f,
+                                storeIds: checked
+                                  ? f.storeIds.filter((x) => x !== s.id)
+                                  : [...f.storeIds, s.id],
+                              }))
+                            }
+                          />
+                          <span>{s.name || "Unnamed"}</span>
+                        </label>
+                      );
+                    })}
+                    {branches.length === 0 && (
+                      <div className="text-black/50 text-sm">Салбар алга</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
