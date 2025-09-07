@@ -2,6 +2,7 @@ export interface ProductStockSummary {
   id: string;
   name: string;
   sku?: string;
+  qty?: number;
   price?: number;
   cost?: number;
   category?: string;
