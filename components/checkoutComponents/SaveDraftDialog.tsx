@@ -1,6 +1,6 @@
-'use client';
-import { useEffect, useMemo, useState } from 'react';
-import type { Item } from '@/lib/sales/salesType';
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import type { Item } from "@/lib/sales/salesTypes";
 
 type Draft = {
   id: string;
@@ -12,7 +12,7 @@ type Draft = {
   createdAt: string; // ISO
 };
 
-const DRAFTS_KEY = 'pos_drafts';
+const DRAFTS_KEY = "pos_drafts";
 
 export default function SaveDraftDialog({
   open,
@@ -23,12 +23,12 @@ export default function SaveDraftDialog({
   onClose: () => void;
   items: Item[];
 }) {
-  const [name, setName] = useState('');
-  const [note, setNote] = useState('');
+  const [name, setName] = useState("");
+  const [note, setNote] = useState("");
 
   const { totalQty, totalAmount } = useMemo(() => {
     const qty = items.reduce((s, it) => s + (it.qty ?? 0), 0);
-    const amt = items.reduce((s, it) => s + (it.qty * it.price), 0);
+    const amt = items.reduce((s, it) => s + it.qty * it.price, 0);
     return { totalQty: qty, totalAmount: amt };
   }, [items]);
 
@@ -37,14 +37,19 @@ export default function SaveDraftDialog({
   // Esc дархад хаах
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
   // Dialog нээгдэх бүрт талбар цэвэрлэе
   useEffect(() => {
-    if (open) { setName(''); setNote(''); }
+    if (open) {
+      setName("");
+      setNote("");
+    }
   }, [open]);
 
   const handleSave = () => {
@@ -66,8 +71,8 @@ export default function SaveDraftDialog({
       localStorage.setItem(DRAFTS_KEY, JSON.stringify(arr));
       onClose();
     } catch (e) {
-      console.error('Failed to save draft:', e);
-      alert('Түр хадгалах үед алдаа гарлаа.');
+      console.error("Failed to save draft:", e);
+      alert("Түр хадгалах үед алдаа гарлаа.");
     }
   };
 
@@ -126,32 +131,44 @@ export default function SaveDraftDialog({
         <div className="max-h-40 overflow-auto border rounded">
           <ul className="divide-y">
             {items.map((it) => (
-              <li key={it.id} className="px-3 py-2 text-sm flex justify-between gap-2">
+              <li
+                key={it.id}
+                className="px-3 py-2 text-sm flex justify-between gap-2"
+              >
                 <div className="truncate">
                   <span className="font-medium">{it.name}</span>
-                  <span className="text-black/50"> — {it.size || '—'} {it.color ? `• ${it.color}` : ''}</span>
+                  <span className="text-black/50">
+                    {" "}
+                    — {it.size || "—"} {it.color ? `• ${it.color}` : ""}
+                  </span>
                 </div>
                 <div className="shrink-0 text-right">
-                  <div>{it.qty} × {formatMNT(it.price)}</div>
+                  <div>
+                    {it.qty} × {formatMNT(it.price)}
+                  </div>
                 </div>
               </li>
             ))}
             {items.length === 0 && (
-              <li className="px-3 py-2 text-sm text-black/60">Сагс хоосон байна.</li>
+              <li className="px-3 py-2 text-sm text-black/60">
+                Сагс хоосон байна.
+              </li>
             )}
           </ul>
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} className="h-10 px-4 rounded border">Болих</button>
+          <button onClick={onClose} className="h-10 px-4 rounded border">
+            Болих
+          </button>
           <button
             onClick={handleSave}
             disabled={disabled}
             className={
-              'h-10 px-4 rounded ' +
+              "h-10 px-4 rounded " +
               (disabled
-                ? 'bg-gray-300 text-white cursor-not-allowed'
-                : 'bg-[#5AA6FF] text-white hover:opacity-90')
+                ? "bg-gray-300 text-white cursor-not-allowed"
+                : "bg-[#5AA6FF] text-white hover:opacity-90")
             }
           >
             Хадгалах
@@ -164,6 +181,6 @@ export default function SaveDraftDialog({
 
 /** Төгрөг форматлагч (локал) */
 function formatMNT(n: number) {
-  if (!Number.isFinite(n)) return '0 ₮';
-  return new Intl.NumberFormat('mn-MN').format(Math.floor(n)) + ' ₮';
+  if (!Number.isFinite(n)) return "0 ₮";
+  return new Intl.NumberFormat("mn-MN").format(Math.floor(n)) + " ₮";
 }

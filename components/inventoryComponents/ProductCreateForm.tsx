@@ -1,24 +1,36 @@
-'use client';
+"use client";
 
-import { useRef, useMemo, useState, useEffect, ChangeEvent } from 'react';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRef, useMemo, useState, useEffect, ChangeEvent } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 
-import type { Variant } from '@/lib/inventory/inventoryTypes';
-import { apiCreateProduct, apiCategoryCreate } from '@/lib/inventory/inventoryApi';
-import type { Category } from '@/lib/category/categoryApi';
-import { Loading } from '@/components/Loading';
+// import type { Variant } from '@/lib/inventory/inventoryTypes';
+type Variant = {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  cost: number;
+};
+import {
+  apiCreateProduct,
+  apiCategoryCreate,
+} from "@/lib/inventory/inventoryApi";
+import type { Category } from "@/lib/category/categoryApi";
+import { Loading } from "@/components/Loading";
 
-function rid() { return Math.random().toString(36).slice(2, 10); }
+function rid() {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 /* ========================== Category helpers ========================== */
 
 type CleanCategory = { id: string; name: string; parent_id: string | null };
 
 function sanitizeCats(cats: Category[]): CleanCategory[] {
-  return (cats ?? []).map(c => ({
+  return (cats ?? []).map((c) => ({
     id: c.id,
-    name: c.name ?? '',
+    name: c.name ?? "",
     parent_id: c.parent_id ?? null,
   }));
 }
@@ -36,7 +48,7 @@ function buildCategoryHelpers(cats: CleanCategory[]) {
   }
 
   for (const arr of children.values()) {
-    arr.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+    arr.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
   }
 
   function getChildren(pid: string | null) {
@@ -54,8 +66,8 @@ function buildCategoryHelpers(cats: CleanCategory[]) {
   }
 
   function getPathText(id: string | null) {
-    const parts = getAncestors(id).map(c => c.name);
-    return parts.length ? parts.join(' › ') : 'Ангилал байхгүй';
+    const parts = getAncestors(id).map((c) => c.name);
+    return parts.length ? parts.join(" › ") : "Ангилал байхгүй";
   }
 
   function search(q: string) {
@@ -63,7 +75,7 @@ function buildCategoryHelpers(cats: CleanCategory[]) {
     if (!s) return [];
     const results: { id: string; text: string }[] = [];
     for (const c of byId.values()) {
-      if ((c.name ?? '').toLowerCase().includes(s)) {
+      if ((c.name ?? "").toLowerCase().includes(s)) {
         results.push({ id: c.id, text: getPathText(c.id) });
       }
     }
@@ -82,10 +94,10 @@ function CategoryPicker({
   onChange,
   tenantId,
 }: {
-  categories: Category[];                      // raw from API
-  value: string | null;                        // selected category id
+  categories: Category[]; // raw from API
+  value: string | null; // selected category id
   onChange: (id: string | null, pathLabel: string, leafName?: string) => void;
-  tenantId?: string;                           // enables inline add
+  tenantId?: string; // enables inline add
 }) {
   const normalized = useMemo(() => sanitizeCats(categories), [categories]);
 
@@ -97,25 +109,38 @@ function CategoryPicker({
 
   const [open, setOpen] = useState(false);
   const [browseId, setBrowseId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [searchQ, setSearchQ] = useState('');
+  const [newName, setNewName] = useState("");
+  const [searchQ, setSearchQ] = useState("");
 
-  const breadcrumb = useMemo(() => helpers.getAncestors(browseId), [helpers, browseId]);
-  const children = useMemo(() => helpers.getChildren(browseId), [helpers, browseId]);
+  const breadcrumb = useMemo(
+    () => helpers.getAncestors(browseId),
+    [helpers, browseId]
+  );
+  const children = useMemo(
+    () => helpers.getChildren(browseId),
+    [helpers, browseId]
+  );
   const selectedText = helpers.getPathText(value);
   const searchResults = searchQ ? helpers.search(searchQ) : [];
 
   async function addSubcategory() {
     const name = newName.trim();
     if (!name || !tenantId) return;
-    const created = await apiCategoryCreate({ tenantId, name, parentId: browseId ?? null });
+    const created = await apiCategoryCreate({
+      tenantId,
+      name,
+      parentId: browseId ?? null,
+    });
     // Append to local list so it appears immediately
-    setLocalCats(prev => [...prev, {
-      id: created.id,
-      name: created.name ?? '',
-      parent_id: created.parent_id ?? null,
-    }]);
-    setNewName('');
+    setLocalCats((prev) => [
+      ...prev,
+      {
+        id: created.id,
+        name: created.name ?? "",
+        parent_id: created.parent_id ?? null,
+      },
+    ]);
+    setNewName("");
   }
 
   function choose(id: string | null) {
@@ -130,13 +155,13 @@ function CategoryPicker({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setOpen(o => !o)}
+          onClick={() => setOpen((o) => !o)}
           className="h-10 px-3 rounded-md border border-[#E6E6E6] bg-white text-sm"
         >
           Ангилал сонгох
         </button>
         <div className="text-sm text-[#333] truncate max-w-[60ch]">
-          <span className="opacity-70">Одоогийн:</span>{' '}
+          <span className="opacity-70">Одоогийн:</span>{" "}
           <b title={selectedText}>{selectedText}</b>
         </div>
       </div>
@@ -147,7 +172,11 @@ function CategoryPicker({
           <div className="flex items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1 text-xs">
               <button
-                className={`px-2 py-1 rounded border ${browseId === null ? 'bg-[#5AA6FF] text-white border-[#5AA6FF]' : 'border-[#E6E6E6] bg-white'}`}
+                className={`px-2 py-1 rounded border ${
+                  browseId === null
+                    ? "bg-[#5AA6FF] text-white border-[#5AA6FF]"
+                    : "border-[#E6E6E6] bg-white"
+                }`}
                 onClick={() => setBrowseId(null)}
               >
                 Үндэс
@@ -189,7 +218,7 @@ function CategoryPicker({
             {searchQ && (
               <div className="mt-2 max-h-52 overflow-y-auto rounded-md border border-[#F0F0F0]">
                 {searchResults.length ? (
-                  searchResults.map(r => (
+                  searchResults.map((r) => (
                     <button
                       key={r.id}
                       onClick={() => choose(r.id)}
@@ -199,7 +228,9 @@ function CategoryPicker({
                     </button>
                   ))
                 ) : (
-                  <div className="px-3 py-2 text-sm text-[#777]">Үр дүн олдсонгүй.</div>
+                  <div className="px-3 py-2 text-sm text-[#777]">
+                    Үр дүн олдсонгүй.
+                  </div>
                 )}
               </div>
             )}
@@ -210,7 +241,10 @@ function CategoryPicker({
             <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2">
               {children.length ? (
                 children.map((c) => (
-                  <div key={c.id} className="border rounded-md p-2 flex items-center justify-between">
+                  <div
+                    key={c.id}
+                    className="border rounded-md p-2 flex items-center justify-between"
+                  >
                     <div className="truncate pr-2">{c.name}</div>
                     <div className="flex items-center gap-2">
                       <button
@@ -230,7 +264,9 @@ function CategoryPicker({
                   </div>
                 ))
               ) : (
-                <div className="text-xs text-[#777] px-1">Дэд ангилал байхгүй.</div>
+                <div className="text-xs text-[#777] px-1">
+                  Дэд ангилал байхгүй.
+                </div>
               )}
             </div>
           )}
@@ -258,11 +294,10 @@ function CategoryPicker({
   );
 }
 
-
 export default function ProductCreateForm({
-  cats,          // full Category objects from your API (must include id,name,parent_id)
+  cats, // full Category objects from your API (must include id,name,parent_id)
   branches,
-  tenantId,      // optional: enables inline add in CategoryPicker
+  tenantId, // optional: enables inline add in CategoryPicker
 }: {
   cats: Category[];
   branches: string[];
@@ -275,7 +310,7 @@ export default function ProductCreateForm({
   type NewProduct = {
     name: string;
     sku?: string;
-    category?: string;          // keep sending LEAF name for now
+    category?: string; // keep sending LEAF name for now
     price?: number;
     cost?: number;
     trackInventory: boolean;
@@ -287,21 +322,22 @@ export default function ProductCreateForm({
   };
 
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
-  const [selectedPathLabel, setSelectedPathLabel] = useState<string>('Ангилал байхгүй');
+  const [selectedPathLabel, setSelectedPathLabel] =
+    useState<string>("Ангилал байхгүй");
 
   const [newProd, setNewProd] = useState<NewProduct>({
-    name: '',
-    sku: '',
+    name: "",
+    sku: "",
     category: undefined,
     price: undefined,
     cost: undefined,
     trackInventory: true,
     isActive: true,
-    description: '',
+    description: "",
     images: [],
     variants: [],
     initialStocks: Object.fromEntries(
-      branches.filter(b => b !== 'Бүх салбар').map(b => [b, 0])
+      branches.filter((b) => b !== "Бүх салбар").map((b) => [b, 0])
     ),
   });
 
@@ -310,40 +346,53 @@ export default function ProductCreateForm({
     if (!files || !files.length) return;
     const urls: string[] = [];
     for (const f of Array.from(files)) urls.push(URL.createObjectURL(f));
-    setNewProd(p => ({ ...p, images: [...p.images, ...urls] }));
+    setNewProd((p) => ({ ...p, images: [...p.images, ...urls] }));
   }
   function removeImage(i: number) {
-    setNewProd(p => ({ ...p, images: p.images.filter((_, idx) => idx !== i) }));
+    setNewProd((p) => ({
+      ...p,
+      images: p.images.filter((_, idx) => idx !== i),
+    }));
   }
   function addVariant() {
-    setNewProd(p => ({
+    setNewProd((p) => ({
       ...p,
-      variants: [...p.variants, { id: rid(), color: '', size: '', sku: '', price: undefined }]
+      variants: [
+        ...p.variants,
+        { id: rid(), color: "", size: "", sku: "", price: undefined },
+      ],
     }));
   }
   function removeVariant(id: string) {
-    setNewProd(p => ({ ...p, variants: p.variants.filter(v => v.id !== id) }));
+    setNewProd((p) => ({
+      ...p,
+      variants: p.variants.filter((v) => v.id !== id),
+    }));
   }
   function updateVariant(id: string, patch: Partial<Variant>) {
-    setNewProd(p => ({ ...p, variants: p.variants.map(v => v.id === id ? { ...v, ...patch } : v) }));
+    setNewProd((p) => ({
+      ...p,
+      variants: p.variants.map((v) => (v.id === id ? { ...v, ...patch } : v)),
+    }));
   }
 
   async function handleCreateSubmit() {
-    if (!newProd.name.trim()) return alert('Барааны нэрийг оруулна уу.');
-    if (newProd.price == null || Number.isNaN(newProd.price)) return alert('Зарах үнийг оруулна уу.');
+    if (!newProd.name.trim()) return alert("Барааны нэрийг оруулна уу.");
+    if (newProd.price == null || Number.isNaN(newProd.price))
+      return alert("Зарах үнийг оруулна уу.");
 
     const cleanVariants = newProd.variants
-      .map(v => ({ ...v, price: v.price ?? newProd.price }))
-      .filter(v => (v.color?.trim() || v.size?.trim() || v.sku?.trim()));
+      .map((v) => ({ ...v, price: v.price ?? newProd.price }))
+      .filter((v) => v.color?.trim() || v.size?.trim() || v.sku?.trim());
 
     const payload = { ...newProd, variants: cleanVariants };
     setLoading(true);
     try {
       const res = await apiCreateProduct(payload as any);
-      alert('Шинэ бараа нэмэгдлээ.');
+      alert("Шинэ бараа нэмэгдлээ.");
       router.push(`/productdetail/${res.id}`);
     } catch (error) {
-      alert('Алдаа гарлаа. Дахин оролдоно уу.');
+      alert("Алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
       setLoading(false);
     }
@@ -359,7 +408,9 @@ export default function ProductCreateForm({
           <input
             className="h-10 w-full rounded-md border border-[#E6E6E6] px-3"
             value={newProd.name}
-            onChange={(e) => setNewProd(p => ({ ...p, name: e.target.value }))}
+            onChange={(e) =>
+              setNewProd((p) => ({ ...p, name: e.target.value }))
+            }
             placeholder="Барааны нэрээ оруулна уу."
           />
         </div>
@@ -374,7 +425,7 @@ export default function ProductCreateForm({
             onChange={(id, pathLabel, leaf) => {
               setSelectedCatId(id);
               setSelectedPathLabel(pathLabel);
-              setNewProd(p => ({ ...p, category: leaf })); // keep sending the leaf name
+              setNewProd((p) => ({ ...p, category: leaf })); // keep sending the leaf name
             }}
           />
           <div className="text-xs text-[#777]">
@@ -387,8 +438,10 @@ export default function ProductCreateForm({
           <input
             type="number"
             className="h-10 w-full rounded-md border border-[#E6E6E6] px-3"
-            value={newProd.price ?? ''}
-            onChange={(e) => setNewProd(p => ({ ...p, price: Number(e.target.value || 0) }))}
+            value={newProd.price ?? ""}
+            onChange={(e) =>
+              setNewProd((p) => ({ ...p, price: Number(e.target.value || 0) }))
+            }
             placeholder="Барааны зарах үнэ"
           />
         </div>
@@ -399,7 +452,9 @@ export default function ProductCreateForm({
         <textarea
           className="min-h-24 w-full rounded-md border border-[#E6E6E6] px-3 py-2"
           value={newProd.description}
-          onChange={(e) => setNewProd(p => ({ ...p, description: e.target.value }))}
+          onChange={(e) =>
+            setNewProd((p) => ({ ...p, description: e.target.value }))
+          }
           placeholder="Материал, онцлог, арчилгаа..."
         />
       </div>
@@ -434,7 +489,9 @@ export default function ProductCreateForm({
                   sizes="(min-width:768px) 14vw, 30vw"
                   className="object-cover rounded-md border"
                   // Skip optimization for blob/data URLs
-                  unoptimized={src.startsWith('blob:') || src.startsWith('data:')}
+                  unoptimized={
+                    src.startsWith("blob:") || src.startsWith("data:")
+                  }
                   priority={i === 0}
                 />
                 <button
@@ -456,66 +513,96 @@ export default function ProductCreateForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Вариант (сонголттой бол)</span>
-          <button onClick={addVariant} className="h-9 px-3 rounded-md border border-[#E6E6E6] bg-white text-sm">+ Variant</button>
+          <button
+            onClick={addVariant}
+            className="h-9 px-3 rounded-md border border-[#E6E6E6] bg-white text-sm"
+          >
+            + Variant
+          </button>
         </div>
         <div className="space-y-2">
-          {newProd.variants.map(v => (
-            <div key={v.id} className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center border rounded-md p-2">
-              <div className='flex items-center gap-2'>
+          {newProd.variants.map((v) => (
+            <div
+              key={v.id}
+              className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center border rounded-md p-2"
+            >
+              <div className="flex items-center gap-2">
                 <input
                   type="color"
                   className="h-9 w-12 p-0 border border-[#E6E6E6] rounded-md cursor-pointer"
-                  value={v.color || '#E6E6E6'}
-                  onChange={(e) => updateVariant(v.id, { color: e.target.value })}
+                  value={v.color || "#E6E6E6"}
+                  onChange={(e) =>
+                    updateVariant(v.id, { color: e.target.value })
+                  }
                 />
                 <input
                   placeholder="#000000"
                   className="h-9 flex-1 rounded-md border border-[#E6E6E6] px-2"
-                  value={v.color || ''}
-                  onChange={(e) => updateVariant(v.id, { color: e.target.value })}
+                  value={v.color || ""}
+                  onChange={(e) =>
+                    updateVariant(v.id, { color: e.target.value })
+                  }
                 />
-                <span className="inline-block h-6 w-6 rounded-full border border-black/10" style={{ backgroundColor: v.color || '#E6E6E6' }} />
+                <span
+                  className="inline-block h-6 w-6 rounded-full border border-black/10"
+                  style={{ backgroundColor: v.color || "#E6E6E6" }}
+                />
               </div>
               <input
                 placeholder="Хэмжээ оруулна уу."
                 className="h-9 rounded-md border border-[#E6E6E6] px-2"
-                value={v.size ?? ''}
+                value={v.size ?? ""}
                 onChange={(e) => updateVariant(v.id, { size: e.target.value })}
               />
               <input
                 type="number"
                 placeholder="Тухайн хэмжээний үнэ."
                 className="h-9 rounded-md border border-[#E6E6E6] px-2"
-                value={v.price ?? ''}
-                onChange={(e) => updateVariant(v.id, { price: Number(e.target.value || 0) })}
+                value={v.price ?? ""}
+                onChange={(e) =>
+                  updateVariant(v.id, { price: Number(e.target.value || 0) })
+                }
               />
               <div className="flex justify-end">
-                <button onClick={() => removeVariant(v.id)} className="h-9 px-3 rounded-md border border-red-200 text-red-600 text-sm bg-white">Устгах</button>
+                <button
+                  onClick={() => removeVariant(v.id)}
+                  className="h-9 px-3 rounded-md border border-red-200 text-red-600 text-sm bg-white"
+                >
+                  Устгах
+                </button>
               </div>
             </div>
           ))}
         </div>
-        <div className="text-xs text-[#777]">Бараа нэмэх үед хэмжээ, өнгөөс хамаарч өөр үнтэй бол заавал оруулна уу.</div>
+        <div className="text-xs text-[#777]">
+          Бараа нэмэх үед хэмжээ, өнгөөс хамаарч өөр үнтэй бол заавал оруулна
+          уу.
+        </div>
       </div>
 
       {/* Initial stocks */}
       <div className="space-y-2">
         <span className="text-sm font-medium">Эхний нөөц (салбарууд)</span>
         <div className="grid md:grid-cols-3 gap-2">
-          {branches.filter(b => b !== 'Бүх салбар').map(b => (
-            <div key={b} className="flex items-center gap-2">
-              <span className="text-sm w-32">{b}</span>
-              <input
-                type="number"
-                className="h-9 w-full rounded-md border border-[#E6E6E6] px-2"
-                value={newProd.initialStocks[b] ?? 0}
-                onChange={(e) => {
-                  const n = Math.max(0, Number(e.target.value || 0));
-                  setNewProd(p => ({ ...p, initialStocks: { ...p.initialStocks, [b]: n } }));
-                }}
-              />
-            </div>
-          ))}
+          {branches
+            .filter((b) => b !== "Бүх салбар")
+            .map((b) => (
+              <div key={b} className="flex items-center gap-2">
+                <span className="text-sm w-32">{b}</span>
+                <input
+                  type="number"
+                  className="h-9 w-full rounded-md border border-[#E6E6E6] px-2"
+                  value={newProd.initialStocks[b] ?? 0}
+                  onChange={(e) => {
+                    const n = Math.max(0, Number(e.target.value || 0));
+                    setNewProd((p) => ({
+                      ...p,
+                      initialStocks: { ...p.initialStocks, [b]: n },
+                    }));
+                  }}
+                />
+              </div>
+            ))}
         </div>
       </div>
 
@@ -524,16 +611,21 @@ export default function ProductCreateForm({
         <button
           onClick={() => {
             setSelectedCatId(null);
-            setSelectedPathLabel('Ангилал байхгүй');
-            setNewProd(p => ({
+            setSelectedPathLabel("Ангилал байхгүй");
+            setNewProd((p) => ({
               ...p,
-              name: '', sku: '', description: '',
-              price: undefined, cost: undefined,
+              name: "",
+              sku: "",
+              description: "",
+              price: undefined,
+              cost: undefined,
               category: undefined,
               images: [],
-              variants: [{ id: rid(), color: '', size: '', sku: '', price: undefined }],
+              variants: [
+                { id: rid(), color: "", size: "", sku: "", price: undefined },
+              ],
               initialStocks: Object.fromEntries(
-                branches.filter(b => b !== 'Бүх салбар').map(b => [b, 0])
+                branches.filter((b) => b !== "Бүх салбар").map((b) => [b, 0])
               ),
             }));
           }}
@@ -541,11 +633,13 @@ export default function ProductCreateForm({
         >
           Цэвэрлэх
         </button>
-        <button onClick={handleCreateSubmit} className="h-10 px-5 rounded-lg bg-[#5AA6FF] text-white">
+        <button
+          onClick={handleCreateSubmit}
+          className="h-10 px-5 rounded-lg bg-[#5AA6FF] text-white"
+        >
           Хадгалах
         </button>
       </div>
     </div>
   );
 }
-

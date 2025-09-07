@@ -1,7 +1,8 @@
-'use client';
-import type { Mode } from '@/lib/inventory/inventoryTypes';
-import { useState } from 'react';
-import { Loading } from '@/components/Loading';
+"use client";
+// import type { Mode } from '@/lib/inventory/inventoryTypes';
+type Mode = "view" | "edit" | "create" | "count" | "transfer" | "receive";
+import { useState } from "react";
+import { Loading } from "@/components/Loading";
 
 export default function ModeSwitcher({
   mode,
@@ -13,8 +14,14 @@ export default function ModeSwitcher({
   const [loading] = useState(false);
 
   function Chip({
-    value, label, disabled = false,
-  }: { value: Mode; label: string; disabled?: boolean }) {
+    value,
+    label,
+    disabled = false,
+  }: {
+    value: Mode;
+    label: string;
+    disabled?: boolean;
+  }) {
     const active = mode === value;
     return (
       <button
@@ -23,10 +30,12 @@ export default function ModeSwitcher({
         disabled={disabled}
         aria-disabled={disabled}
         className={[
-          'h-8 px-3 rounded-full text-xs border transition shrink-0',
-          active ? 'bg-[#5AA6FF] text-white border-[#5171F3]' : 'bg-white text-black border-[#E6E6E6]',
-          disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-sm',
-        ].join(' ')}
+          "h-8 px-3 rounded-full text-xs border transition shrink-0",
+          active
+            ? "bg-[#5AA6FF] text-white border-[#5171F3]"
+            : "bg-white text-black border-[#E6E6E6]",
+          disabled ? "opacity-50 cursor-not-allowed" : "hover:shadow-sm",
+        ].join(" ")}
       >
         {label}
       </button>
@@ -37,7 +46,11 @@ export default function ModeSwitcher({
 
   return (
     <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none]">
-      <style jsx>{`div::-webkit-scrollbar{display:none;}`}</style>
+      <style jsx>{`
+        div::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <Chip value="view" label="Зүгээр харах" />
       <Chip value="count" label="Тооллого" />
       <Chip value="transfer" label="Өөр салбар руу шилжүүлэх" />

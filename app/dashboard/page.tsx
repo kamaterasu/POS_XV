@@ -8,7 +8,6 @@ import { FaArrowRotateLeft } from "react-icons/fa6";
 import { VscGraph } from "react-icons/vsc";
 import { FaRegUser } from "react-icons/fa";
 import { IoExitOutline } from "react-icons/io5";
-import { MdDashboard } from "react-icons/md";
 import type { IconType } from "react-icons";
 import { supabase } from "@/lib/supabaseClient";
 import { Loading } from "@/components/Loading";
@@ -97,16 +96,39 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg">
-                <MdDashboard size={24} />
+                <BiTransferAlt size={24} />
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  Удирдлагын самбар
-                </h1>
-                <p className="text-sm text-gray-600">
+              <button
+                onClick={goToManagement}
+                disabled={!canAccessFeature(userRole, "management")}
+                className={`transition-all duration-200 rounded-lg p-2 ${
+                  !canAccessFeature(userRole, "management")
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-indigo-50 active:scale-[0.98]"
+                }`}
+                title={
+                  !canAccessFeature(userRole, "management")
+                    ? "Тун удахгүй"
+                    : "Хэрэглэгч, эрхийн удирдлага"
+                }
+              >
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-gray-900">
+                    Удирдлагын самбар
+                  </h1>
+                  <FaRegUser
+                    size={16}
+                    className={
+                      !canAccessFeature(userRole, "management")
+                        ? "text-gray-400"
+                        : "text-indigo-600"
+                    }
+                  />
+                </div>
+                <p className="text-sm text-gray-600 text-left">
                   Тавтай морилно уу, {userName || "Хэрэглэгч"}
                 </p>
-              </div>
+              </button>
             </div>
 
             <div className="flex items-center gap-3">
@@ -192,18 +214,6 @@ export default function DashboardPage() {
               iconBg="bg-purple-50"
               iconColor="text-purple-600"
               disabled={!canAccessFeature(userRole, "report")}
-            />
-          </div>
-          <div className="fade-in-up stagger-5">
-            <FeatureCard
-              onClick={goToManagement}
-              Icon={FaRegUser}
-              label="Хяналт"
-              description="Хэрэглэгч, эрхийн удирдлага"
-              gradient="from-indigo-500 to-purple-500"
-              iconBg="bg-indigo-50"
-              iconColor="text-indigo-600"
-              disabled={!canAccessFeature(userRole, "management")}
             />
           </div>
         </div>

@@ -6,6 +6,7 @@ import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getTenantId } from "@/lib/helper/getTenantId";
 import {
   createReturn,
+  getReturnsByOrder,
   mapPaymentMethod,
   mapReturnReason,
   type CreateReturnRequest,
@@ -80,7 +81,8 @@ export default function ProductReturnPage() {
   ];
 
   const paymentMethods = [
-    { id: "original", label: "Анхны төлбөрөөр", icon: "🔄" },
+    { id: "bank", label: "Дансаар", icon: "🏦" },
+    { id: "qpay", label: "Qpay", icon: "�" },
     { id: "cash", label: "Бэлнээр", icon: "💵" },
     { id: "card", label: "Картаар", icon: "💳" },
   ];
@@ -119,24 +121,73 @@ export default function ProductReturnPage() {
 
         setCurrentOrder(order);
 
-        // Transform order items to return items
-        const returnItems: ReturnItem[] = order.items.map((item, index) => ({
-          id: item.id || `item-${index}`,
-          name: item.product_name || item.variant_name || `Бараа ${index + 1}`,
-          price: item.unit_price,
-          quantity: 1, // Default return quantity
-          maxQuantity: item.quantity, // Max is the original ordered quantity
-          order_item_id: item.id,
-          variant_id: item.variant_id,
-        }));
+        // Get existing returns for this order to calculate remaining returnable quantities
+        let existingReturns: any[] = [];
+        try {
+          const returnsResponse = await getReturnsByOrder(
+            tenantId,
+            order.id,
+            token
+          );
+          existingReturns = returnsResponse.items || [];
+        } catch (returnError) {
+          console.warn("Could not fetch existing returns:", returnError);
+          // Continue without existing returns data
+        }
+
+        // Calculate returned quantities per item
+        const returnedQuantities: Record<string, number> = {};
+        existingReturns.forEach((returnRecord: any) => {
+          if (returnRecord.items) {
+            returnRecord.items.forEach((returnItem: any) => {
+              const itemId = returnItem.order_item_id;
+              returnedQuantities[itemId] =
+                (returnedQuantities[itemId] || 0) + returnItem.quantity;
+            });
+          }
+        });
+
+        // Transform order items to return items with correct remaining quantities
+        const returnItems: ReturnItem[] = order.items
+          .map((item, index) => {
+            const alreadyReturned = returnedQuantities[item.id] || 0;
+            const remainingQuantity = Math.max(
+              0,
+              item.quantity - alreadyReturned
+            );
+
+            return {
+              id: item.id || `item-${index}`,
+              name:
+                item.product_name || item.variant_name || `Бараа ${index + 1}`,
+              price: item.unit_price,
+              quantity: remainingQuantity > 0 ? 1 : 0, // Default return quantity, but 0 if nothing left
+              maxQuantity: remainingQuantity, // Max is the remaining returnable quantity
+              order_item_id: item.id,
+              variant_id: item.variant_id,
+            };
+          })
+          .filter((item) => item.maxQuantity > 0); // Only show items that can still be returned
 
         setItems(returnItems);
         setOrderFound(true);
-        addToast(
-          "success",
-          "Амжилттай",
-          `Баримт олдлоо. Нийт ${returnItems.length} бараа байна.`
-        );
+
+        const totalReturnableItems = returnItems.length;
+        const hasReturnableItems = totalReturnableItems > 0;
+
+        if (hasReturnableItems) {
+          addToast(
+            "success",
+            "Амжилттай",
+            `Баримт олдлоо. Буцаах боломжтой ${totalReturnableItems} бараа байна.`
+          );
+        } else {
+          addToast(
+            "warning",
+            "Анхааруулга",
+            "Баримт олдсон боловч буцаах боломжтой бараа байхгүй байна."
+          );
+        }
       } catch (error: any) {
         console.error("Search error:", error);
         let errorMessage = "Баримт хайхад алдаа гарлаа";
@@ -177,6 +228,18 @@ export default function ProductReturnPage() {
       const message = "Буцаах барааны тоо ширхэг оруулна уу";
       setError(message);
       addToast("warning", "Анхааруулга", message);
+      return;
+    }
+
+    // Validate that no item exceeds its maximum returnable quantity
+    const invalidItems = itemsToReturn.filter(
+      (item) => item.quantity > item.maxQuantity
+    );
+    if (invalidItems.length > 0) {
+      const invalidItemNames = invalidItems.map((item) => item.name).join(", ");
+      const message = `Дараах барааны тоо ширхэг хэтэрсэн байна: ${invalidItemNames}`;
+      setError(message);
+      addToast("error", "Алдаа", message);
       return;
     }
 
@@ -255,7 +318,24 @@ export default function ProductReturnPage() {
       );
     } catch (error: any) {
       console.error("Return submission error:", error);
-      const errorMessage = error.message || "Буцаалт үүсгэхэд алдаа гарлаа";
+      let errorMessage = "Буцаалт үүсгэхэд алдаа гарлаа";
+
+      if (error.message) {
+        // Check for specific quantity validation errors
+        if (error.message.includes("qty exceeds remaining to return")) {
+          errorMessage =
+            "Буцаах тоо ширхэг хэтэрсэн байна. Хуудсыг дахин ачааллаад дахин оролдоно уу.";
+          // Refresh the order data to get updated returnable quantities
+          if (documentNumber) {
+            setTimeout(() => {
+              handleSearch(documentNumber);
+            }, 1000);
+          }
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       setError(errorMessage);
       addToast("error", "Алдаа", errorMessage);
     } finally {
@@ -489,7 +569,7 @@ export default function ProductReturnPage() {
                             ₮{(item.price * item.quantity).toLocaleString()}
                           </p>
                           <p className="text-xs text-gray-500">
-                            Макс: {item.maxQuantity}
+                            Буцаах боломжтой: {item.maxQuantity}
                           </p>
                         </div>
                         <button
@@ -581,12 +661,12 @@ export default function ProductReturnPage() {
               ⚡ Үйлдэл
             </h2>
             <div className="space-y-3">
-              <button
+              {/* <button
                 onClick={handlePrint}
                 className="w-full px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 🖨️ Хэвлэх (буцаалтын баримт)
-              </button>
+              </button> */}
               <button
                 onClick={handleConfirm}
                 className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
