@@ -1,17 +1,26 @@
-'use client';
-import { useMemo, useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+"use client";
+import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 
-import { Item, QuickActions } from '@/lib/sales/salesType';
-import { listProducts } from '@/lib/product/productApi';
-import { fmt, calcTotals } from '@/lib/sales/salesUtils';
+import { Item, QuickActions } from "@/lib/sales/salesTypes";
+import { listProducts } from "@/lib/product/productApi";
+import { fmt, calcTotals } from "@/lib/sales/salesUtils";
 
-import CartFooter from '@/components/checkoutComponents/CartFooter';
-import AddItemModal from '@/components/checkoutComponents/AddItemModal';
-import QuickActionsSheet from '@/components/checkoutComponents/QuickActionsSheet';
-import SaveDraftDialog from '@/components/checkoutComponents/SaveDraftDialog';
-import PayDialogMulti from '@/components/checkoutComponents/PayDialogMulti';
+/** ===== Product type for API response ===== */
+type ProductFromAPI = {
+  id: string;
+  name: string;
+  imgPath: string;
+  price: number;
+  qty: number;
+};
+
+import CartFooter from "@/components/checkoutComponents/CartFooter";
+import AddItemModal from "@/components/checkoutComponents/AddItemModal";
+import QuickActionsSheet from "@/components/checkoutComponents/QuickActionsSheet";
+import SaveDraftDialog from "@/components/checkoutComponents/SaveDraftDialog";
+import PayDialogMulti from "@/components/checkoutComponents/PayDialogMulti";
 
 /** ===== Favorites types (энд локалд барина) ===== */
 type FavVariant = {
@@ -33,7 +42,7 @@ export type FavoriteProduct = {
 /** ===== Эхний төлөв ===== */
 const initialItems: Item[] = []; // хоосноос эхлүүлнэ
 
-export default function checkoutPage() {
+export default function CheckoutPage() {
   const router = useRouter();
 
   const [items, setItems] = useState<Item[]>(initialItems);
@@ -58,21 +67,23 @@ export default function checkoutPage() {
     (async () => {
       try {
         // inventoryApi-ийн одоогийн no-op буцаалттай байсан ч зүгээр — хоосон жагсаалт болно
-        const prods = await listProducts({ storeId: 'all' });
+        const prods = await listProducts({ storeId: "all" });
         if (cancelled) return;
 
-        const favs: FavoriteProduct[] = (prods ?? []).slice(0, 24).map((p) => ({
-          id: p.id,
-          name: p.name,
-          img: p.imgPath,
-          variants: [
-            {
-              price: p.price,
-              stock: p.qty,
-              img: p.imgPath,
-            },
-          ],
-        }));
+        const favs: FavoriteProduct[] = (prods ?? [])
+          .slice(0, 24)
+          .map((p: ProductFromAPI) => ({
+            id: p.id,
+            name: p.name,
+            img: p.imgPath,
+            variants: [
+              {
+                price: p.price,
+                stock: p.qty,
+                img: p.imgPath,
+              },
+            ],
+          }));
         setFavorites(favs);
       } catch {
         setFavorites([]); // зүгээр л хоосон үлдээнэ
@@ -84,16 +95,25 @@ export default function checkoutPage() {
   }, []);
 
   /** Товч тооцооллууд */
-  const totalRaw = useMemo(() => items.reduce((s, it) => s + it.qty * it.price, 0), [items]);
+  const totalRaw = useMemo(
+    () => items.reduce((s, it) => s + it.qty * it.price, 0),
+    [items]
+  );
   const totals = useMemo(() => calcTotals(items, qa), [items, qa]);
 
   /** Qty өөрчлөлт */
   const inc = (id: string) =>
-    setItems((arr) => arr.map((it) => (it.id === id ? { ...it, qty: it.qty + 1 } : it)));
+    setItems((arr) =>
+      arr.map((it) => (it.id === id ? { ...it, qty: it.qty + 1 } : it))
+    );
   const dec = (id: string) =>
-    setItems((arr) => arr.map((it) => (it.id === id && it.qty > 1 ? { ...it, qty: it.qty - 1 } : it)));
+    setItems((arr) =>
+      arr.map((it) =>
+        it.id === id && it.qty > 1 ? { ...it, qty: it.qty - 1 } : it
+      )
+    );
 
-  const goToDashboard = () => router.push('/dashboard');
+  const goToDashboard = () => router.push("/dashboard");
 
   return (
     <div className="bg-[#F7F7F5] min-h-dvh w-screen p-5 flex flex-col gap-2.5">
@@ -117,26 +137,33 @@ export default function checkoutPage() {
             {items.map((it, idx) => {
               const line = it.qty * it.price;
               return (
-                <li key={it.id} className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 items-center">
+                <li
+                  key={it.id}
+                  className="grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 items-center"
+                >
                   <div className="flex items-start gap-2 w-full">
                     <div className="flex items-start gap-2">
                       <Image
-                        src={it.imgPath || '/default.png'}
+                        src={it.imgPath || "/default.png"}
                         alt={it.name}
                         width={40}
                         height={40}
                         className="w-10 h-10 rounded-sm object-cover bg-[#EFEFEF]"
-                        onError={(e) => {
+                        onError={() => {
                           // Next/Image дээр шууд src солих боломжгүй тул fallback-д анхнаасаа default.png өгсөн
-                          console.debug('image load failed for', it.imgPath);
+                          console.debug("image load failed for", it.imgPath);
                         }}
                       />
                       <div className="leading-tight flex flex-col">
                         <div className="text-[12px] font-semibold text-black">
                           {idx + 1}. {it.name}
                         </div>
-                        <div className="text-[10px] text-black/60">Хэмжээ: {it.size || '—'}</div>
-                        <div className="text-[10px] text-black/60">Өнгө: {it.color || '—'}</div>
+                        <div className="text-[10px] text-black/60">
+                          Хэмжээ: {it.size || "—"}
+                        </div>
+                        <div className="text-[10px] text-black/60">
+                          Өнгө: {it.color || "—"}
+                        </div>
                         <div className="text-[12px] text-black/40">
                           {fmt(it.price)} × {it.qty}
                         </div>
@@ -167,7 +194,9 @@ export default function checkoutPage() {
                         </div>
                       </div>
 
-                      <div className="w-24 text-right font-semibold text-black">{fmt(line)}</div>
+                      <div className="w-24 text-right font-semibold text-black">
+                        {fmt(line)}
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -222,7 +251,11 @@ export default function checkoutPage() {
         onAdd={(it) =>
           setItems((prev) => {
             const i = prev.findIndex(
-              (p) => p.name === it.name && p.price === it.price && p.size === it.size && p.color === it.color
+              (p) =>
+                p.name === it.name &&
+                p.price === it.price &&
+                p.size === it.size &&
+                p.color === it.color
             );
             if (i > -1) {
               const copy = [...prev];
@@ -244,7 +277,11 @@ export default function checkoutPage() {
         onPickFavorite={(it) =>
           setItems((prev) => {
             const i = prev.findIndex(
-              (p) => p.name === it.name && p.price === it.price && p.size === it.size && p.color === it.color
+              (p) =>
+                p.name === it.name &&
+                p.price === it.price &&
+                p.size === it.size &&
+                p.color === it.color
             );
             if (i > -1) {
               const copy = [...prev];
@@ -257,7 +294,11 @@ export default function checkoutPage() {
       />
 
       {/* Save draft */}
-      <SaveDraftDialog open={openSave} onClose={() => setOpenSave(false)} items={items} />
+      <SaveDraftDialog
+        open={openSave}
+        onClose={() => setOpenSave(false)}
+        items={items}
+      />
 
       {/* Pay */}
       <PayDialogMulti
@@ -265,7 +306,7 @@ export default function checkoutPage() {
         onClose={() => setOpenPay(false)}
         total={totals.grand}
         onPaidMulti={(rows, totalReceived, change) => {
-          console.log('PAID', rows, totalReceived, change);
+          console.log("PAID", rows, totalReceived, change);
         }}
       />
     </div>

@@ -1,9 +1,39 @@
 import { jwtDecode } from "jwt-decode";
+import { getAccessToken } from "@/lib/helper/getAccessToken";
+
+export async function listProducts(params: { storeId: string }) {
+  try {
+    // Get token for API call
+    const token = await getAccessToken();
+    if (!token) return [];
+
+    // Use the existing getProduct function to get products
+    const response = await getProduct(token, "");
+
+    // Transform the response to match expected format
+    if (response?.products) {
+      return response.products.map((product: any) => ({
+        id: product.id,
+        name: product.name,
+        imgPath: product.img || "/default.png",
+        price: product.variants?.[0]?.price || 0,
+        qty: product.variants?.[0]?.stock || 0,
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return [];
+  }
+}
 
 export async function getProduct(token: string, order_id: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
-  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&search=&limit=20&offset=0`);
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&search=&limit=20&offset=0`
+  );
 
   const res = await fetch(url.toString(), {
     method: "GET",
@@ -16,7 +46,9 @@ export async function getProduct(token: string, order_id: string) {
 export async function getProductByVariant(token: string, product_id: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
-  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&id=${product_id}&withVariants=true}`);
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&id=${product_id}&withVariants=true}`
+  );
   const res = await fetch(url.toString(), {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
@@ -28,7 +60,9 @@ export async function getProductByVariant(token: string, product_id: string) {
 export async function getProductByCategory(token: string, category_id: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
-  const url = new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&category_id=${category_id}&subtree=true`);
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&category_id=${category_id}&subtree=true`
+  );
 
   const res = await fetch(url.toString(), {
     method: "GET",
@@ -69,4 +103,3 @@ export async function createProduct(token: string, product: ProductInput) {
 
   return res.json();
 }
-
