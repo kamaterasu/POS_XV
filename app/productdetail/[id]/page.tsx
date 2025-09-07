@@ -4,14 +4,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProductDetail from '@/components/inventoryComponents/ProductDetail';
-import { getProductById } from '@/lib/product/productSummary';
-import type { ProductStockSummary } from '@/lib/product/productSummary';
+// import { getProductById } from '@/lib/product/productApi';
 import { Loading } from '@/components/Loading';
 
 export default function Page() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [data, setData] = useState<ProductStockSummary | null>(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
