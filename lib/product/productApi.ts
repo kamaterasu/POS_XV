@@ -1,7 +1,7 @@
 import { jwtDecode } from "jwt-decode";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 
-export async function listProducts( storeId: string ) {
+export async function listProducts(storeId: string) {
   try {
     // Get token for API call
     const token = await getAccessToken();

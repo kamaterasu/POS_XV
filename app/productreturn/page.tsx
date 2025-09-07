@@ -40,8 +40,7 @@ export default function ProductReturnPage() {
   const [loading, setLoading] = useState(false);
   const [documentNumber, setDocumentNumber] = useState("");
   const [selectedReason, setSelectedReason] = useState<ReturnReason>("size");
-  const [selectedPayment, setSelectedPayment] =
-    useState<PaymentMethod>("original");
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>("cash");
   const [customReason, setCustomReason] = useState("");
   const [items, setItems] = useState<ReturnItem[]>([]);
   const [orderFound, setOrderFound] = useState(false);
@@ -78,13 +77,6 @@ export default function ProductReturnPage() {
     { id: "wrong", label: "Буруу бараа", icon: "❌" },
     { id: "unsatisfied", label: "Сэтгэл ханамжгүй", icon: "😞" },
     { id: "other", label: "Бусад", icon: "📝" },
-  ];
-
-  const paymentMethods = [
-    { id: "bank", label: "Дансаар", icon: "🏦" },
-    { id: "qpay", label: "Qpay", icon: "�" },
-    { id: "cash", label: "Бэлнээр", icon: "💵" },
-    { id: "card", label: "Картаар", icon: "💳" },
   ];
 
   const handleSearch = useCallback(
@@ -250,13 +242,6 @@ export default function ProductReturnPage() {
       return;
     }
 
-    if (!selectedPayment) {
-      const message = "Төлбөрийн хэлбэр сонгоно уу";
-      setError(message);
-      addToast("warning", "Анхааруулга", message);
-      return;
-    }
-
     if (!currentOrder) {
       const message = "Захиалгын мэдээлэл олдсонгүй";
       setError(message);
@@ -292,7 +277,7 @@ export default function ProductReturnPage() {
         })),
         refunds: [
           {
-            method: mapPaymentMethod(selectedPayment),
+            method: "CASH",
             amount: totalRefund,
           },
         ],
@@ -308,7 +293,6 @@ export default function ProductReturnPage() {
       setCurrentOrder(null);
       setSelectedReason("size");
       setCustomReason("");
-      setSelectedPayment("original");
       setError(null);
 
       addToast(
@@ -627,31 +611,6 @@ export default function ProductReturnPage() {
                   ₮{totalReturn.toLocaleString()}
                 </span>
               </div>
-            </div>
-          </div>
-
-          {/* Payment Method */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              💳 Төлбөрийн арга
-            </h2>
-            <div className="space-y-3">
-              {paymentMethods.map((method) => (
-                <button
-                  key={method.id}
-                  onClick={() => setSelectedPayment(method.id as PaymentMethod)}
-                  className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-sm font-medium ${
-                    selectedPayment === method.id
-                      ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md"
-                      : "border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-lg">{method.icon}</span>
-                    {method.label}
-                  </div>
-                </button>
-              ))}
             </div>
           </div>
 

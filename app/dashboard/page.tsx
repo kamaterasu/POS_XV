@@ -8,6 +8,8 @@ import { FaArrowRotateLeft } from "react-icons/fa6";
 import { VscGraph } from "react-icons/vsc";
 import { FaRegUser } from "react-icons/fa";
 import { IoExitOutline } from "react-icons/io5";
+import { MdOutlineShoppingCart } from "react-icons/md";
+import { TbTransfer } from "react-icons/tb";
 import type { IconType } from "react-icons";
 import { supabase } from "@/lib/supabaseClient";
 import { Loading } from "@/components/Loading";
@@ -63,6 +65,8 @@ export default function DashboardPage() {
   const goToReport = () => router.push("/report");
   const goToManagement = () => router.push("/management");
   const goToProductReturn = () => router.push("/productreturn");
+  // const goToOrderCount = () => router.push("/order");
+  const goToTransferItems = () => router.push("/transfer");
 
   const handleLogout = async () => {
     try {
@@ -140,14 +144,14 @@ export default function DashboardPage() {
               )}
               <button
                 onClick={handleLogout}
-                className="group p-2 rounded-xl flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-sm hover:shadow-md hover:bg-red-50 transition-all duration-200 active:scale-95"
+                className="group p-2 rounded-xl flex items-center gap-2 bg-red-500 backdrop-blur-sm border border-red-600 shadow-sm hover:shadow-md hover:bg-red-600 transition-all duration-200 active:scale-95"
                 title="Системээс гарах"
               >
                 <IoExitOutline
                   size={20}
-                  className="text-gray-600 group-hover:text-red-600 transition-colors"
+                  className="text-white group-hover:text-white transition-colors"
                 />
-                <span className="text-sm text-gray-600">Гарах</span>
+                <span className="text-sm text-white">Гарах</span>
               </button>
             </div>
           </div>
@@ -216,6 +220,19 @@ export default function DashboardPage() {
               iconBg="bg-purple-50"
               iconColor="text-purple-600"
               disabled={!canAccessFeature(userRole, "report")}
+            />
+          </div>
+
+          <div className="fade-in-up stagger-5">
+            <FeatureCard
+              onClick={goToTransferItems}
+              Icon={TbTransfer}
+              label="Шилжүүлэг"
+              description="Бараа материал шилжүүлэх"
+              gradient="from-teal-500 to-green-500"
+              iconBg="bg-teal-50"
+              iconColor="text-teal-600"
+              disabled={!canAccessFeature(userRole, "transfer")}
             />
           </div>
         </div>
