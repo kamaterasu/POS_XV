@@ -164,10 +164,10 @@ export default function DashboardPage() {
               Системд амжилттай холбогдлоо
             </span>
           </div>
-          <p className="text-gray-600 max-w-2xl mx-auto">
+          {/* <p className="text-gray-600 max-w-2xl mx-auto">
             Борлуулалтын цэгийн системийн удирдлагын самбар. Дараах үйл
             ажиллагааг гүйцэтгэх боломжтой.
-          </p>
+          </p> */}
         </div>
 
         {/* Feature cards grid */}

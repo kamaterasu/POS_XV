@@ -76,6 +76,7 @@ export default function ManagementPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [branchQuery, setBranchQuery] = useState("");
   const [userRole, setUserRole] = useState<string>("");
 
@@ -167,6 +168,7 @@ export default function ManagementPage() {
     let cancelled = false;
     (async () => {
       setLoadingBranches(true);
+      setLoadingUsers(true);
       try {
         const tid = (await getTenantId()) ?? "";
         if (cancelled) return;
@@ -269,7 +271,10 @@ export default function ManagementPage() {
       } catch (e) {
         // Init failed
       } finally {
-        if (!cancelled) setLoadingBranches(false);
+        if (!cancelled) {
+          setLoadingBranches(false);
+          setLoadingUsers(false);
+        }
       }
     })();
     return () => {
@@ -494,7 +499,7 @@ export default function ManagementPage() {
         message: `"${u.name}" хэрэглэгчийг устгах уу?`,
         confirmText: "Устгах",
         cancelText: "Болих",
-        type: "warning",
+        type: "danger",
         onConfirm: () => performDeleteUser(u),
         onCancel: () =>
           setConfirmDialog((prev) => ({ ...prev, isOpen: false })),
@@ -576,7 +581,7 @@ export default function ManagementPage() {
       message: `"${branch.name}" салбарыг устгах уу?`,
       confirmText: "Устгах",
       cancelText: "Болих",
-      type: "warning",
+      type: "danger",
       onConfirm: () => performDeleteBranch(branch),
       onCancel: () => setConfirmDialog((prev) => ({ ...prev, isOpen: false })),
     });
@@ -648,7 +653,20 @@ export default function ManagementPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              👥 Хэрэглэгчид
+              <svg
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197V9a3 3 0 00-6 0v2.5a5 5 0 110 11V21z"
+                />
+              </svg>
+              Хэрэглэгчид
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               Системийн хэрэглэгчдийг удирдах
@@ -659,7 +677,20 @@ export default function ManagementPage() {
               onClick={openCreate}
               className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#5AA6FF] to-[#4A96E8] text-white shadow-lg hover:shadow-xl transition-all duration-200 font-medium flex items-center gap-2 hover:scale-105"
             >
-              ✨ Хэрэглэгч үүсгэх
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                />
+              </svg>
+              Хэрэглэгч үүсгэх
             </button>
           )}
         </div>
@@ -676,100 +707,186 @@ export default function ManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {users.map((u, index) => (
-                <tr
-                  key={u.id}
-                  className="hover:bg-gray-50 transition-colors duration-150"
-                >
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                          u.role === "Admin"
-                            ? "bg-red-500"
-                            : u.role === "Manager"
-                            ? "bg-blue-500"
-                            : "bg-green-500"
-                        }`}
-                      >
-                        {u.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {u.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          #{u.id.slice(-6)}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 text-gray-700">{u.email}</td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                        u.role === "Admin"
-                          ? "bg-red-100 text-red-800"
-                          : u.role === "Manager"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
+              {loadingUsers
+                ? // Loading skeleton for users
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <tr
+                      key={`user-skeleton-${index}`}
+                      className="animate-pulse"
                     >
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    {u.role === "Admin" || u.role === "Manager" ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        🌟 Бүх салбар
-                      </span>
-                    ) : u.store_ids?.length ? (
-                      <div className="flex flex-wrap gap-1">
-                        {u.store_ids.slice(0, 2).map((id) => (
-                          <span
-                            key={id}
-                            className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-300"></div>
+                          <div>
+                            <div className="h-4 bg-gray-300 rounded w-24 mb-1"></div>
+                            <div className="h-3 bg-gray-200 rounded w-16"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="h-4 bg-gray-300 rounded w-32"></div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="h-6 bg-gray-300 rounded-full w-16"></div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="h-6 bg-gray-300 rounded-full w-20"></div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex gap-2">
+                          <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
+                          <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                : users.map((u, index) => (
+                    <tr
+                      key={u.id}
+                      className="hover:bg-gray-50 transition-colors duration-150"
+                    >
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm ${
+                              u.role === "Admin"
+                                ? "bg-gradient-to-br from-red-500 to-red-600"
+                                : u.role === "Manager"
+                                ? "bg-gradient-to-br from-blue-500 to-blue-600"
+                                : "bg-gradient-to-br from-gray-500 to-gray-600"
+                            }`}
                           >
-                            {branchesById[id] || "Unknown"}
+                            {u.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">
+                              {u.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              #{u.id.slice(-6)}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-gray-700">{u.email}</td>
+                      <td className="py-4 px-6">
+                        <span
+                          className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                            u.role === "Admin"
+                              ? "bg-red-100 text-red-800"
+                              : u.role === "Manager"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        {u.role === "Admin" || u.role === "Manager" ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            <svg
+                              className="w-3 h-3 mr-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                              />
+                            </svg>
+                            Бүх салбар
                           </span>
-                        ))}
-                        {u.store_ids.length > 2 && (
-                          <span className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
-                            +{u.store_ids.length - 2}
-                          </span>
+                        ) : u.store_ids?.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {u.store_ids.slice(0, 2).map((id) => (
+                              <span
+                                key={id}
+                                className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
+                              >
+                                {branchesById[id] || "Unknown"}
+                              </span>
+                            ))}
+                            {u.store_ids.length > 2 && (
+                              <span className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
+                                +{u.store_ids.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
                         )}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-6">
-                    {userRole !== "CASHIER" ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openEdit(u)}
-                          className="h-9 px-4 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors duration-150 font-medium"
-                        >
-                          ✏️ Засах
-                        </button>
-                        <button
-                          onClick={() => confirmDelete(u)}
-                          className="h-9 px-4 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors duration-150 font-medium"
-                        >
-                          🗑️ Устгах
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {users.length === 0 && (
+                      </td>
+                      <td className="py-4 px-6">
+                        {userRole !== "CASHIER" ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openEdit(u)}
+                              className="h-9 px-4 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors duration-150 font-medium flex items-center gap-1"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                              Засах
+                            </button>
+                            <button
+                              onClick={() => confirmDelete(u)}
+                              className="h-9 px-4 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors duration-150 font-medium flex items-center gap-1"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
+                              </svg>
+                              Устгах
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              {users.length === 0 && !loadingUsers && (
                 <tr>
                   <td className="py-12 text-center text-gray-500" colSpan={5}>
                     <div className="flex flex-col items-center gap-2">
-                      <div className="text-4xl">👤</div>
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197V9a3 3 0 00-6 0v2.5a5 5 0 110 11V21z"
+                          />
+                        </svg>
+                      </div>
                       <div className="font-medium">Хэрэглэгч байхгүй байна</div>
                       <div className="text-sm">
                         Шинэ хэрэглэгч нэмж эхлээрэй
@@ -788,7 +905,20 @@ export default function ManagementPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              🏢 Салбарууд
+              <svg
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                />
+              </svg>
+              Салбарууд
             </h2>
             <p className="text-sm text-gray-600 mt-1">
               Дэлгүүрийн салбаруудыг удирдах
@@ -796,62 +926,47 @@ export default function ManagementPage() {
           </div>
           <div className="flex gap-3">
             <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg
+                  className="w-4 h-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
               <input
-                placeholder="🔍 Хайх..."
-                className="h-11 pl-4 pr-4 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 bg-gray-50 focus:bg-white"
+                placeholder="Хайх..."
+                className="h-11 pl-10 pr-4 rounded-xl border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 bg-gray-50 focus:bg-white"
                 value={branchQuery}
                 onChange={(e) => setBranchQuery(e.target.value)}
               />
             </div>
-            <button
-              onClick={() => {
-                setLoadingBranches(true);
-                getAccessToken()
-                  .then((token) => getStore(token))
-                  .then((storesResponse: any) => {
-                    let stores = [];
-                    if (Array.isArray(storesResponse)) {
-                      stores = storesResponse;
-                    } else if (
-                      storesResponse?.stores &&
-                      Array.isArray(storesResponse.stores)
-                    ) {
-                      stores = storesResponse.stores;
-                    } else if (storesResponse?.id && storesResponse?.name) {
-                      stores = [storesResponse];
-                    } else if (
-                      storesResponse?.data &&
-                      Array.isArray(storesResponse.data)
-                    ) {
-                      stores = storesResponse.data;
-                    } else {
-                      stores = [];
-                    }
-                    const validStores = stores.filter(
-                      (store: any) => store && store.id && store.name
-                    );
-                    setBranches(validStores);
-                  })
-                  .catch((err: any) =>
-                    addToast(
-                      "error",
-                      "Алдаа",
-                      "[getStore] " + (err?.message || err)
-                    )
-                  )
-                  .finally(() => setLoadingBranches(false));
-              }}
-              disabled={loadingBranches}
-              className="h-11 px-5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 disabled:opacity-50 transition-all duration-200 font-medium"
-            >
-              {loadingBranches ? "🔄 Уншиж байна..." : "🔄 Шинэчлэх"}
-            </button>
             {userRole !== "CASHIER" && (
               <button
                 onClick={addBranch}
-                className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#5AA6FF] to-[#4A96E8] text-white shadow-lg hover:shadow-xl transition-all duration-200 font-medium hover:scale-105"
+                className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#5AA6FF] to-[#4A96E8] text-white shadow-lg hover:shadow-xl transition-all duration-200 font-medium hover:scale-105 flex items-center gap-2"
               >
-                ➕ Нэмэх
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                  />
+                </svg>
+                Нэмэх
               </button>
             )}
           </div>
@@ -867,64 +982,145 @@ export default function ManagementPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {branches
-                .filter(
-                  (b) =>
-                    !branchQuery.trim() ||
-                    b.name?.toLowerCase().includes(branchQuery.toLowerCase())
-                )
-                .map((b, index) => (
-                  <tr
-                    key={b.id || `branch-${index}`}
-                    className="hover:bg-gray-50 transition-colors duration-150"
-                  >
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold">
-                          🏬
-                        </div>
-                        <div>
-                          <div className="font-semibold text-gray-900">
-                            {b.name || "Нэргүй"}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Салбар #{index + 1}
+              {loadingBranches
+                ? // Loading skeleton for branches
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <tr
+                      key={`branch-skeleton-${index}`}
+                      className="animate-pulse"
+                    >
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gray-300"></div>
+                          <div>
+                            <div className="h-4 bg-gray-300 rounded w-24 mb-1"></div>
+                            <div className="h-3 bg-gray-200 rounded w-20"></div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">
-                        {b.id || "No ID"}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      {userRole !== "CASHIER" ? (
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="h-6 bg-gray-300 rounded w-20"></div>
+                      </td>
+                      <td className="py-4 px-6">
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => editBranch(b)}
-                            className="h-9 px-4 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors duration-150 font-medium"
-                          >
-                            ✏️ Засах
-                          </button>
-                          <button
-                            onClick={() => confirmDeleteBranch(b)}
-                            className="h-9 px-4 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors duration-150 font-medium"
-                          >
-                            🗑️ Устгах
-                          </button>
+                          <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
+                          <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
                         </div>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  ))
+                : branches
+                    .filter(
+                      (b) =>
+                        !branchQuery.trim() ||
+                        b.name
+                          ?.toLowerCase()
+                          .includes(branchQuery.toLowerCase())
+                    )
+                    .map((b, index) => (
+                      <tr
+                        key={b.id || `branch-${index}`}
+                        className="hover:bg-gray-50 transition-colors duration-150"
+                      >
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white">
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                                />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900">
+                                {b.name || "Нэргүй"}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Салбар #{index + 1}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">
+                            {b.id || "No ID"}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          {userRole !== "CASHIER" ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => editBranch(b)}
+                                className="h-9 px-4 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors duration-150 font-medium flex items-center gap-1"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                                Засах
+                              </button>
+                              <button
+                                onClick={() => confirmDeleteBranch(b)}
+                                className="h-9 px-4 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors duration-150 font-medium flex items-center gap-1"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                                Устгах
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
               {branches.length === 0 && !loadingBranches && (
                 <tr>
                   <td className="py-12 text-center text-gray-500" colSpan={3}>
                     <div className="flex flex-col items-center gap-2">
-                      <div className="text-4xl">🏢</div>
+                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                          />
+                        </svg>
+                      </div>
                       <div className="font-medium">Салбар байхгүй байна</div>
                       <div className="text-sm">Шинэ салбар нэмж эхлээрэй</div>
                     </div>
@@ -944,7 +1140,24 @@ export default function ManagementPage() {
             <div className="bg-gradient-to-r from-[#5AA6FF] to-[#4A96E8] px-6 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  {editing ? "✏️ Хэрэглэгч засах" : "✨ Хэрэглэгч үүсгэх"}
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d={
+                        editing
+                          ? "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          : "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                      }
+                    />
+                  </svg>
+                  {editing ? "Хэрэглэгч засах" : "Хэрэглэгч үүсгэх"}
                 </h3>
                 <button
                   onClick={() => setOpen(false)}
@@ -1057,7 +1270,19 @@ export default function ManagementPage() {
                     <div className="rounded-xl border-2 border-dashed border-purple-300 bg-purple-50 p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center">
-                          <span className="text-white text-lg">🌟</span>
+                          <svg
+                            className="w-5 h-5 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                            />
+                          </svg>
                         </div>
                         <div>
                           <p className="font-medium text-purple-900">
@@ -1098,7 +1323,19 @@ export default function ManagementPage() {
                                 }
                               />
                               <div className="flex items-center gap-2">
-                                <span className="text-lg">🏢</span>
+                                <svg
+                                  className="w-4 h-4 text-gray-500"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                                  />
+                                </svg>
                                 <span className="font-medium">
                                   {s.name || "Unnamed"}
                                 </span>
@@ -1108,7 +1345,21 @@ export default function ManagementPage() {
                         })}
                         {branches.length === 0 && (
                           <div className="col-span-2 text-center text-gray-500 py-8">
-                            <div className="text-3xl mb-2">🏢</div>
+                            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                              <svg
+                                className="w-6 h-6 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                                />
+                              </svg>
+                            </div>
                             <div>Салбар байхгүй байна</div>
                           </div>
                         )}
@@ -1132,9 +1383,27 @@ export default function ManagementPage() {
                           : "text-gray-400"
                       }`}
                     >
-                      <span className="text-lg">
-                        {form.password.length >= 8 ? "✅" : "⭕"}
-                      </span>
+                      <div
+                        className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                          form.password.length >= 8
+                            ? "bg-green-100"
+                            : "bg-gray-100"
+                        }`}
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
                       <span>8+ тэмдэгт</span>
                     </div>
                     <div
@@ -1144,9 +1413,27 @@ export default function ManagementPage() {
                           : "text-gray-400"
                       }`}
                     >
-                      <span className="text-lg">
-                        {/[A-Za-z]/.test(form.password) ? "✅" : "⭕"}
-                      </span>
+                      <div
+                        className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                          /[A-Za-z]/.test(form.password)
+                            ? "bg-green-100"
+                            : "bg-gray-100"
+                        }`}
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
                       <span>Үсэг агуулсан</span>
                     </div>
                     <div
@@ -1156,9 +1443,27 @@ export default function ManagementPage() {
                           : "text-gray-400"
                       }`}
                     >
-                      <span className="text-lg">
-                        {/\d/.test(form.password) ? "✅" : "⭕"}
-                      </span>
+                      <div
+                        className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                          /\d/.test(form.password)
+                            ? "bg-green-100"
+                            : "bg-gray-100"
+                        }`}
+                      >
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
                       <span>Тоо агуулсан</span>
                     </div>
                   </div>
@@ -1180,7 +1485,24 @@ export default function ManagementPage() {
                     !activeTenantId || (!editing && (!form.email || !pwOk))
                   }
                 >
-                  {editing ? "💾 Хадгалах" : "✨ Үүсгэх"}
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d={
+                        editing
+                          ? "M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                          : "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                      }
+                    />
+                  </svg>
+                  {editing ? "Хадгалах" : "Үүсгэх"}
                 </button>
               </div>
             </div>

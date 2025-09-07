@@ -1,11 +1,22 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Item } from "@/lib/sales/salesTypes";
 import { FiHeart } from "react-icons/fi";
 import { FaShoppingCart } from "react-icons/fa";
 import Image from "next/image";
+import { getProduct } from "@/lib/product/productApi";
+import { getAccessToken } from "@/lib/helper/getAccessToken";
 
-type Variant = { color: string; size: string; stock: number; price: number };
+type Variant = { 
+  variant_id: string; // Made required since we need real IDs
+  color?: string; 
+  size?: string; 
+  stock: number; 
+  price: number; 
+  name?: string; // Add name for variant
+  sku?: string; // Add SKU
+  attrs?: Record<string, string>; // Add attributes
+};
 type Product = {
   id: string;
   name: string;
@@ -13,36 +24,65 @@ type Product = {
   variants: Variant[];
 };
 
-const defaultCatalog: Product[] = [
-  {
-    id: "p1",
-    name: "Бараа 1",
-    img: "",
-    variants: [
-      { color: "Цэнхэр", size: "3XL", stock: 2, price: 200000 },
-      { color: "Цэнхэр", size: "2XL", stock: 1, price: 200000 },
-      { color: "Хар", size: "XL", stock: 5, price: 200000 },
-      { color: "Цайвар", size: "L", stock: 0, price: 200000 },
-      { color: "Хар", size: "M", stock: 3, price: 200000 },
-    ],
-  },
-];
-
 export default function AddItemModal({
   open,
   onClose,
   onAdd,
-  catalog = defaultCatalog,
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (it: Item) => void;
-  catalog?: Product[];
 }) {
   const [query, setQuery] = useState("");
-  const [activeId, setActiveId] = useState<string | null>(
-    catalog[0]?.id ?? null
-  );
+  const [catalog, setCatalog] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Fetch products when modal opens
+  useEffect(() => {
+    if (open && catalog.length === 0) {
+      setLoading(true);
+      (async () => {
+        try {
+          const token = await getAccessToken();
+          if (!token) {
+            console.error("No access token available");
+            return;
+          }
+          
+          const response = await getProduct(token);
+          console.log("Product API response:", response);
+          
+          if (response?.products) {
+            const products: Product[] = response.products.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              img: p.img || "/default.png",
+              variants: (p.variants || []).map((v: any) => ({
+                variant_id: v.id, // Use the actual variant ID
+                color: v.attrs?.color || v.attrs?.Color,
+                size: v.attrs?.size || v.attrs?.Size,
+                stock: v.stock || 0,
+                price: v.price || 0,
+                name: v.name,
+                sku: v.sku,
+                attrs: v.attrs,
+              }))
+            }));
+            
+            setCatalog(products);
+            if (products.length > 0) {
+              setActiveId(products[0].id);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching products:", error);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [open, catalog.length]);
 
   const active = useMemo(
     () => catalog.find((p) => p.id === activeId) ?? null,
@@ -50,11 +90,11 @@ export default function AddItemModal({
   );
 
   const colors = useMemo(
-    () => Array.from(new Set((active?.variants ?? []).map((v) => v.color))),
+    () => Array.from(new Set((active?.variants ?? []).map((v) => v.color).filter((c): c is string => Boolean(c)))),
     [active]
   );
   const sizes = useMemo(
-    () => Array.from(new Set((active?.variants ?? []).map((v) => v.size))),
+    () => Array.from(new Set((active?.variants ?? []).map((v) => v.size).filter((s): s is string => Boolean(s)))),
     [active]
   );
 
@@ -92,9 +132,8 @@ export default function AddItemModal({
   const handleAdd = () => {
     if (!canAdd || !active || !selectedVariant) return;
     onAdd({
-      id: `${active.id}-${selectedVariant.color}-${
-        selectedVariant.size
-      }-${Date.now()}`,
+      id: crypto.randomUUID?.() ?? `${active.id}-${selectedVariant.color}-${selectedVariant.size}-${Date.now()}`,
+      variant_id: selectedVariant.variant_id, // Use the actual variant_id
       name: active.name,
       qty,
       price: selectedVariant.price,
@@ -213,6 +252,18 @@ export default function AddItemModal({
               </div>
 
               <div className="flex-1 overflow-auto">
+                {loading ? (
+                  <div className="flex items-center justify-center h-48">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Бүтээгдэхүүн ачаалж байна...</p>
+                    </div>
+                  </div>
+                ) : catalog.length === 0 ? (
+                  <div className="flex items-center justify-center h-48">
+                    <p className="text-gray-600">Бүтээгдэхүүн олдсонгүй</p>
+                  </div>
+                ) : (
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                     <tr>
@@ -305,6 +356,7 @@ export default function AddItemModal({
                     )}
                   </tbody>
                 </table>
+                )}
               </div>
 
               <div className="p-4 shrink-0 flex justify-center">

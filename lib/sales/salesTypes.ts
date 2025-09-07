@@ -1,5 +1,6 @@
 export type Item = {
   id: string;
+  variant_id?: string; // Add variant_id field for backend mapping
   name: string;
   qty: number;
   price: number;

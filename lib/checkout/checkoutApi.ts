@@ -221,7 +221,7 @@ export async function createCheckoutOrder(
 
     // Convert frontend items to backend format
     const backendItems = items.map((item) => ({
-      variant_id: item.id, // Assuming item.id is the variant_id
+      variant_id: item.variant_id || item.id, // Use variant_id if available, fallback to id
       quantity: item.qty,
       unit_price: item.price,
       discount: 0, // Could be per-item discount if needed
