@@ -1,7 +1,7 @@
 import { jwtDecode } from "jwt-decode";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 
-export async function listProducts(params: { storeId: string }) {
+export async function listProducts( storeId: string ) {
   try {
     // Get token for API call
     const token = await getAccessToken();
@@ -26,6 +26,21 @@ export async function listProducts(params: { storeId: string }) {
     console.error("Error fetching products:", error);
     return [];
   }
+}
+export async function getProductByStore(token: string, storeId: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory?tenant_id=${tenant_id}&scope=store&store_id=${storeId}`
+  );
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json();
+  console.log("Inventory Response:", data);
+  return data;
 }
 
 export async function getProduct(token: string) {

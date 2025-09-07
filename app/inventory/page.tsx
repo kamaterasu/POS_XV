@@ -1,18 +1,15 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { jwtDecode } from 'jwt-decode';
-
-import ProductCreateForm, { type Category } from '@/components/inventoryComponents/ProductCreateForm';
-
+import ProductCreateForm, { Category } from '@/components/inventoryComponents/ProductCreateForm';
 import { getAccessToken } from '@/lib/helper/getAccessToken';
+import { getProduct, getProductByStore } from '@/lib/product/productApi';
 import { getStore } from '@/lib/store/storeApi';
-import { getProduct } from '@/lib/product/productApi';
 
 // --- Types (UI-д хэрэгтэй талбарууд)
 type StoreRow = { id: string; name: string };
-type Product = { id: string; name: string; code?: string; storeId?: string };
+type Product = { id: string; name: string; qty?: number; code?: string; storeId?: string };
 
 // --- Жижиг туслах функцууд
 const toArray = (v: any, keys: string[] = []) => {
@@ -29,14 +26,25 @@ const mapStore = (s: any): StoreRow | null => {
   return { id: String(id), name: s?.name ?? s?.store_name ?? 'Салбар' };
 };
 
-const mapProduct = (p: any): Product | null => {
-  const id = p?.id ?? p?.product_id ?? p?.uuid;
+// --- Барааны өгөгдлийг зөв хөрвүүлэх (store inventory API structure)
+const mapProduct = (item: any): Product | null => {
+  // getProductByStore response: item.product, item.qty, item.store_id
+  if (item?.product?.id) {
+    return {
+      id: String(item.product.id),
+      name: item.product.name ?? '(нэргүй)',
+      qty: item.qty ?? 0,
+      storeId: item.store_id ?? undefined,
+    };
+  }
+  // getProduct response: шууд product
+  const id = item?.id ?? item?.product_id ?? item?.uuid ?? item?.variant_id;
   if (!id) return null;
   return {
     id: String(id),
-    name: p?.name ?? p?.product_name ?? p?.title ?? '(нэргүй)',
-    code: p?.code ?? p?.sku ?? p?.barcode ?? undefined,
-    storeId: p?.storeId ?? p?.store_id ?? p?.store?.id ?? undefined,
+    name: item?.name ?? item?.product_name ?? item?.title ?? '(нэргүй)',
+    code: item?.code ?? item?.sku ?? item?.barcode ?? undefined,
+    storeId: item?.storeId ?? item?.store_id ?? item?.store?.id ?? undefined,
   };
 };
 
@@ -54,52 +62,55 @@ export default function InventoryPage() {
 
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
+  // visibleProducts-г mergedProducts болгож өөрчилнө
+  const mergedProducts = useMemo(() => {
+    if (storeId !== 'all') {
+      return products.filter(p => String(p.storeId) === storeId);
+    }
+    // "Бүгд" үед id-аар нэгтгэж, qty-г нийлүүлнэ
+    const map = new Map<string, Product & { qty: number }>();
+    for (const p of products) {
+      if (!p.id) continue;
+      const prev = map.get(p.id);
+      map.set(p.id, {
+        ...p,
+        qty: (prev?.qty ?? 0) + (p.qty ?? 0),
+      });
+    }
+    return Array.from(map.values());
+  }, [products, storeId]);
 
   // ProductCreateForm-toggle
   const [showCreate, setShowCreate] = useState(false);
 
   // ProductCreateForm props
-  const [cats, setCats] = useState<Category[]>([]); // TODO: Хэрэв ангиллын API байвал эндээс тат
+  const [cats, setCats] = useState<Category[]>([]);
   const [tenantId, setTenantId] = useState<string | undefined>(undefined);
 
   // 1) Салбаруудыг ачаална
   useEffect(() => {
-    let alive = true;
+    setLoadingStores(true);
     (async () => {
       try {
-        setLoadingStores(true);
         const token = await getAccessToken();
         if (!token) throw new Error('no token');
-
-        // tenantId decode
-        try {
-          const decoded: any = jwtDecode(token);
-          const t = decoded?.app_metadata?.tenants?.[0];
-          if (t) setTenantId(String(t));
-        } catch { /* noop */ }
-
-        const raw = await getStore(token); // таны getStore → stores массив
-        const arr = toArray(raw, ['stores']).map(mapStore).filter(Boolean) as StoreRow[];
-
-        if (!alive) return;
-        const withAll = [{ id: 'all', name: 'Бүгд' }, ...arr];
-        setStores(withAll);
-
-        // сүүлийн сонголт сэргээх
-        const saved = localStorage.getItem('storeId');
-        setStoreId(saved && withAll.some(s => s.id === saved) ? saved : 'all');
+        const raw = await getStore(token);
+        const arr = toArray(raw, ['stores', 'data', 'items'])
+          .map(mapStore)
+          .filter(Boolean) as StoreRow[];
+        setStores([{ id: 'all', name: 'Бүгд' }, ...arr]);
       } catch (e) {
-        console.error(e);
         setStores([{ id: 'all', name: 'Бүгд' }]);
-        setStoreId('all');
       } finally {
-        if (alive) setLoadingStores(false);
+        setLoadingStores(false);
       }
     })();
-    return () => { alive = false; };
   }, []);
 
-  // 2) Бараануудыг ачаална (сервер талдаа салбараар шүүдэг бол dependency-г [storeId] болго)
+  // 2) Бараануудыг ачаална
+// ...existing code...
+
+  // 2) Бараануудыг ачаална
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -108,9 +119,26 @@ export default function InventoryPage() {
         const token = await getAccessToken();
         if (!token) throw new Error('no token');
 
-        const raw = await getProduct(token); // танай getProduct → products
-        const arr = toArray(raw, ['products', 'data', 'items'])
-          .map(mapProduct).filter(Boolean) as Product[];
+        let arr: Product[] = [];
+        if (storeId === 'all') {
+          // БҮГД үед бүх салбарын барааг нэгтгэж татна
+          const allProducts: Product[] = [];
+          for (const store of stores) {
+            if (store.id === 'all') continue;
+            const raw = await getProductByStore(token, store.id);
+            const items = toArray(raw, ['items', 'products', 'data'])
+              .map(mapProduct)
+              .filter(Boolean) as Product[];
+            allProducts.push(...items);
+          }
+          arr = allProducts;
+        } else {
+          // Тухайн салбарын барааг татна
+          const raw = await getProductByStore(token, storeId);
+          arr = toArray(raw, ['items', 'products', 'data'])
+            .map(mapProduct)
+            .filter(Boolean) as Product[];
+        }
 
         if (!alive) return;
         setProducts(arr);
@@ -122,13 +150,9 @@ export default function InventoryPage() {
       }
     })();
     return () => { alive = false; };
-  }, []); // <- хэрэв storeId-р сервер талдаа авах бол [storeId] болгож өөрчил
+  }, [storeId, stores]);
 
-  // 3) Клиент талын шүүлт
-  const visibleProducts = useMemo(
-    () => products.filter(p => storeId === 'all' || String(p.storeId) === storeId),
-    [products, storeId]
-  );
+  // ...mergedProducts useMemo хэвээр...
 
   const handleBack = () => router.back();
   const handleStoreChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -170,11 +194,10 @@ export default function InventoryPage() {
                   id="branch"
                   value={storeId}
                   onChange={handleStoreChange}
-                  className="h-9 rounded-full bg-[#5AA6FF] text-white text-xs px-3 pr-8 outline-none cursor-pointer appearance-none"
-                  aria-label="Салбар сонгох"
+                  className="h-9 rounded-full border border-neutral-200 bg-white px-4 pr-8 text-xs"
                 >
                   {stores.map(s => (
-                    <option key={s.id} value={s.id} className="text-black">{s.name}</option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               )}
@@ -194,7 +217,7 @@ export default function InventoryPage() {
         {showCreate && storeId !== 'all' && (
           <div className="rounded-xl bg-white border border-neutral-200 shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-medium">Шинэ бараа нэмэх (Салбар: <b>{stores.find(s => s.id === storeId)?.name}</b>)</div>
+              <div className="text-sm font-medium">Шинэ бараа нэмэх (Салбар: {stores.find(s => s.id === storeId)?.name})</div>
               <button
                 onClick={() => setShowCreate(false)}
                 className="h-8 px-3 rounded-md border border-[#E6E6E6] bg-white text-xs"
@@ -203,9 +226,9 @@ export default function InventoryPage() {
               </button>
             </div>
             <ProductCreateForm
-              cats={cats}                   // TODO: жинхэнэ category list-ээ эндээс дамжуул
-              branches={branchNames}        // ['Бүгд', '1-р салбар', ...]
-              tenantId={tenantId}           // inline ангилал нэмэхийг идэвхжүүлнэ
+              cats={cats}
+              branches={branchNames}
+              tenantId={tenantId}
             />
           </div>
         )}
@@ -213,7 +236,7 @@ export default function InventoryPage() {
         {/* ======== БАРАА ХАРАХ (ЖАГСААЛТ) ======== */}
         <div className="rounded-xl bg-white border border-neutral-200 shadow-sm">
           <div className="px-4 py-3 border-b border-neutral-200 text-sm font-medium">
-            Барааны жагсаалт {loadingProducts ? '…' : `(${visibleProducts.length})`}
+            Барааны жагсаалт {loadingProducts ? '…' : `(${mergedProducts.length})`}
           </div>
 
           <div className="divide-y divide-neutral-100">
@@ -223,13 +246,27 @@ export default function InventoryPage() {
                 <Skeleton className="h-10" />
                 <Skeleton className="h-10" />
               </>
-            ) : visibleProducts.length === 0 ? (
-              <div className="px-4 py-8 text-sm text-neutral-500">Юу ч алга.</div>
+            ) : mergedProducts.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-neutral-400">Бараа олдсонгүй.</div>
             ) : (
-              visibleProducts.map(p => (
-                <div key={p.id} className="px-4 py-3 flex items-center justify-between text-sm">
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-neutral-500">{p.code ?? '-'}</div>
+              mergedProducts.map(p => (
+                <div key={p.id} className="flex items-center gap-4 px-4 py-3">
+                  <div className="flex-1">
+                    <div className="font-medium">{p.name}</div>
+                    <div className="text-xs text-neutral-500">{p.code ? `Код: ${p.code}` : ''}</div>
+                  </div>
+                  <div className="text-xs text-neutral-500">
+                    {typeof p.qty === 'number'
+                      ? storeId === 'all'
+                        ? `Нийт: ${p.qty}`
+                        : `Тоо: ${p.qty}`
+                      : ''}
+                  </div>
+                  <div className="text-xs text-neutral-400">
+                    {storeId === 'all'
+                      ? ''
+                      : stores.find(s => s.id === p.storeId)?.name || ''}
+                  </div>
                 </div>
               ))
             )}
