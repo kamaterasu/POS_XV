@@ -1,44 +1,29 @@
 'use client';
-import React, { useEffect, useState } from 'react';
-import { getAccessToken } from '@/lib/helper/getAccessToken';
-import { getUser } from '@/lib/user/userApi';
-import { jwtDecode } from "jwt-decode";
+import { useState } from 'react';
+import { uploadProductImageOnly } from '@/lib/product/productImages';
 
-export default function StorePage() {
-  const [data, setData] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
+export default function UploadOnlyTest() {
+  const [img, setImg] = useState<{ path: string; signedUrl: string } | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const token = await getAccessToken();
-        if (!token) throw new Error('No access token');
-        const decoded: any = jwtDecode(token);
-        const user_id = decoded.app_metadata.tenants?.[0];
-        const users = await getUser(user_id, token); // user_id → token
-        setData(users);
-      } catch (e: any) {
-        setError(e?.message || 'Алдаа гарлаа');
-        // MOCK fallback
-        setData([
-          { id: 'u_mock_1', email: 'cashier@example.com', display_name: 'Mock Cashier', role: 'CASHIER' },
-          { id: 'u_mock_2', email: 'manager@example.com', display_name: 'Mock Manager', role: 'MANAGER' },
-        ]);
-      }
-    })();
-  }, []);
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const res = await uploadProductImageOnly(file, { prefix: 'product_img' });
+    setImg(res);
+    console.log('Uploaded path:', res.path, res.signedUrl);
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">Хэрэглэгчид</h1>
-        {error && <div className="mb-3 text-sm text-red-600">⚠ {error}</div>}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <pre className="text-sm text-gray-700 overflow-auto">
-            {JSON.stringify(data, null, 2)}
-          </pre>
+    <div className="p-6">
+      <input type="file" accept="image/*" onChange={onPick} />
+      {img && (
+        <div className="mt-3 text-sm">
+          Uploaded: {img.path}
+          <div className="mt-2">
+            <img src={img.signedUrl} alt="Uploaded" className="max-w-xs border" />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

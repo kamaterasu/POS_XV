@@ -8,7 +8,7 @@ export async function listProducts(params: { storeId: string }) {
     if (!token) return [];
 
     // Use the existing getProduct function to get products
-    const response = await getProduct(token, "");
+    const response = await getProduct(token);
 
     // Transform the response to match expected format
     if (response?.products) {
