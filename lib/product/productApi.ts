@@ -113,7 +113,7 @@ export async function getProduct(token: string) {
   return res.json();
 }
 
-export async function getProductById( product_id: string) {
+export async function getProductById(product_id: string) {
   const token = await getAccessToken();
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
@@ -165,6 +165,67 @@ export async function createProduct(token: string, product: ProductInput) {
 
   const res = await fetch(url, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return res.json();
+}
+
+type UpdateProductInput = {
+  id: string;
+  name?: string;
+  description?: string | null;
+  category_id?: string | null;
+  img?: string | null;
+  upsert_variants?: Array<{
+    id?: string;
+    name: string;
+    sku: string;
+    price: number;
+    cost: number | null;
+    attrs?: Record<string, string>;
+  }>;
+  remove_variant_ids?: string[];
+};
+
+export async function updateProduct(product: UpdateProductInput) {
+  const token = await getAccessToken();
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`;
+  const payload = { ...product, tenant_id };
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return res.json();
+}
+
+export async function deleteProduct(productId: string) {
+  const token = await getAccessToken();
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`;
+  const payload = {
+    tenant_id,
+    id: productId,
+    confirm: "DELETE",
+  };
+
+  const res = await fetch(url, {
+    method: "DELETE",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
