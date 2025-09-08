@@ -1,10 +1,59 @@
-import { jwtDecode } from "jwt-decode";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getTenantId } from "@/lib/helper/getTenantId";
-import { getStoreId } from "@/lib/store/storeId";
-import type { Item, PaymentRow } from "@/lib/sales/salesTypes";
 
 const BASE_URL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/checkout`;
+
+
+import { jwtDecode } from "jwt-decode";
+
+export type PaymentInput = {
+  method: string;     // ж: "CASH" | "CARD" | "BANK"
+  amount: number;     // төгрөгөөр
+  ref?: string;       // (заавал биш) баримтын дугаар, POS slip, г.м.
+};
+
+export async function createCheckoutOrder(
+  token: string,
+  store_id: string,
+  variant_id: string,
+  quantity: number,
+  unit_price: number,
+  payments: PaymentInput[],
+  opts?: { discount?: number; tax?: number }
+): Promise<any> {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+  if (!tenant_id) throw new Error("tenant_id not found");
+  if (!store_id) throw new Error("store_id is required");
+  if (!variant_id) throw new Error("variant_id is required");
+  if (!payments?.length) throw new Error("payments is empty");
+
+  const body = {
+    tenant_id,
+    store_id,
+    items: [{ variant_id, quantity, unit_price }],
+    payments: payments.map(p => ({ method: p.method, amount: p.amount, ref: p.ref })),
+    discount: Math.round(opts?.discount ?? 0),
+    tax: Math.round(opts?.tax ?? 0),
+  };
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/checkout`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Checkout failed with ${res.status}`);
+  }
+  return res.json();
+}
+
 
 // ===== Types =====
 export type CheckoutOrder = {
@@ -159,113 +208,6 @@ export async function getCheckoutOrder(
   } catch (error) {
     console.error("Error fetching checkout order:", error);
     return null;
-  }
-}
-
-/**
- * Create a new order with items and payments
- */
-export async function createCheckoutOrder(
-  items: Item[],
-  payments: PaymentRow[],
-  options: {
-    discount?: number;
-    tax?: number;
-    order_id?: string;
-  } = {}
-): Promise<CheckoutOrderDetail | null> {
-  try {
-    const token = await getAccessToken();
-    const tenant_id = await getTenantId();
-
-    // Try to get store_id with better error handling
-    let store_id: string | null = null;
-    try {
-      store_id = await getStoreId(token);
-    } catch (storeError) {
-      console.error("Error getting store_id:", storeError);
-
-      // Check if this is a "no stores" error - we can provide a more helpful message
-      if (
-        storeError instanceof Error &&
-        storeError.message.includes("No stores are set up")
-      ) {
-        throw new Error(
-          "No stores have been created yet. Please go to Store Management to create a store first."
-        );
-      } else if (
-        storeError instanceof Error &&
-        storeError.message.includes("don't have access")
-      ) {
-        throw new Error(
-          "You don't have access to any stores. Please contact your administrator."
-        );
-      } else {
-        throw new Error(
-          "Failed to get store information - please try again or contact support"
-        );
-      }
-    }
-
-    if (!tenant_id) {
-      throw new Error(
-        "Missing tenant_id - please ensure you are logged in and have tenant access"
-      );
-    }
-
-    if (!store_id) {
-      throw new Error(
-        "Missing store_id - please ensure you have access to a store"
-      );
-    }
-
-    // Convert frontend items to backend format
-    const backendItems = items.map((item) => ({
-      variant_id: item.variant_id || item.id, // Use variant_id if available, fallback to id
-      quantity: item.qty,
-      unit_price: item.price,
-      discount: 0, // Could be per-item discount if needed
-    }));
-
-    // Convert frontend payments to backend format
-    const backendPayments = payments.map((payment) => ({
-      method: payment.method.toUpperCase(),
-      amount: payment.amount,
-    }));
-
-    const payload: CreateOrderPayload = {
-      tenant_id,
-      store_id,
-      items: backendItems,
-      payments: backendPayments,
-      discount: options.discount || 0,
-      tax: options.tax || 0,
-    };
-
-    if (options.order_id) {
-      payload.order_id = options.order_id;
-    }
-
-    const res = await fetch(BASE_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Failed to create checkout order:", res.status, errorText);
-      throw new Error(`Failed to create order: ${errorText}`);
-    }
-
-    const data = await res.json();
-    return data;
-  } catch (error) {
-    console.error("Error creating checkout order:", error);
-    throw error;
   }
 }
 
