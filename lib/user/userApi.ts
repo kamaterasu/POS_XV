@@ -1,5 +1,5 @@
 import { jwtDecode } from "jwt-decode";
-
+// /home/tr1bo/Documents/1. Projets/pos-x/lib/user/userApi.ts
 // New function to get all users with complete details
 export async function getAllUsersWithDetails(token: string) {
   const decoded: any = jwtDecode(token);

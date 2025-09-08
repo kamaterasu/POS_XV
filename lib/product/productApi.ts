@@ -58,7 +58,8 @@ export async function getProduct(token: string) {
   return res.json();
 }
 
-export async function getProductByVariant(token: string, product_id: string) {
+export async function getProductById( product_id: string) {
+  const token = await getAccessToken();
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(

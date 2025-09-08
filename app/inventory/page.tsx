@@ -1,14 +1,17 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { jwtDecode } from 'jwt-decode';
 
 import ProductCreateForm, { type Category } from '@/components/inventoryComponents/ProductCreateForm';
 import { getAccessToken } from '@/lib/helper/getAccessToken';
-import { getProductByStore } from '@/lib/product/productApi';
+import { getProductByStore, getProductByCategory } from '@/lib/product/productApi';
 import { getStore } from '@/lib/store/storeApi';
 import { getImageShowUrl } from '@/lib/product/productImages';
+import { getCategories, createCategory, createSubcategory } from '@/lib/category/categoryApi';
 
 // ---------- Types ----------
 type StoreRow = { id: string; name: string };
@@ -19,8 +22,8 @@ type Product = {
   qty?: number;
   code?: string;
   storeId?: string;
-  img?: string;     // DB-д хадгалсан утга (ж: "product_img/xxx.png" эсвэл "xxx.png")
-  imgUrl?: string;  // Дүгнэсэн харах URL (signed/public/absolute)
+  img?: string;
+  imgUrl?: string; // Дүгнэсэн харах URL (signed/public/absolute)
 };
 
 // ---------- Utils ----------
@@ -59,6 +62,38 @@ const mapProduct = (item: any): Product | null => {
     img: item?.img ?? item?.image ?? undefined,
   };
 };
+
+// ---------- Category helpers ----------
+// API-ээс tree бүтэцтэй ирж буйг normalize хийж, хүүхдүүдийг үргэлж массив болгоно
+export type CatNode = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  children?: CatNode[];
+};
+
+function normalizeTree(nodes: any[]): CatNode[] {
+  const walk = (n: any): CatNode => ({
+    id: String(n?.id ?? crypto.randomUUID()),
+    name: String(n?.name ?? '(нэргүй ангилал)'),
+    parent_id: n?.parent_id ?? null,
+    children: Array.isArray(n?.children) ? normalizeTree(n.children) : [],
+  });
+  return Array.isArray(nodes) ? nodes.map(walk) : [];
+}
+
+// Категорийн модыг dropdown сонголтод ашиглахаар хавтгайруулж (path label-тай) бэлтгэнэ
+function flattenCats(nodes: CatNode[], path: string[] = []): { id: string; label: string }[] {
+  const out: { id: string; label: string }[] = [];
+  for (const n of nodes) {
+    const label = [...path, n.name].join(' › ');
+    out.push({ id: n.id, label });
+    if (Array.isArray(n.children) && n.children.length) {
+      out.push(...flattenCats(n.children, [...path, n.name]));
+    }
+  }
+  return out;
+}
 
 // ---------- Image URL resolver (7 хоногийн signed URL, кэштэй) ----------
 const imgUrlCache = new Map<string, string>();
@@ -116,10 +151,79 @@ function SBImage({
       height={size}
       className={className}
       onError={() => setFailed(true)}
-      // Хэрэв next.config-д remotePatterns нэмээгүй бол дараахыг түр асаагаад optimization-оос гарна:
       unoptimized
       loading="lazy"
     />
+  );
+}
+
+// ---------- Category Tree UI (сонгоод шүүх) ----------
+function CategoryNode({
+  node,
+  onSelect,
+  selectedId,
+}: {
+  node: any;
+  onSelect: (n: any) => void;
+  selectedId?: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasChildren = Array.isArray(node?.children) && node.children.length > 0;
+  const selected = selectedId === node?.id;
+
+  return (
+    <li>
+      <div className="flex items-center gap-2 text-sm py-1">
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="inline-flex w-5 justify-center select-none text-neutral-600 hover:text-neutral-900"
+            aria-label={open ? 'Collapse' : 'Expand'}
+            aria-expanded={open}
+          >
+            <span className={`transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+          </button>
+        ) : (
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-300 ml-1" aria-hidden />
+        )}
+        <button
+          type="button"
+          onClick={() => onSelect(node)}
+          className={`text-left hover:underline ${selected ? 'text-blue-600 font-medium' : ''}`}
+          title="Энэ ангиллаар шүүх"
+        >
+          {node?.name}
+        </button>
+      </div>
+
+      {hasChildren && open && (
+        <ul className="pl-4 ml-2 border-l border-neutral-200 space-y-1">
+          {node.children.map((child: any) => (
+            <CategoryNode key={child.id} node={child} onSelect={onSelect} selectedId={selectedId} />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function CategoryTree({
+  nodes,
+  onSelect,
+  selectedId,
+}: {
+  nodes: any[];
+  onSelect: (n: any) => void;
+  selectedId?: string | null;
+}) {
+  if (!nodes?.length) return null;
+  return (
+    <ul className="space-y-1">
+      {nodes.map((n: any) => (
+        <CategoryNode key={n.id} node={n} onSelect={onSelect} selectedId={selectedId} />
+      ))}
+    </ul>
   );
 }
 
@@ -136,10 +240,22 @@ export default function InventoryPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
 
-  // ProductCreateForm state
+  // ProductCreateForm & categories
   const [showCreate, setShowCreate] = useState(false);
   const [cats, setCats] = useState<Category[]>([]);
+  const [selectedCat, setSelectedCat] = useState<{ id: string; name: string } | null>(null);
+  const [loadingCats, setLoadingCats] = useState(true);
+  const [catsOpen, setCatsOpen] = useState(false);
   const [tenantId, setTenantId] = useState<string | undefined>(undefined);
+
+  // Add Category/Subcategory UI state
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [showAddSub, setShowAddSub] = useState(false);
+  const [catName, setCatName] = useState('');
+  const [subName, setSubName] = useState('');
+  const [parentId, setParentId] = useState<string | null>(null);
+  const [creatingCat, setCreatingCat] = useState(false);
+  const [creatingSub, setCreatingSub] = useState(false);
 
   // 1) Салбарууд
   useEffect(() => {
@@ -161,7 +277,36 @@ export default function InventoryPage() {
     })();
   }, []);
 
-  // 2) Бараа (+ зураг бүрийн signed URL)
+  // 2) Ангилал (Category)
+  async function refreshCategories(token?: string) {
+    const tk = token ?? (await getAccessToken());
+    if (!tk) throw new Error('no token');
+    const raw = await getCategories(tk);
+    const treeRaw = Array.isArray(raw?.tree) ? raw.tree : toArray(raw, ['categories', 'data', 'items']);
+    const tree = normalizeTree(treeRaw);
+    setCats(tree as unknown as Category[]);
+  }
+
+  useEffect(() => {
+    setLoadingCats(true);
+    (async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token) throw new Error('no token');
+        const decoded: any = jwtDecode(token);
+        const tId = decoded?.app_metadata?.tenants?.[0];
+        setTenantId(tId);
+        await refreshCategories(token);
+      } catch (e) {
+        console.error(e);
+        setCats([]);
+      } finally {
+        setLoadingCats(false);
+      }
+    })();
+  }, []);
+
+  // 3) Бараа (+ зураг бүрийн signed URL)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -171,7 +316,12 @@ export default function InventoryPage() {
         if (!token) throw new Error('no token');
 
         let arr: Product[] = [];
-        if (storeId === 'all') {
+
+        if (selectedCat?.id) {
+          // Категори сонгосон үед: тухайн категорийн (subtree=true) барааг API-аас авч үзүүлнэ
+          const raw = await getProductByCategory(token, selectedCat.id);
+          arr = toArray(raw, ['items', 'products', 'data']).map(mapProduct).filter(Boolean) as Product[];
+        } else if (storeId === 'all') {
           const merged: Product[] = [];
           for (const s of stores) {
             if (s.id === 'all') continue;
@@ -209,7 +359,7 @@ export default function InventoryPage() {
     return () => {
       alive = false;
     };
-  }, [storeId, stores]);
+  }, [storeId, stores, selectedCat?.id]);
 
   const mergedProducts = useMemo(() => {
     if (storeId !== 'all') {
@@ -232,7 +382,7 @@ export default function InventoryPage() {
   const handleStoreChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const v = e.target.value;
     setStoreId(v);
-    localStorage.setItem('storeId', v);
+    if (typeof window !== 'undefined') localStorage.setItem('storeId', v);
   };
   const handleAddProduct = () => {
     if (storeId === 'all') {
@@ -242,7 +392,65 @@ export default function InventoryPage() {
     setShowCreate(true);
   };
 
+  // --------- Create Category/Subcategory handlers ----------
+  const handleOpenAddCat = () => {
+    setCatsOpen(true);
+    setShowAddCat(true);
+    setShowAddSub(false);
+  };
+
+  const handleOpenAddSub = () => {
+    setCatsOpen(true);
+    setShowAddSub(true);
+    setShowAddCat(false);
+    // selectedCat байгаа бол эцэг ангиллыг автоматаар сонгоно
+    setParentId(selectedCat?.id ?? null);
+  };
+
+  const handleCreateCategory = async () => {
+    const name = catName.trim();
+    if (!name) return alert('Ангиллын нэр шаардлагатай.');
+    try {
+      setCreatingCat(true);
+      const token = await getAccessToken();
+      if (!token) throw new Error('no token');
+      await createCategory(name, token);
+      await refreshCategories(token);
+      setCatName('');
+      setShowAddCat(false);
+    } catch (e: any) {
+      console.error(e);
+      alert(`Ангилал нэмэхэд алдаа гарлаа:\n${e?.message ?? e}`);
+    } finally {
+      setCreatingCat(false);
+    }
+  };
+
+  const handleCreateSubcategory = async () => {
+    const name = subName.trim();
+    const pid = parentId;
+    if (!name) return alert('Дэд ангиллын нэр шаардлагатай.');
+    if (!pid) return alert('Эцэг ангиллыг сонгоно уу.');
+    try {
+      setCreatingSub(true);
+      const token = await getAccessToken();
+      if (!token) throw new Error('no token');
+      await createSubcategory(pid, name, token);
+      await refreshCategories(token);
+      setSubName('');
+      setShowAddSub(false);
+      // шинэчлэгдсэн категорийг шүүж харах бол дараахыг идэвхжүүлж болно:
+      // setSelectedCat({ id: pid, name: flattenCats(cats).find(c => c.id === pid)?.label ?? '...' });
+    } catch (e: any) {
+      console.error(e);
+      alert(`Дэд ангилал нэмэхэд алдаа гарлаа:\n${e?.message ?? e}`);
+    } finally {
+      setCreatingSub(false);
+    }
+  };
+
   const branchNames = useMemo(() => stores.map((s) => s.name), [stores]);
+  const flatCatOptions = useMemo(() => flattenCats(cats as unknown as CatNode[]), [cats]);
 
   return (
     <div className="min-h-svh bg-[#F7F7F5] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
@@ -258,9 +466,7 @@ export default function InventoryPage() {
             </button>
 
             <div className="relative">
-              <label htmlFor="branch" className="sr-only">
-                Салбар сонгох
-              </label>
+              <label htmlFor="branch" className="sr-only">Салбар сонгох</label>
               {loadingStores ? (
                 <Skeleton className="h-9 w-40 rounded-full" />
               ) : (
@@ -271,15 +477,11 @@ export default function InventoryPage() {
                   className="h-9 rounded-full border border-neutral-200 bg-white px-4 pr-8 text-xs"
                 >
                   {stores.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               )}
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white text-xs">
-                ▾
-              </span>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white text-xs">▾</span>
             </div>
 
             <button
@@ -288,8 +490,149 @@ export default function InventoryPage() {
             >
               + Бараа
             </button>
+
+            <button
+              onClick={() => setCatsOpen((v) => !v)}
+              className="h-9 px-3 rounded-full bg-white border border-[#E6E6E6] text-xs shadow-sm"
+            >
+              {catsOpen ? 'Ангилал нуух' : 'Ангилал харах'}
+            </button>
+
+            {/* Шинэ: Ангилал/Дэд ангилал нэмэх товчнууд */}
+            <button
+              onClick={handleOpenAddCat}
+              className="h-9 px-3 rounded-full bg-white border border-[#E6E6E6] text-xs shadow-sm"
+              title="Үндсэн ангилал нэмэх"
+            >
+              + Ангилал
+            </button>
+            <button
+              onClick={handleOpenAddSub}
+              className="h-9 px-3 rounded-full bg-white border border-[#E6E6E6] text-xs shadow-sm"
+              title="Дэд ангилал нэмэх"
+            >
+              + Дэд ангилал
+            </button>
           </div>
         </div>
+
+        {/* Categories panel */}
+        {catsOpen && (
+          <div className="rounded-xl bg-white border border-neutral-200 shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <div className="text-sm font-medium flex items-center gap-2">
+                Ангилалууд
+                {selectedCat && (
+                  <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                    Шүүлт: {selectedCat.name}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-neutral-500">
+                {loadingCats ? 'Уншиж байна…' : `${cats.length} үндсэн ангилал`}
+                {selectedCat && (
+                  <button
+                    onClick={() => setSelectedCat(null)}
+                    className="ml-2 h-7 px-2 rounded-full border border-neutral-200 bg-white text-xs hover:shadow-sm"
+                    title="Категори шүүлтийг арилгах"
+                  >
+                    Шүүлт арилгах
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Шинэ: Үндсэн ангилал нэмэх form */}
+            {showAddCat && (
+              <div className="mb-4 rounded-lg border border-neutral-200 p-3 bg-neutral-50/50">
+                <div className="text-xs font-medium mb-2">Үндсэн ангилал нэмэх</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={catName}
+                    onChange={(e) => setCatName(e.target.value)}
+                    placeholder="Ангиллын нэр"
+                    className="h-9 px-3 rounded-md border border-neutral-300 text-sm flex-1"
+                  />
+                  <button
+                    onClick={handleCreateCategory}
+                    disabled={creatingCat}
+                    className="h-9 px-3 rounded-md bg-black text-white text-xs disabled:opacity-50"
+                  >
+                    {creatingCat ? 'Хадгалж байна…' : 'Хадгалах'}
+                  </button>
+                  <button
+                    onClick={() => { setShowAddCat(false); setCatName(''); }}
+                    className="h-9 px-3 rounded-md border border-neutral-300 bg-white text-xs"
+                  >
+                    Болих
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Шинэ: Дэд ангилал нэмэх form */}
+            {showAddSub && (
+              <div className="mb-4 rounded-lg border border-neutral-200 p-3 bg-neutral-50/50">
+                <div className="text-xs font-medium mb-2">Дэд ангилал нэмэх</div>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+                  <input
+                    value={subName}
+                    onChange={(e) => setSubName(e.target.value)}
+                    placeholder="Дэд ангиллын нэр"
+                    className="h-9 px-3 rounded-md border border-neutral-300 text-sm"
+                  />
+                  <select
+                    value={parentId ?? ''}
+                    onChange={(e) => setParentId(e.target.value || null)}
+                    className="h-9 px-3 rounded-md border border-neutral-300 text-sm"
+                    title="Эцэг ангилал"
+                  >
+                    <option value="" disabled>Эцэг ангилал сонгох</option>
+                    {flatCatOptions.map((opt) => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCreateSubcategory}
+                      disabled={creatingSub}
+                      className="h-9 px-3 rounded-md bg-black text-white text-xs disabled:opacity-50"
+                    >
+                      {creatingSub ? 'Хадгалж байна…' : 'Хадгалах'}
+                    </button>
+                    <button
+                      onClick={() => { setShowAddSub(false); setSubName(''); setParentId(null); }}
+                      className="h-9 px-3 rounded-md border border-neutral-300 bg-white text-xs"
+                    >
+                      Болих
+                    </button>
+                  </div>
+                </div>
+                {selectedCat?.id && (
+                  <div className="text-[11px] text-neutral-500 mt-1">
+                    Сануулга: Одоогоор сонгогдсон “{selectedCat.name}” ангиллыг эцэг болгон автоматаар санал болгосон.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {loadingCats ? (
+              <>
+                <Skeleton className="h-4 w-1/3 mb-2" />
+                <Skeleton className="h-4 w-1/2 mb-2" />
+                <Skeleton className="h-4 w-1/4 mb-2" />
+              </>
+            ) : cats.length === 0 ? (
+              <div className="text-sm text-neutral-400">Ангилал олдсонгүй.</div>
+            ) : (
+              <CategoryTree
+                nodes={cats}
+                onSelect={(n: any) => setSelectedCat({ id: String(n.id), name: String(n.name) })}
+                selectedId={selectedCat?.id ?? null}
+              />
+            )}
+          </div>
+        )}
 
         {/* Create form */}
         {showCreate && storeId !== 'all' && (
@@ -326,7 +669,13 @@ export default function InventoryPage() {
               <div className="px-4 py-6 text-center text-sm text-neutral-400">Бараа олдсонгүй.</div>
             ) : (
               mergedProducts.map((p) => (
-                <div key={p.id} className="flex items-center gap-4 px-4 py-3">
+                <Link
+                  key={p.id}
+                  href={`/productdetail/${p.id}`}
+                  prefetch
+                  className="group flex items-center gap-4 px-4 py-3 hover:bg-neutral-50 active:bg-neutral-100 transition"
+                  title="Дэлгэрэнгүй рүү орох"
+                >
                   <SBImage
                     src={p.imgUrl}
                     alt={p.name}
@@ -334,16 +683,18 @@ export default function InventoryPage() {
                     className="w-12 h-12 object-cover rounded border border-neutral-200 bg-neutral-100 flex-shrink-0"
                   />
                   <div className="flex-1">
-                    <div className="font-medium">{p.name}</div>
+                    <div className="font-medium group-hover:underline">{p.name}</div>
                     <div className="text-xs text-neutral-500">{p.code ? `Код: ${p.code}` : ''}</div>
                   </div>
                   <div className="text-xs text-neutral-500">
-                    {typeof p.qty === 'number' ? (storeId === 'all' ? `Нийт: ${p.qty}` : `Тоо: ${p.qty}`) : ''}
+                    {typeof p.qty === 'number'
+                      ? (storeId === 'all' ? `Нийт: ${p.qty}` : `Тоо: ${p.qty}`)
+                      : ''}
                   </div>
                   <div className="text-xs text-neutral-400">
                     {storeId === 'all' ? '' : stores.find((s) => s.id === p.storeId)?.name || ''}
                   </div>
-                </div>
+                </Link>
               ))
             )}
           </div>
