@@ -58,12 +58,11 @@ export async function getProduct(token: string) {
   return res.json();
 }
 
-export async function getProductById( product_id: string) {
-  const token = await getAccessToken();
+export async function getProductById(token: string, product_id: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&id=${product_id}&withVariants=true}`
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&id=${product_id}&withVariants=true`
   );
   const res = await fetch(url.toString(), {
     method: "GET",
