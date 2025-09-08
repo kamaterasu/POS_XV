@@ -1,7 +1,8 @@
-import { supabase } from '../supabaseClient';
-import { getTenantId } from '../helper/getTenantId';
+import { supabase } from "../supabaseClient";
+import { getTenantId } from "../helper/getTenantId";
 
-const REPORT_API_URL = 'https://kaaszzouxgbyusxbobdx.supabase.co/functions/v1/report';
+const REPORT_API_URL =
+  "https://kaaszzouxgbyusxbobdx.supabase.co/functions/v1/report";
 
 // Types for API responses
 export interface SalesSummaryItem {
@@ -83,38 +84,44 @@ export interface ReturnsSummaryItem {
 
 // Helper function to get authorization headers
 async function getAuthHeaders() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session?.access_token) {
-    throw new Error('No authentication token available');
+    throw new Error("No authentication token available");
   }
-  
+
   return {
-    'Authorization': `Bearer ${session.access_token}`,
-    'Content-Type': 'application/json',
+    Authorization: `Bearer ${session.access_token}`,
+    "Content-Type": "application/json",
   };
 }
 
 // Helper function to make API requests
-async function makeReportRequest<T>(params: Record<string, string>): Promise<T> {
+async function makeReportRequest<T>(
+  params: Record<string, string>
+): Promise<T> {
   const headers = await getAuthHeaders();
   const tenant_id = await getTenantId();
-  
+
   if (!tenant_id) {
-    throw new Error('No tenant ID available');
+    throw new Error("No tenant ID available");
   }
 
   const searchParams = new URLSearchParams({
     tenant_id,
-    ...params
+    ...params,
   });
 
   const response = await fetch(`${REPORT_API_URL}?${searchParams}`, {
-    method: 'GET',
+    method: "GET",
     headers,
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: "Unknown error" }));
     throw new Error(errorData.error || `HTTP ${response.status}`);
   }
 
@@ -123,7 +130,7 @@ async function makeReportRequest<T>(params: Record<string, string>): Promise<T> 
 
 // Sales Summary Report
 export async function getSalesSummary(params: {
-  period?: 'day' | 'week' | 'month';
+  period?: "day" | "week" | "month";
   store_id?: string;
   from?: string;
   to?: string;
@@ -137,8 +144,8 @@ export async function getSalesSummary(params: {
     items: SalesSummaryItem[];
     totals: SalesSummaryItem;
   }>({
-    type: 'sales_summary',
-    period: params.period || 'day',
+    type: "sales_summary",
+    period: params.period || "day",
     ...(params.store_id && { store_id: params.store_id }),
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
@@ -146,17 +153,14 @@ export async function getSalesSummary(params: {
 }
 
 // Sales by Store Report
-export async function getSalesByStore(params: {
-  from?: string;
-  to?: string;
-}) {
+export async function getSalesByStore(params: { from?: string; to?: string }) {
   return makeReportRequest<{
     type: string;
     from: string;
     to: string;
     items: SalesByStoreItem[];
   }>({
-    type: 'sales_by_store',
+    type: "sales_by_store",
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
   });
@@ -181,7 +185,7 @@ export async function getPaymentsByMethod(params: {
       net: number;
     }>;
   }>({
-    type: 'payments_by_method',
+    type: "payments_by_method",
     ...(params.store_id && { store_id: params.store_id }),
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
@@ -202,7 +206,7 @@ export async function getTopVariants(params: {
     limit: number;
     items: TopVariantItem[];
   }>({
-    type: 'top_variants',
+    type: "top_variants",
     limit: (params.limit || 10).toString(),
     ...(params.store_id && { store_id: params.store_id }),
     ...(params.from && { from: params.from }),
@@ -222,7 +226,7 @@ export async function getCategorySummary(params: {
     to: string;
     items: CategorySummaryItem[];
   }>({
-    type: 'category_summary',
+    type: "category_summary",
     ...(params.store_id && { store_id: params.store_id }),
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
@@ -244,15 +248,17 @@ export async function getInventorySnapshot(params: {
       value: number;
     };
   }>({
-    type: 'inventory_snapshot',
+    type: "inventory_snapshot",
     ...(params.store_id && { store_id: params.store_id }),
-    ...(params.only_in_stock !== undefined && { only_in_stock: params.only_in_stock.toString() }),
+    ...(params.only_in_stock !== undefined && {
+      only_in_stock: params.only_in_stock.toString(),
+    }),
   });
 }
 
 // Returns Summary Report
 export async function getReturnsSummary(params: {
-  period?: 'day' | 'week' | 'month';
+  period?: "day" | "week" | "month";
   store_id?: string;
   from?: string;
   to?: string;
@@ -270,8 +276,8 @@ export async function getReturnsSummary(params: {
       refunds_value: number;
     };
   }>({
-    type: 'returns_summary',
-    period: params.period || 'day',
+    type: "returns_summary",
+    period: params.period || "day",
     ...(params.store_id && { store_id: params.store_id }),
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
@@ -294,7 +300,7 @@ export async function getReturnsByStore(params: {
       returns_value: number;
     }>;
   }>({
-    type: 'returns_by_store',
+    type: "returns_by_store",
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
   });
@@ -315,7 +321,7 @@ export async function getRefundsByMethod(params: {
       count: number;
     }>;
   }>({
-    type: 'refunds_by_method',
+    type: "refunds_by_method",
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
   });
@@ -342,7 +348,7 @@ export async function getTopReturnedVariants(params: {
       return_value: number;
     }>;
   }>({
-    type: 'top_returned_variants',
+    type: "top_returned_variants",
     limit: (params.limit || 10).toString(),
     ...(params.from && { from: params.from }),
     ...(params.to && { to: params.to }),
@@ -351,17 +357,19 @@ export async function getTopReturnedVariants(params: {
 
 // Utility function to format currency
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('mn-MN', {
-    style: 'currency',
-    currency: 'MNT',
+  return new Intl.NumberFormat("mn-MN", {
+    style: "currency",
+    currency: "MNT",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount).replace('MNT', '₮');
+  })
+    .format(amount)
+    .replace("MNT", "₮");
 }
 
 // Utility function to format percentage
 export function formatPercentage(current: number, previous: number): string {
-  if (previous === 0) return current > 0 ? '+∞%' : '0%';
+  if (previous === 0) return current > 0 ? "+∞%" : "0%";
   const change = ((current - previous) / previous) * 100;
-  return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+  return `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`;
 }
