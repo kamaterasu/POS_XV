@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FaPrint,
   FaUndo,
@@ -9,6 +9,25 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import {
+  getSalesSummary,
+  getSalesByStore,
+  getPaymentsByMethod,
+  getTopVariants,
+  getCategorySummary,
+  getInventorySnapshot,
+  getReturnsSummary,
+  formatCurrency,
+  formatPercentage,
+  type SalesSummaryItem,
+  type SalesByStoreItem,
+  type PaymentsByMethodItem,
+  type TopVariantItem,
+  type CategorySummaryItem,
+  type InventorySnapshotItem,
+  type ReturnsSummaryItem,
+} from "@/lib/report/reportApi";
+import { Loading } from "@/components/Loading";
 
 type ReportType = "sales" | "finance" | "inventory" | "overview";
 
@@ -19,6 +38,72 @@ export default function ReportPage() {
     from: "2024-01-01",
     to: "2024-12-31",
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Data states for each report type
+  const [salesData, setSalesData] = useState<SalesSummaryItem[]>([]);
+  const [financeData, setFinanceData] = useState<PaymentsByMethodItem[]>([]);
+  const [inventoryData, setInventoryData] = useState<InventorySnapshotItem[]>([]);
+  const [overviewData, setOverviewData] = useState<any>(null);
+
+  // Load data when report type or date range changes
+  useEffect(() => {
+    loadReportData();
+  }, [activeReport, dateRange]);
+
+  const loadReportData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      switch (activeReport) {
+        case "sales":
+          const salesResponse = await getSalesSummary({
+            period: "day",
+            from: dateRange.from,
+            to: dateRange.to,
+          });
+          setSalesData(salesResponse.items);
+          break;
+
+        case "finance":
+          const financeResponse = await getPaymentsByMethod({
+            from: dateRange.from,
+            to: dateRange.to,
+          });
+          setFinanceData(financeResponse.payments);
+          break;
+
+        case "inventory":
+          const inventoryResponse = await getInventorySnapshot({
+            only_in_stock: true,
+          });
+          setInventoryData(inventoryResponse.items);
+          break;
+
+        case "overview":
+          // Load overview data (combination of multiple reports)
+          const [salesOverview, paymentsOverview, inventoryOverview] = await Promise.all([
+            getSalesSummary({ period: "day", from: dateRange.from, to: dateRange.to }),
+            getPaymentsByMethod({ from: dateRange.from, to: dateRange.to }),
+            getInventorySnapshot({ only_in_stock: true }),
+          ]);
+          
+          setOverviewData({
+            sales: salesOverview,
+            payments: paymentsOverview,
+            inventory: inventoryOverview,
+          });
+          break;
+      }
+    } catch (err) {
+      console.error("Error loading report data:", err);
+      setError(err instanceof Error ? err.message : "Failed to load report data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const reportTypes = [
     {
@@ -82,12 +167,35 @@ export default function ReportPage() {
   ];
 
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loading open={true} label="Тайлан ачаалж байна..." />
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-red-800 mb-2">Алдаа гарлаа</h3>
+          <p className="text-red-600">{error}</p>
+          <button
+            onClick={loadReportData}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Дахин оролдох
+          </button>
+        </div>
+      );
+    }
+
     switch (activeReport) {
       case "sales":
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {mockSalesData.map((item, index) => (
+              {salesData.slice(0, 4).map((item, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500"
@@ -96,14 +204,14 @@ export default function ReportPage() {
                     {item.period}
                   </h3>
                   <p className="text-2xl font-bold text-gray-900 mb-1">
-                    {item.sales}
+                    {formatCurrency(item.total_gross)}
                   </p>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500">
                       {item.orders} захиалга
                     </span>
                     <span className="text-sm font-medium text-green-600">
-                      {item.growth}
+                      {formatCurrency(item.total_net)} цэвэр
                     </span>
                   </div>
                 </div>
@@ -121,22 +229,31 @@ export default function ReportPage() {
 
             <div className="bg-white rounded-lg shadow-md p-6">
               <h3 className="text-lg font-semibold mb-4">
-                Шилдэг бүтээгдэхүүн
+                Борлуулалтын дэлгэрэнгүй
               </h3>
-              <div className="space-y-3">
-                {["Бүтээгдэхүүн 1", "Бүтээгдэхүүн 2", "Бүтээгдэхүүн 3"].map(
-                  (product, index) => (
-                    <div
-                      key={index}
-                      className="flex justify-between items-center py-2 border-b"
-                    >
-                      <span className="font-medium">{product}</span>
-                      <span className="text-gray-600">
-                        {150 - index * 20} ширхэг
-                      </span>
-                    </div>
-                  )
-                )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Хугацаа</th>
+                      <th className="px-4 py-2 text-left">Захиалга</th>
+                      <th className="px-4 py-2 text-left">Нийт дүн</th>
+                      <th className="px-4 py-2 text-left">Цэвэр дүн</th>
+                      <th className="px-4 py-2 text-left">Буцаалт</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesData.map((item, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="px-4 py-2 font-medium">{item.period}</td>
+                        <td className="px-4 py-2">{item.orders}</td>
+                        <td className="px-4 py-2">{formatCurrency(item.total_gross)}</td>
+                        <td className="px-4 py-2">{formatCurrency(item.total_net)}</td>
+                        <td className="px-4 py-2">{formatCurrency(item.returns_value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -146,19 +263,43 @@ export default function ReportPage() {
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {mockFinanceData.map((item, index) => (
+              {financeData.slice(0, 4).map((item, index) => (
                 <div key={index} className="bg-white rounded-lg shadow-md p-6">
                   <h3 className="text-sm font-medium text-gray-600 mb-2">
-                    {item.category}
+                    {item.method}
                   </h3>
                   <p className="text-2xl font-bold text-gray-900 mb-1">
-                    {item.amount}
+                    {formatCurrency(item.amount)}
                   </p>
-                  <span className={`text-sm font-medium ${item.color}`}>
-                    {item.change}
+                  <span className="text-sm font-medium text-blue-600">
+                    {item.count} гүйлгээ
                   </span>
                 </div>
               ))}
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h3 className="text-lg font-semibold mb-4">Төлбөрийн арга</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Төлбөрийн арга</th>
+                      <th className="px-4 py-2 text-left">Дүн</th>
+                      <th className="px-4 py-2 text-left">Тоо ширхэг</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {financeData.map((item, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="px-4 py-2 font-medium">{item.method}</td>
+                        <td className="px-4 py-2">{formatCurrency(item.amount)}</td>
+                        <td className="px-4 py-2">{item.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -171,6 +312,10 @@ export default function ReportPage() {
         );
 
       case "inventory":
+        const totalItems = inventoryData.length;
+        const lowStockItems = inventoryData.filter(item => item.qty > 0 && item.qty < 10).length;
+        const outOfStockItems = inventoryData.filter(item => item.qty === 0).length;
+        
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -178,19 +323,19 @@ export default function ReportPage() {
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Нийт бараа
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">1,234</p>
+                <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Дуусч байгаа
                 </h3>
-                <p className="text-2xl font-bold text-red-600">23</p>
+                <p className="text-2xl font-bold text-red-600">{lowStockItems}</p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Дууссан
                 </h3>
-                <p className="text-2xl font-bold text-orange-600">5</p>
+                <p className="text-2xl font-bold text-orange-600">{outOfStockItems}</p>
               </div>
             </div>
 
@@ -201,51 +346,42 @@ export default function ReportPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-2 text-left">Барааны нэр</th>
+                      <th className="px-4 py-2 text-left">SKU</th>
                       <th className="px-4 py-2 text-left">Үлдэгдэл</th>
                       <th className="px-4 py-2 text-left">Үнэ</th>
                       <th className="px-4 py-2 text-left">Төлөв</th>
                     </tr>
                   </thead>
                   <tbody className="space-y-1">
-                    {[
-                      {
-                        name: "Бараа 1",
-                        stock: 45,
-                        price: "15,000₮",
-                        status: "Хангалттай",
-                      },
-                      {
-                        name: "Бараа 2",
-                        stock: 12,
-                        price: "25,000₮",
-                        status: "Бага",
-                      },
-                      {
-                        name: "Бараа 3",
-                        stock: 0,
-                        price: "30,000₮",
-                        status: "Дууссан",
-                      },
-                    ].map((item, index) => (
-                      <tr key={index} className="border-b">
-                        <td className="px-4 py-2">{item.name}</td>
-                        <td className="px-4 py-2">{item.stock}</td>
-                        <td className="px-4 py-2">{item.price}</td>
-                        <td className="px-4 py-2">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs ${
-                              item.status === "Хангалттай"
-                                ? "bg-green-100 text-green-800"
-                                : item.status === "Бага"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {inventoryData.slice(0, 20).map((item, index) => {
+                      const status = item.qty === 0 
+                        ? "Дууссан" 
+                        : item.qty < 10 
+                        ? "Бага" 
+                        : "Хангалттай";
+                      
+                      return (
+                        <tr key={index} className="border-b">
+                          <td className="px-4 py-2">{item.product_name || item.variant_name || 'Нэргүй'}</td>
+                          <td className="px-4 py-2">{item.sku || '-'}</td>
+                          <td className="px-4 py-2">{item.qty}</td>
+                          <td className="px-4 py-2">{formatCurrency(item.cost)}</td>
+                          <td className="px-4 py-2">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                status === "Хангалттай"
+                                  ? "bg-green-100 text-green-800"
+                                  : status === "Бага"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -254,6 +390,19 @@ export default function ReportPage() {
         );
 
       case "overview":
+        if (!overviewData) {
+          return (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-gray-500">Ерөнхий тойм ачаалж байна...</p>
+            </div>
+          );
+        }
+
+        const todayData = overviewData.sales?.items?.[0];
+        const totalInventoryValue = overviewData.inventory?.totals?.value || 0;
+        const totalOrders = todayData?.orders || 0;
+        const totalRevenue = todayData?.total_gross || 0;
+        
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -261,55 +410,45 @@ export default function ReportPage() {
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Өнөөдрийн орлого
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">1,250,000₮</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Захиалга
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">45</p>
+                <p className="text-2xl font-bold text-gray-900">{totalOrders}</p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
-                  Үйлчлүүлэгч
+                  Агуулахын үнэ цэнэ
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">38</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalInventoryValue)}</p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Буцаалт
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">3</p>
+                <p className="text-2xl font-bold text-gray-900">{formatCurrency(todayData?.returns_value || 0)}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-4">Сүүлийн гүйлгээ</h3>
+                <h3 className="text-lg font-semibold mb-4">Төлбөрийн аргууд</h3>
                 <div className="space-y-3">
-                  {[
-                    { time: "14:30", amount: "25,000₮", type: "Борлуулалт" },
-                    { time: "14:15", amount: "15,000₮", type: "Борлуулалт" },
-                    { time: "13:45", amount: "-5,000₮", type: "Буцаалт" },
-                  ].map((transaction, index) => (
+                  {overviewData.payments?.payments?.slice(0, 5).map((payment: PaymentsByMethodItem, index: number) => (
                     <div
                       key={index}
                       className="flex justify-between items-center py-2 border-b"
                     >
                       <div>
-                        <span className="font-medium">{transaction.type}</span>
+                        <span className="font-medium">{payment.method}</span>
                         <span className="text-sm text-gray-500 ml-2">
-                          {transaction.time}
+                          {payment.count} гүйлгээ
                         </span>
                       </div>
-                      <span
-                        className={`font-bold ${
-                          transaction.amount.startsWith("-")
-                            ? "text-red-600"
-                            : "text-green-600"
-                        }`}
-                      >
-                        {transaction.amount}
+                      <span className="font-bold text-green-600">
+                        {formatCurrency(payment.amount)}
                       </span>
                     </div>
                   ))}
@@ -320,16 +459,16 @@ export default function ReportPage() {
                 <h3 className="text-lg font-semibold mb-4">Системийн тайлан</h3>
                 <div className="space-y-4">
                   <div className="flex justify-between">
-                    <span>Идэвхтэй хэрэглэгч:</span>
-                    <span className="font-medium">5</span>
+                    <span>Нийт бараа:</span>
+                    <span className="font-medium">{overviewData.inventory?.items?.length || 0}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Салбар:</span>
-                    <span className="font-medium">3</span>
+                    <span>Агуулахын үнэ цэнэ:</span>
+                    <span className="font-medium">{formatCurrency(totalInventoryValue)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Сүүлийн backup:</span>
-                    <span className="font-medium">Өнөөдөр 09:00</span>
+                    <span>Өнөөдрийн борлуулалт:</span>
+                    <span className="font-medium">{formatCurrency(totalRevenue)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Системийн статус:</span>
@@ -390,6 +529,14 @@ export default function ReportPage() {
                 className="border border-gray-300 rounded-md px-3 py-1 text-sm"
               />
             </div>
+            <button 
+              onClick={loadReportData}
+              className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors flex items-center gap-2 mr-2"
+              disabled={loading}
+            >
+              <FaUndo className={loading ? "animate-spin" : ""} />
+              Сэргээх
+            </button>
             <button className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors flex items-center gap-2">
               <FaDownload />
               Татах
