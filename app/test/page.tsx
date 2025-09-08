@@ -1,29 +1,14 @@
 'use client';
-import { useState } from 'react';
-import { uploadProductImageOnly } from '@/lib/product/productImages';
+import { useEffect, useState } from 'react';
+import { getImageShowUrl } from '@/lib/product/productImages';
 
-export default function UploadOnlyTest() {
-  const [img, setImg] = useState<{ path: string; signedUrl: string } | null>(null);
+export default function ShowTest1() {
+  const [url, setUrl] = useState<string>('');
 
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const res = await uploadProductImageOnly(file, { prefix: 'product_img' });
-    setImg(res);
-    console.log('Uploaded path:', res.path, res.signedUrl);
-  }
+  useEffect(() => {
+    getImageShowUrl('product_img/3225ec33-d712-43a3-ac87-092288a7447d.jpeg').then((u) => setUrl(u));
+  }, []);
 
-  return (
-    <div className="p-6">
-      <input type="file" accept="image/*" onChange={onPick} />
-      {img && (
-        <div className="mt-3 text-sm">
-          Uploaded: {img.path}
-          <div className="mt-2">
-            <img src={img.signedUrl} alt="Uploaded" className="max-w-xs border" />
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  if (!url) return <p>Loading…</p>;
+  return <img src={url} alt="test1" className="max-w-xs border" />;
 }

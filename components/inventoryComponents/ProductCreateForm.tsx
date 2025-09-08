@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useRef, useMemo, useState, useEffect, ChangeEvent } from "react";
 import Image from "next/image";
@@ -7,10 +7,18 @@ import { jwtDecode } from "jwt-decode";
 
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getCategories } from "@/lib/category/categoryApi";
-import { createProduct } from "@/lib/product/productApi";
 import { createCategory } from "@/lib/category/categoryApi";
+import { createProduct } from "@/lib/product/productApi";
 import { Loading } from "@/components/Loading";
+
+// ✅ Зөв замаас
 import { uploadProductImageOnly } from "@/lib/product/productImages";
+
+// ✅ Салбаруудын жагсаалт авч ID-г нэртэй нь тааруулах
+import { listStores, type StoreRow } from "@/lib/store/storeApi";
+
+// ✅ Анхны үлдэгдлийг бүртгэх
+import { productAddToInventory } from "@/lib/inventory/inventoryApi";
 
 /* ========================== Types & utils ========================== */
 export type Category = { id: string; name: string; parent_id: string | null };
@@ -32,6 +40,7 @@ const toArray = (v: any) => {
     if (Array.isArray(v.categories)) return v.categories;
     if (Array.isArray(v.data)) return v.data;
     if (Array.isArray(v.items)) return v.items;
+    if (Array.isArray(v.rows)) return v.rows;
   }
   return [];
 };
@@ -326,7 +335,7 @@ export default function ProductCreateForm({
   tenantId,
 }: {
   cats?: Category[];
-  branches: string[];
+  branches: string[]; // UI-д харагдах салбарын нэрс (жишээ нь ["Салбар A", "Салбар B", "Бүх салбар"])
   tenantId?: string;
 }) {
   const router = useRouter();
@@ -340,6 +349,10 @@ export default function ProductCreateForm({
   const [resolvedTenantId, setResolvedTenantId] = useState<string | undefined>(
     tenantId
   );
+
+  // ✅ Салбаруудыг server-оос авч ID/нэрийн map үүсгэнэ
+  const [stores, setStores] = useState<StoreRow[]>([]);
+  const [loadingStores, setLoadingStores] = useState(true);
 
   useEffect(() => {
     setCatsState(cats ?? []);
@@ -370,11 +383,20 @@ export default function ProductCreateForm({
           const arr = toArray(raw) as Category[];
           setCatsState(arr);
         }
+
+        // stores авч ID/нэрийг тааруулах
+        setLoadingStores(true);
+        const s = await listStores(token);
+        if (!alive) return;
+        setStores(toArray(s) as StoreRow[]);
       } catch (e) {
         console.error(e);
         setCatsState([]);
       } finally {
-        if (alive) setLoadingCats(false);
+        if (alive) {
+          setLoadingCats(false);
+          setLoadingStores(false);
+        }
       }
     })();
     return () => {
@@ -389,10 +411,10 @@ export default function ProductCreateForm({
     price?: number;
     cost?: number;
     description?: string;
-    images: string[];
-    imageFiles: File[];
+    images: string[];      // preview blobs (UI only)
+    imageFiles: File[];    // real files to upload
     variants: Variant[];
-    initialStocks: Record<string, number>;
+    initialStocks: Record<string, number>; // storeName -> qty
   };
 
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
@@ -417,25 +439,48 @@ export default function ProductCreateForm({
   function handleImagePick(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || !files.length) return;
+
+    const fileArr = Array.from(files);
+    const accepted = ["image/jpeg","image/png","image/webp","image/svg+xml"];
+    const maxSizeMB = 8;
+
     const urls: string[] = [];
-    const fileArr: File[] = [];
-    for (const f of Array.from(files)) {
+    const picked: File[] = [];
+    for (const f of fileArr) {
+      if (!accepted.includes(f.type)) {
+        alert(`Дэмжигдэхгүй төрөл: ${f.name}`);
+        continue;
+      }
+      if (f.size > maxSizeMB * 1024 * 1024) {
+        alert(`Хэт том файл (${maxSizeMB}MB+): ${f.name}`);
+        continue;
+      }
       urls.push(URL.createObjectURL(f));
-      fileArr.push(f);
+      picked.push(f);
     }
+    if (!picked.length) return;
+
     setNewProd((p) => ({
       ...p,
       images: [...p.images, ...urls],
-      imageFiles: [...p.imageFiles, ...fileArr],
+      imageFiles: [...p.imageFiles, ...picked],
     }));
+
+    if (imgInputRef.current) imgInputRef.current.value = "";
   }
 
   function removeImage(i: number) {
-    setNewProd((p) => ({
-      ...p,
-      images: p.images.filter((_, idx) => idx !== i),
-      imageFiles: p.imageFiles.filter((_, idx) => idx !== i),
-    }));
+    setNewProd((p) => {
+      const url = p.images[i];
+      if (url && (url.startsWith("blob:") || url.startsWith("data:"))) {
+        try { URL.revokeObjectURL(url); } catch {}
+      }
+      return {
+        ...p,
+        images: p.images.filter((_, idx) => idx !== i),
+        imageFiles: p.imageFiles.filter((_, idx) => idx !== i),
+      };
+    });
   }
 
   function addVariant() {
@@ -447,19 +492,30 @@ export default function ProductCreateForm({
       ],
     }));
   }
-
   function removeVariant(id: string) {
-    setNewProd((p) => ({
-      ...p,
-      variants: p.variants.filter((v) => v.id !== id),
-    }));
+    setNewProd((p) => ({ ...p, variants: p.variants.filter((v) => v.id !== id) }));
   }
-
   function updateVariant(id: string, patch: Partial<Variant>) {
     setNewProd((p) => ({
       ...p,
       variants: p.variants.map((v) => (v.id === id ? { ...v, ...patch } : v)),
     }));
+  }
+
+  // ✅ Helper: product create response-аас variant ID-уудыг уян хатан сугалж авах
+  function extractVariantIds(res: any): string[] {
+    const pools = [
+      toArray(res?.variants),
+      toArray(res?.data?.variants),
+      toArray(res?.product?.variants),
+      toArray(res?.result?.variants),
+    ];
+    const flat = pools.flat();
+    const ids = flat
+      .map((v: any) => String(v?.id ?? v?.variant_id ?? ""))
+      .filter(Boolean);
+    // fallback: variants байхгүй бол ганцхан variant үүсгэсэн гэж үзэх боломжгүй тул хоосон буцаая
+    return Array.from(new Set(ids));
   }
 
   async function handleCreateSubmit() {
@@ -472,6 +528,14 @@ export default function ProductCreateForm({
     const cleanVariants = newProd.variants
       .map((v) => ({ ...v, price: v.price ?? basePrice }))
       .filter((v) => v.color?.trim() || v.size?.trim() || v.sku?.trim());
+
+    // ⬇️ SKU давхардлыг шалгах
+    const allSkus = cleanVariants.map(v => v.sku?.trim()).filter(Boolean);
+    const hasDuplicateSku = new Set(allSkus).size !== allSkus.length;
+    if (hasDuplicateSku) {
+      alert("SKU давхардаж байна. Вариант бүрийн SKU-г давхардахгүй оруулна уу.");
+      return;
+    }
 
     const variantInputs = (
       cleanVariants.length ? cleanVariants : [{ id: rid(), price: basePrice }]
@@ -486,7 +550,8 @@ export default function ProductCreateForm({
       },
     }));
 
-    let uploadedImageUrls: string[] = [];
+    // ⬇️ Signed URL бус, path хадгална
+    let uploadedPaths: string[] = [];
     if (newProd.imageFiles.length > 0) {
       try {
         const uploadResults = await Promise.all(
@@ -494,8 +559,9 @@ export default function ProductCreateForm({
             uploadProductImageOnly(file, { prefix: "product_img" })
           )
         );
-        uploadedImageUrls = uploadResults.map((res) => res.signedUrl);
+        uploadedPaths = uploadResults.map((res) => res.path);
       } catch (e) {
+        console.error(e);
         alert("Зураг upload хийхэд алдаа гарлаа.");
         return;
       }
@@ -506,19 +572,85 @@ export default function ProductCreateForm({
       const token = await getAccessToken();
       if (!token) throw new Error("No token");
 
-      const payload = {
+      // Edge function-д нийцтэй байлгахын тулд images болон img хоёуланг дамжуулъя
+      const payload: any = {
         name: newProd.name,
         category_id: selectedCatId!,
         variants: variantInputs,
-        images: uploadedImageUrls,
+        images: uploadedPaths,               // storage path-ууд
+        img: uploadedPaths[0] ?? "test",     // нийцтэй fallback
         description: newProd.description,
       };
 
-      const res = await createProduct(token, payload as any);
-      const newId = res?.id ?? res?.data?.id;
-      alert("Шинэ бараа амжилттай нэмэгдлээ.");
-      if (newId) router.push(`/productdetail/${newId}`);
-      else router.back();
+      // 1) Барааг үүсгэнэ
+      const res = await createProduct(token, payload);
+      console.log('createProduct response:', res); // ← энэ мөрийг нэм
+      const newId =
+        res?.id ?? res?.data?.id ?? res?.product?.id ?? res?.result?.id;
+      if (!newId) {
+        console.warn("createProduct response:", res);
+        if (res?.error) {
+          alert(`Бараа үүсгэхэд алдаа гарлаа: ${res.error}`);
+        } else {
+          alert("Шинэ барааны ID олдсонгүй.");
+        }
+        throw new Error("Шинэ барааны ID олдсонгүй.");
+      }
+
+      // 2) Вариант ID-уудыг сугална
+      const variantIds = extractVariantIds(res);
+      if (!variantIds.length) {
+        console.warn("No variant ids found in response to seed stock.", res);
+      }
+
+      // 3) Салбаруудын нэр -> ID зураглал
+      const nameToId = new Map<string, string>(
+        stores.map((s) => [String((s as any).name ?? (s as any).store_name ?? ""), String(s.id ?? (s as any).store_id ?? "")])
+      );
+
+      // 4) Эхний үлдэгдлийг SEED хийх (вариант бүрээр)
+      const seedOps: Promise<any>[] = [];
+      Object.entries(newProd.initialStocks)
+        .filter(([name, qty]) => name !== "Бүх салбар" && Number(qty) > 0)
+        .forEach(([storeName, qty]) => {
+          const store_id =
+            nameToId.get(storeName) ||
+            storeName; // Хэрэв key нь анхнаасаа ID байсан бол шууд ашиглана
+
+          if (!store_id) return;
+
+          if (variantIds.length) {
+            for (const vid of variantIds) {
+              seedOps.push(
+                productAddToInventory(token, {
+                  store_id,
+                  variant_id: vid,
+                  delta: Number(qty),        // Хэрвээ "вариантаар хуваарилах" бол энд логикоороо хуваа
+                  reason: "INITIAL",
+                  note: "SEEDING",
+                })
+              );
+            }
+          }
+        });
+
+      // Алдаа задаргаа: амжилттай/амжилтгүйг тусад нь тоолоод мэдээлнэ
+      if (seedOps.length) {
+        const results = await Promise.allSettled(seedOps);
+        const ok = results.filter((r) => r.status === "fulfilled").length;
+        const fail = results.length - ok;
+        if (fail) {
+          console.warn(`${fail} seed movement(s) failed`, results);
+          alert(`Бараа үүссэн. Нөөц SEED хийхэд ${fail} алдаа гарлаа (амжилттай: ${ok}).`);
+        } else {
+          alert("Шинэ бараа үүсэж, эхний нөөц бүртгэгдлээ.");
+        }
+      } else {
+        alert("Шинэ бараа үүссэн. (Эхний нөөц оруулаагүй эсвэл variant_id олдсонгүй)");
+      }
+
+      // 5) Дундаас буцах/шинэ дэлгэрэнгүй рүү очих
+      router.push(`/productdetail/${newId}`);
     } catch (error) {
       console.error(error);
       alert("Алдаа гарлаа. Дахин оролдоно уу.");
@@ -558,13 +690,7 @@ export default function ProductCreateForm({
             }}
           />
           <div className="text-xs text-[#777]">
-            {loadingCats ? (
-              "Ангилал ачаалж байна…"
-            ) : (
-              <>
-                Сонгосон: <b>{selectedPathLabel}</b>
-              </>
-            )}
+            {loadingCats ? "Ангилал ачаалж байна…" : <>Сонгосон: <b>{selectedPathLabel}</b></>}
           </div>
         </div>
 
@@ -578,19 +704,6 @@ export default function ProductCreateForm({
               setNewProd((p) => ({ ...p, price: Number(e.target.value || 0) }))
             }
             placeholder="Барааны зарах үнэ"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Өртөг (сонголттой)</label>
-          <input
-            type="number"
-            className="h-10 w-full rounded-md border border-[#E6E6E6] px-3"
-            value={newProd.cost ?? ""}
-            onChange={(e) =>
-              setNewProd((p) => ({ ...p, cost: Number(e.target.value || 0) }))
-            }
-            placeholder="Өртөг"
           />
         </div>
       </div>
@@ -635,9 +748,7 @@ export default function ProductCreateForm({
                   fill
                   sizes="(min-width:768px) 14vw, 30vw"
                   className="object-cover rounded-md border"
-                  unoptimized={
-                    src.startsWith("blob:") || src.startsWith("data:")
-                  }
+                  unoptimized={src.startsWith("blob:") || src.startsWith("data:")}
                   priority={i === 0}
                 />
                 <button
@@ -676,17 +787,13 @@ export default function ProductCreateForm({
                   type="color"
                   className="h-9 w-12 p-0 border border-[#E6E6E6] rounded-md cursor-pointer"
                   value={v.color || "#E6E6E6"}
-                  onChange={(e) =>
-                    updateVariant(v.id, { color: e.target.value })
-                  }
+                  onChange={(e) => updateVariant(v.id, { color: e.target.value })}
                 />
                 <input
                   placeholder="#000000"
                   className="h-9 flex-1 rounded-md border border-[#E6E6E6] px-2"
                   value={v.color || ""}
-                  onChange={(e) =>
-                    updateVariant(v.id, { color: e.target.value })
-                  }
+                  onChange={(e) => updateVariant(v.id, { color: e.target.value })}
                 />
                 <span
                   className="inline-block h-6 w-6 rounded-full border border-black/10"
@@ -733,7 +840,7 @@ export default function ProductCreateForm({
       {branches?.length ? (
         <div className="space-y-2">
           <span className="text-sm font-medium">
-            Эхний нөөц (UI) — payload-д оруулахгүй
+            Эхний нөөц (UI) — SEED хийхэд ашиглана
           </span>
           <div className="grid md:grid-cols-3 gap-2">
             {branches
@@ -756,6 +863,9 @@ export default function ProductCreateForm({
                 </div>
               ))}
           </div>
+          {loadingStores && (
+            <div className="text-xs text-[#777]">Салбарууд ачаалж байна…</div>
+          )}
         </div>
       ) : null}
 
@@ -764,6 +874,11 @@ export default function ProductCreateForm({
           onClick={() => {
             setSelectedCatId(null);
             setSelectedPathLabel("Ангилал байхгүй");
+            newProd.images.forEach((u) => {
+              if (u.startsWith("blob:") || u.startsWith("data:")) {
+                try { URL.revokeObjectURL(u); } catch {}
+              }
+            });
             setNewProd((p) => ({
               ...p,
               name: "",
@@ -779,6 +894,7 @@ export default function ProductCreateForm({
                 branches.filter((b) => b !== "Бүх салбар").map((b) => [b, 0])
               ),
             }));
+            if (imgInputRef.current) imgInputRef.current.value = "";
           }}
           className="h-10 px-4 rounded-lg border border-[#E6E6E6] bg-white"
         >
