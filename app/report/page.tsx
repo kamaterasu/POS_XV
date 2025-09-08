@@ -33,10 +33,10 @@ type ReportType = "sales" | "finance" | "inventory" | "overview";
 
 export default function ReportPage() {
   const router = useRouter();
-  const [activeReport, setActiveReport] = useState<ReportType>("sales");
+  const [activeReport, setActiveReport] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState({
-    from: "2024-01-01",
-    to: "2024-12-31",
+    from: "2025-01-01",
+    to: new Date().toISOString().split("T")[0], // Today's date
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +44,9 @@ export default function ReportPage() {
   // Data states for each report type
   const [salesData, setSalesData] = useState<SalesSummaryItem[]>([]);
   const [financeData, setFinanceData] = useState<PaymentsByMethodItem[]>([]);
-  const [inventoryData, setInventoryData] = useState<InventorySnapshotItem[]>([]);
+  const [inventoryData, setInventoryData] = useState<InventorySnapshotItem[]>(
+    []
+  );
   const [overviewData, setOverviewData] = useState<any>(null);
 
   // Load data when report type or date range changes
@@ -55,7 +57,7 @@ export default function ReportPage() {
   const loadReportData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       switch (activeReport) {
         case "sales":
@@ -84,12 +86,17 @@ export default function ReportPage() {
 
         case "overview":
           // Load overview data (combination of multiple reports)
-          const [salesOverview, paymentsOverview, inventoryOverview] = await Promise.all([
-            getSalesSummary({ period: "day", from: dateRange.from, to: dateRange.to }),
-            getPaymentsByMethod({ from: dateRange.from, to: dateRange.to }),
-            getInventorySnapshot({ only_in_stock: true }),
-          ]);
-          
+          const [salesOverview, paymentsOverview, inventoryOverview] =
+            await Promise.all([
+              getSalesSummary({
+                period: "day",
+                from: dateRange.from,
+                to: dateRange.to,
+              }),
+              getPaymentsByMethod({ from: dateRange.from, to: dateRange.to }),
+              getInventorySnapshot({ only_in_stock: true }),
+            ]);
+
           setOverviewData({
             sales: salesOverview,
             payments: paymentsOverview,
@@ -99,13 +106,21 @@ export default function ReportPage() {
       }
     } catch (err) {
       console.error("Error loading report data:", err);
-      setError(err instanceof Error ? err.message : "Failed to load report data");
+      setError(
+        err instanceof Error ? err.message : "Failed to load report data"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const reportTypes = [
+    {
+      id: "overview" as ReportType,
+      label: "Ерөнхий тойм",
+      icon: FaCalendarAlt,
+      color: "bg-purple-500",
+    },
     {
       id: "sales" as ReportType,
       label: "Борлуулалт",
@@ -123,12 +138,6 @@ export default function ReportPage() {
       label: "Бараа материал",
       icon: FaPrint,
       color: "bg-orange-500",
-    },
-    {
-      id: "overview" as ReportType,
-      label: "Ерөнхий тойм",
-      icon: FaCalendarAlt,
-      color: "bg-purple-500",
     },
   ];
 
@@ -178,7 +187,9 @@ export default function ReportPage() {
     if (error) {
       return (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-red-800 mb-2">Алдаа гарлаа</h3>
+          <h3 className="text-lg font-semibold text-red-800 mb-2">
+            Алдаа гарлаа
+          </h3>
           <p className="text-red-600">{error}</p>
           <button
             onClick={loadReportData}
@@ -247,9 +258,15 @@ export default function ReportPage() {
                       <tr key={index} className="border-b">
                         <td className="px-4 py-2 font-medium">{item.period}</td>
                         <td className="px-4 py-2">{item.orders}</td>
-                        <td className="px-4 py-2">{formatCurrency(item.total_gross)}</td>
-                        <td className="px-4 py-2">{formatCurrency(item.total_net)}</td>
-                        <td className="px-4 py-2">{formatCurrency(item.returns_value)}</td>
+                        <td className="px-4 py-2">
+                          {formatCurrency(item.total_gross)}
+                        </td>
+                        <td className="px-4 py-2">
+                          {formatCurrency(item.total_net)}
+                        </td>
+                        <td className="px-4 py-2">
+                          {formatCurrency(item.returns_value)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -293,7 +310,9 @@ export default function ReportPage() {
                     {financeData.map((item, index) => (
                       <tr key={index} className="border-b">
                         <td className="px-4 py-2 font-medium">{item.method}</td>
-                        <td className="px-4 py-2">{formatCurrency(item.amount)}</td>
+                        <td className="px-4 py-2">
+                          {formatCurrency(item.amount)}
+                        </td>
                         <td className="px-4 py-2">{item.count}</td>
                       </tr>
                     ))}
@@ -313,9 +332,13 @@ export default function ReportPage() {
 
       case "inventory":
         const totalItems = inventoryData.length;
-        const lowStockItems = inventoryData.filter(item => item.qty > 0 && item.qty < 10).length;
-        const outOfStockItems = inventoryData.filter(item => item.qty === 0).length;
-        
+        const lowStockItems = inventoryData.filter(
+          (item) => item.qty > 0 && item.qty < 10
+        ).length;
+        const outOfStockItems = inventoryData.filter(
+          (item) => item.qty === 0
+        ).length;
+
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -329,13 +352,17 @@ export default function ReportPage() {
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Дуусч байгаа
                 </h3>
-                <p className="text-2xl font-bold text-red-600">{lowStockItems}</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {lowStockItems}
+                </p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Дууссан
                 </h3>
-                <p className="text-2xl font-bold text-orange-600">{outOfStockItems}</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {outOfStockItems}
+                </p>
               </div>
             </div>
 
@@ -354,18 +381,23 @@ export default function ReportPage() {
                   </thead>
                   <tbody className="space-y-1">
                     {inventoryData.slice(0, 20).map((item, index) => {
-                      const status = item.qty === 0 
-                        ? "Дууссан" 
-                        : item.qty < 10 
-                        ? "Бага" 
-                        : "Хангалттай";
-                      
+                      const status =
+                        item.qty === 0
+                          ? "Дууссан"
+                          : item.qty < 10
+                          ? "Бага"
+                          : "Хангалттай";
+
                       return (
                         <tr key={index} className="border-b">
-                          <td className="px-4 py-2">{item.product_name || item.variant_name || 'Нэргүй'}</td>
-                          <td className="px-4 py-2">{item.sku || '-'}</td>
+                          <td className="px-4 py-2">
+                            {item.product_name || item.variant_name || "Нэргүй"}
+                          </td>
+                          <td className="px-4 py-2">{item.sku || "-"}</td>
                           <td className="px-4 py-2">{item.qty}</td>
-                          <td className="px-4 py-2">{formatCurrency(item.cost)}</td>
+                          <td className="px-4 py-2">
+                            {formatCurrency(item.cost)}
+                          </td>
                           <td className="px-4 py-2">
                             <span
                               className={`px-2 py-1 rounded-full text-xs ${
@@ -402,7 +434,7 @@ export default function ReportPage() {
         const totalInventoryValue = overviewData.inventory?.totals?.value || 0;
         const totalOrders = todayData?.orders || 0;
         const totalRevenue = todayData?.total_gross || 0;
-        
+
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -410,25 +442,33 @@ export default function ReportPage() {
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Өнөөдрийн орлого
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(totalRevenue)}
+                </p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Захиалга
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">{totalOrders}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {totalOrders}
+                </p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Агуулахын үнэ цэнэ
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalInventoryValue)}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(totalInventoryValue)}
+                </p>
               </div>
               <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
                 <h3 className="text-sm font-medium text-gray-600 mb-2">
                   Буцаалт
                 </h3>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(todayData?.returns_value || 0)}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(todayData?.returns_value || 0)}
+                </p>
               </div>
             </div>
 
@@ -436,22 +476,24 @@ export default function ReportPage() {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="text-lg font-semibold mb-4">Төлбөрийн аргууд</h3>
                 <div className="space-y-3">
-                  {overviewData.payments?.payments?.slice(0, 5).map((payment: PaymentsByMethodItem, index: number) => (
-                    <div
-                      key={index}
-                      className="flex justify-between items-center py-2 border-b"
-                    >
-                      <div>
-                        <span className="font-medium">{payment.method}</span>
-                        <span className="text-sm text-gray-500 ml-2">
-                          {payment.count} гүйлгээ
+                  {overviewData.payments?.payments
+                    ?.slice(0, 5)
+                    .map((payment: PaymentsByMethodItem, index: number) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center py-2 border-b"
+                      >
+                        <div>
+                          <span className="font-medium">{payment.method}</span>
+                          <span className="text-sm text-gray-500 ml-2">
+                            {payment.count} гүйлгээ
+                          </span>
+                        </div>
+                        <span className="font-bold text-green-600">
+                          {formatCurrency(payment.amount)}
                         </span>
                       </div>
-                      <span className="font-bold text-green-600">
-                        {formatCurrency(payment.amount)}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
 
@@ -460,15 +502,21 @@ export default function ReportPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span>Нийт бараа:</span>
-                    <span className="font-medium">{overviewData.inventory?.items?.length || 0}</span>
+                    <span className="font-medium">
+                      {overviewData.inventory?.items?.length || 0}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Агуулахын үнэ цэнэ:</span>
-                    <span className="font-medium">{formatCurrency(totalInventoryValue)}</span>
+                    <span className="font-medium">
+                      {formatCurrency(totalInventoryValue)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Өнөөдрийн борлуулалт:</span>
-                    <span className="font-medium">{formatCurrency(totalRevenue)}</span>
+                    <span className="font-medium">
+                      {formatCurrency(totalRevenue)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Системийн статус:</span>
@@ -529,7 +577,7 @@ export default function ReportPage() {
                 className="border border-gray-300 rounded-md px-3 py-1 text-sm"
               />
             </div>
-            <button 
+            <button
               onClick={loadReportData}
               className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors flex items-center gap-2 mr-2"
               disabled={loading}

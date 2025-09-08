@@ -31,15 +31,70 @@ export async function getProductByStore(token: string, storeId: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
 
+  if (!tenant_id) {
+    throw new Error("No tenant_id found in JWT token");
+  }
+
   const url = new URL(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory?tenant_id=${tenant_id}&scope=store&store_id=${storeId}`
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory`
   );
+
+  url.searchParams.set("tenant_id", tenant_id);
+  url.searchParams.set("scope", "store");
+  url.searchParams.set("store_id", storeId);
+  // Add a higher limit to get more products
+  url.searchParams.set("limit", "500");
+
   const res = await fetch(url.toString(), {
     method: "GET",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
+
+  if (!res.ok) {
+    throw new Error(`Inventory API failed: ${res.status} ${res.statusText}`);
+  }
+
   const data = await res.json();
   console.log("Inventory Response:", data);
+  return data;
+}
+
+// New function to get inventory for all stores (global scope for OWNER)
+export async function getInventoryGlobal(token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  if (!tenant_id) {
+    throw new Error("No tenant_id found in JWT token");
+  }
+
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory`
+  );
+
+  url.searchParams.set("tenant_id", tenant_id);
+  url.searchParams.set("scope", "global");
+  url.searchParams.set("limit", "500");
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Global Inventory API failed: ${res.status} ${res.statusText}`
+    );
+  }
+
+  const data = await res.json();
+  console.log("Global Inventory Response:", data);
   return data;
 }
 

@@ -1,17 +1,24 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { jwtDecode } from 'jwt-decode';
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { jwtDecode } from "jwt-decode";
 
-import ProductCreateForm, { type Category } from '@/components/inventoryComponents/ProductCreateForm';
-import { getAccessToken } from '@/lib/helper/getAccessToken';
-import { getProductByStore, getProductByCategory } from '@/lib/product/productApi';
-import { getStore } from '@/lib/store/storeApi';
-import { getImageShowUrl } from '@/lib/product/productImages';
-import { getCategories, createCategory, createSubcategory } from '@/lib/category/categoryApi';
+import ProductCreateForm, {
+  type Category,
+} from "@/components/inventoryComponents/ProductCreateForm";
+import { getAccessToken } from "@/lib/helper/getAccessToken";
+import { getTenantId } from "@/lib/helper/getTenantId";
+import {
+  getProductByStore,
+  getProductByCategory,
+  getInventoryGlobal,
+} from "@/lib/product/productApi";
+import { getStore } from "@/lib/store/storeApi";
+import { getImageShowUrl } from "@/lib/product/productImages";
+import { getCategories, createCategory, createSubcategory } from "@/lib/category/categoryApi";
 
 // ---------- Types ----------
 type StoreRow = { id: string; name: string };
@@ -20,16 +27,40 @@ type Product = {
   id: string;
   name: string;
   qty?: number;
-  code?: string;
+  code?: string; // SKU from variant
   storeId?: string;
-  img?: string;
+  img?: string; // DB-д хадгалсан утга (ж: "product_img/xxx.png" эсвэл "xxx.png")
   imgUrl?: string; // Дүгнэсэн харах URL (signed/public/absolute)
+  variantId?: string; // Variant ID for inventory tracking
+  variantName?: string; // Variant name if different from product name
+  price?: number; // Price from variant
+};
+
+// Backend inventory API response structure:
+// { items: [{ store_id, variant_id, qty, variant: {...}, product: {...} }] }
+const mapInventoryItem = (item: any): Product | null => {
+  if (!item?.variant_id || !item?.product) return null;
+
+  const variant = item.variant || {};
+  const product = item.product || {};
+
+  return {
+    id: String(product.id || variant.id || item.variant_id),
+    variantId: String(item.variant_id),
+    name: product.name || variant.name || "(нэргүй)",
+    variantName: variant.name !== product.name ? variant.name : undefined,
+    qty: typeof item.qty === "number" ? item.qty : 0,
+    code: variant.sku || undefined,
+    storeId: item.store_id ? String(item.store_id) : undefined,
+    img: product.img || undefined,
+    price: variant.price || 0,
+  };
 };
 
 // ---------- Utils ----------
 const toArray = (v: any, keys: string[] = []) => {
   if (Array.isArray(v)) return v;
-  if (!v || typeof v !== 'object') return [];
+  if (!v || typeof v !== "object") return [];
   for (const k of keys) if (Array.isArray((v as any)[k])) return (v as any)[k];
   const vals = Object.values(v);
   return Array.isArray(vals) ? vals : [];
@@ -38,29 +69,7 @@ const toArray = (v: any, keys: string[] = []) => {
 const mapStore = (s: any): StoreRow | null => {
   const id = s?.id ?? s?.store_id ?? s?.storeId;
   if (!id) return null;
-  return { id: String(id), name: s?.name ?? s?.store_name ?? 'Салбар' };
-};
-
-// getProductByStore → { product, qty, store_id } | getProduct → шууд product
-const mapProduct = (item: any): Product | null => {
-  if (item?.product?.id) {
-    return {
-      id: String(item.product.id),
-      name: item.product.name ?? '(нэргүй)',
-      qty: item.qty ?? 0,
-      storeId: item.store_id ?? undefined,
-      img: item.product.img ?? item.product.image ?? undefined,
-    };
-  }
-  const id = item?.id ?? item?.product_id ?? item?.uuid ?? item?.variant_id;
-  if (!id) return null;
-  return {
-    id: String(id),
-    name: item?.name ?? item?.product_name ?? item?.title ?? '(нэргүй)',
-    code: item?.code ?? item?.sku ?? item?.barcode ?? undefined,
-    storeId: item?.storeId ?? item?.store_id ?? item?.store?.id ?? undefined,
-    img: item?.img ?? item?.image ?? undefined,
-  };
+  return { id: String(id), name: s?.name ?? s?.store_name ?? "Салбар" };
 };
 
 // ---------- Category helpers ----------
@@ -105,11 +114,11 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
   if (/^https?:\/\//i.test(raw) || /^data:/i.test(raw)) return raw;
 
   // Public (app/public) зам бол шууд
-  if (raw.startsWith('/')) return raw;
+  if (raw.startsWith("/")) return raw;
 
   // Supabase storage object замыг таамаглах
   // зөвхөн файл нэр өгөгдсөн бол product_img/ гэж prefix хийнэ
-  const path = raw.includes('/') ? raw : `product_img/${raw}`;
+  const path = raw.includes("/") ? raw : `product_img/${raw}`;
 
   if (imgUrlCache.has(path)) return imgUrlCache.get(path)!;
 
@@ -118,13 +127,13 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
     imgUrlCache.set(path, signed);
     return signed;
   } catch (e) {
-    console.error('Failed to sign image url for', path, e);
+    console.error("Failed to sign image url for", path, e);
     return undefined;
   }
 }
 
 // ---------- Tiny UI ----------
-const Skeleton = ({ className = '' }: { className?: string }) => (
+const Skeleton = ({ className = "" }: { className?: string }) => (
   <div className={`animate-pulse bg-neutral-200 ${className}`} />
 );
 
@@ -141,7 +150,7 @@ function SBImage({
   size?: number;
 }) {
   const [failed, setFailed] = useState(false);
-  const finalSrc = failed || !src ? '/default.png' : src;
+  const finalSrc = failed || !src ? "/default.png" : src;
 
   return (
     <Image
@@ -234,8 +243,10 @@ export default function InventoryPage() {
 
   // UI state
   const [loadingStores, setLoadingStores] = useState(true);
-  const [stores, setStores] = useState<StoreRow[]>([{ id: 'all', name: 'Бүгд' }]);
-  const [storeId, setStoreId] = useState<string>('all');
+  const [stores, setStores] = useState<StoreRow[]>([
+    { id: "all", name: "Бүгд" },
+  ]);
+  const [storeId, setStoreId] = useState<string>("all");
 
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -257,20 +268,27 @@ export default function InventoryPage() {
   const [creatingCat, setCreatingCat] = useState(false);
   const [creatingSub, setCreatingSub] = useState(false);
 
-  // 1) Салбарууд
+  // 1) Салбарууд болон tenant ID
   useEffect(() => {
     setLoadingStores(true);
     (async () => {
       try {
         const token = await getAccessToken();
-        if (!token) throw new Error('no token');
+        if (!token) throw new Error("no token");
+
+        // Get tenant ID
+        const tId = await getTenantId();
+        if (tId) setTenantId(tId);
+
+        // Get stores
         const raw = await getStore(token);
-        const arr = toArray(raw, ['stores', 'data', 'items'])
+        const arr = toArray(raw, ["stores", "data", "items"])
           .map(mapStore)
           .filter(Boolean) as StoreRow[];
-        setStores([{ id: 'all', name: 'Бүгд' }, ...arr]);
-      } catch {
-        setStores([{ id: 'all', name: 'Бүгд' }]);
+        setStores([{ id: "all", name: "Бүгд" }, ...arr]);
+      } catch (error) {
+        console.error("Failed to load stores and tenant ID:", error);
+        setStores([{ id: "all", name: "Бүгд" }]);
       } finally {
         setLoadingStores(false);
       }
@@ -313,29 +331,54 @@ export default function InventoryPage() {
       try {
         setLoadingProducts(true);
         const token = await getAccessToken();
-        if (!token) throw new Error('no token');
+        if (!token) throw new Error("no token");
 
         let arr: Product[] = [];
 
         if (selectedCat?.id) {
           // Категори сонгосон үед: тухайн категорийн (subtree=true) барааг API-аас авч үзүүлнэ
           const raw = await getProductByCategory(token, selectedCat.id);
-          arr = toArray(raw, ['items', 'products', 'data']).map(mapProduct).filter(Boolean) as Product[];
-        } else if (storeId === 'all') {
-          const merged: Product[] = [];
-          for (const s of stores) {
-            if (s.id === 'all') continue;
-            const raw = await getProductByStore(token, s.id);
-            const items = toArray(raw, ['items', 'products', 'data'])
-              .map(mapProduct)
+          arr = toArray(raw, ['items', 'products', 'data']).map(mapInventoryItem).filter(Boolean) as Product[];
+        } else if (storeId === "all") {
+          // For "all" stores, we can either:
+          // 1. Use global scope (if user is OWNER) - aggregated inventory
+          // 2. Fetch from each store individually
+          try {
+            // Try global scope first
+            const globalRaw = await getInventoryGlobal(token);
+            const globalItems = toArray(globalRaw, ["items", "data"])
+              .map(mapInventoryItem)
               .filter(Boolean) as Product[];
-            merged.push(...items);
+            arr = globalItems;
+          } catch (globalError) {
+            console.log(
+              "Global scope not available, fetching per store:",
+              globalError
+            );
+            // Fallback: fetch from each store individually
+            const merged: Product[] = [];
+            for (const s of stores) {
+              if (s.id === "all") continue;
+              try {
+                const raw = await getProductByStore(token, s.id);
+                const items = toArray(raw, ["items", "data"])
+                  .map(mapInventoryItem)
+                  .filter(Boolean) as Product[];
+                merged.push(...items);
+              } catch (storeError) {
+                console.error(
+                  `Failed to fetch inventory for store ${s.id}:`,
+                  storeError
+                );
+              }
+            }
+            arr = merged;
           }
-          arr = merged;
         } else {
+          // Single store
           const raw = await getProductByStore(token, storeId);
-          arr = toArray(raw, ['items', 'products', 'data'])
-            .map(mapProduct)
+          arr = toArray(raw, ["items", "data"])
+            .map(mapInventoryItem)
             .filter(Boolean) as Product[];
         }
 
@@ -350,7 +393,7 @@ export default function InventoryPage() {
         if (!alive) return;
         setProducts(withUrls);
       } catch (e) {
-        console.error(e);
+        console.error("Failed to fetch inventory:", e);
         setProducts([]);
       } finally {
         if (alive) setLoadingProducts(false);
@@ -362,19 +405,36 @@ export default function InventoryPage() {
   }, [storeId, stores, selectedCat?.id]);
 
   const mergedProducts = useMemo(() => {
-    if (storeId !== 'all') {
+    if (storeId !== "all") {
       return products.filter((p) => String(p.storeId) === storeId);
     }
+
+    // For "all" stores, we need to handle variants properly
+    // Each variant should be treated as a separate item, but we may want to group by product
     const map = new Map<string, Product & { qty: number }>();
+
     for (const p of products) {
-      if (!p.id) continue;
-      const prev = map.get(p.id);
-      map.set(p.id, {
-        ...(prev ?? p),
-        imgUrl: prev?.imgUrl ?? p.imgUrl,
-        qty: (prev?.qty ?? 0) + (p.qty ?? 0),
-      });
+      if (!p.variantId) continue;
+
+      // Use variantId as the key to avoid conflicts between variants of the same product
+      const key = p.variantId;
+      const prev = map.get(key);
+
+      if (prev) {
+        // Same variant from different stores - sum quantities
+        map.set(key, {
+          ...prev,
+          qty: (prev.qty ?? 0) + (p.qty ?? 0),
+        });
+      } else {
+        // New variant
+        map.set(key, {
+          ...p,
+          qty: p.qty ?? 0,
+        });
+      }
     }
+
     return Array.from(map.values());
   }, [products, storeId]);
 
@@ -385,8 +445,8 @@ export default function InventoryPage() {
     if (typeof window !== 'undefined') localStorage.setItem('storeId', v);
   };
   const handleAddProduct = () => {
-    if (storeId === 'all') {
-      alert('Эхлээд тодорхой салбар сонгоно уу.');
+    if (storeId === "all") {
+      alert("Эхлээд тодорхой салбар сонгоно уу.");
       return;
     }
     setShowCreate(true);
@@ -635,11 +695,12 @@ export default function InventoryPage() {
         )}
 
         {/* Create form */}
-        {showCreate && storeId !== 'all' && (
+        {showCreate && storeId !== "all" && (
           <div className="rounded-xl bg-white border border-neutral-200 shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm font-medium">
-                Шинэ бараа нэмэх (Салбар: {stores.find((s) => s.id === storeId)?.name})
+                Шинэ бараа нэмэх (Салбар:{" "}
+                {stores.find((s) => s.id === storeId)?.name})
               </div>
               <button
                 onClick={() => setShowCreate(false)}
@@ -648,14 +709,19 @@ export default function InventoryPage() {
                 Хаах
               </button>
             </div>
-            <ProductCreateForm cats={cats} branches={branchNames} tenantId={tenantId} />
+            <ProductCreateForm
+              cats={cats}
+              branches={branchNames}
+              tenantId={tenantId}
+            />
           </div>
         )}
 
         {/* List */}
         <div className="rounded-xl bg-white border border-neutral-200 shadow-sm">
           <div className="px-4 py-3 border-b border-neutral-200 text-sm font-medium">
-            Барааны жагсаалт {loadingProducts ? '…' : `(${mergedProducts.length})`}
+            Барааны жагсаалт{" "}
+            {loadingProducts ? "…" : `(${mergedProducts.length})`}
           </div>
 
           <div className="divide-y divide-neutral-100">
@@ -666,11 +732,13 @@ export default function InventoryPage() {
                 <Skeleton className="h-10" />
               </>
             ) : mergedProducts.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-neutral-400">Бараа олдсонгүй.</div>
+              <div className="px-4 py-6 text-center text-sm text-neutral-400">
+                Бараа олдсонгүй.
+              </div>
             ) : (
               mergedProducts.map((p) => (
                 <Link
-                  key={p.id}
+                  key={p.variantId || p.id}
                   href={`/productdetail/${p.id}`}
                   prefetch
                   className="group flex items-center gap-4 px-4 py-3 hover:bg-neutral-50 active:bg-neutral-100 transition"
@@ -683,16 +751,34 @@ export default function InventoryPage() {
                     className="w-12 h-12 object-cover rounded border border-neutral-200 bg-neutral-100 flex-shrink-0"
                   />
                   <div className="flex-1">
-                    <div className="font-medium group-hover:underline">{p.name}</div>
-                    <div className="text-xs text-neutral-500">{p.code ? `Код: ${p.code}` : ''}</div>
+                    <div className="font-medium group-hover:underline">
+                      {p.name}
+                      {p.variantName && p.variantName !== p.name && (
+                        <span className="text-sm text-neutral-500 ml-2">
+                          ({p.variantName})
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {p.code && `Код: ${p.code}`}
+                      {p.price && (
+                        <span className="ml-3">
+                          Үнэ: ₮{p.price.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-xs text-neutral-500">
-                    {typeof p.qty === 'number'
-                      ? (storeId === 'all' ? `Нийт: ${p.qty}` : `Тоо: ${p.qty}`)
-                      : ''}
+                    {typeof p.qty === "number"
+                      ? storeId === "all"
+                        ? `Нийт: ${p.qty}`
+                        : `Тоо: ${p.qty}`
+                      : ""}
                   </div>
                   <div className="text-xs text-neutral-400">
-                    {storeId === 'all' ? '' : stores.find((s) => s.id === p.storeId)?.name || ''}
+                    {storeId === "all"
+                      ? ""
+                      : stores.find((s) => s.id === p.storeId)?.name || ""}
                   </div>
                 </Link>
               ))

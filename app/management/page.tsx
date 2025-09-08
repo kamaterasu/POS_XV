@@ -648,187 +648,146 @@ export default function ManagementPage() {
         </div>
       </header>
 
-      {/* Users Section */}
-      <section className="bg-white rounded-2xl shadow-xl border border-[#E6E6E6] p-6 mb-8 hover:shadow-2xl transition-shadow duration-300">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+      {/* Users Section - Hidden for Cashier users */}
+      {userRole !== "CASHIER" && (
+        <section className="bg-white rounded-2xl shadow-xl border border-[#E6E6E6] p-6 mb-8 hover:shadow-2xl transition-shadow duration-300">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197V9a3 3 0 00-6 0v2.5a5 5 0 110 11V21z"
+                  />
+                </svg>
+                Хэрэглэгчид
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Системийн хэрэглэгчдийг удирдах
+              </p>
+            </div>
+            {userRole !== "CASHIER" && (
+              <button
+                onClick={openCreate}
+                className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#5AA6FF] to-[#4A96E8] text-white shadow-lg hover:shadow-xl transition-all duration-200 font-medium flex items-center gap-2 hover:scale-105"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197V9a3 3 0 00-6 0v2.5a5 5 0 110 11V21z"
-                />
-              </svg>
-              Хэрэглэгчид
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Системийн хэрэглэгчдийг удирдах
-            </p>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                  />
+                </svg>
+                Хэрэглэгч үүсгэх
+              </button>
+            )}
           </div>
-          {userRole !== "CASHIER" && (
-            <button
-              onClick={openCreate}
-              className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#5AA6FF] to-[#4A96E8] text-white shadow-lg hover:shadow-xl transition-all duration-200 font-medium flex items-center gap-2 hover:scale-105"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-              Хэрэглэгч үүсгэх
-            </button>
-          )}
-        </div>
 
-        <div className="overflow-hidden rounded-xl border border-gray-200">
-          <table className="min-w-full bg-white">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-              <tr className="text-left text-gray-700">
-                <th className="py-4 px-6 font-semibold">Нэр</th>
-                <th className="py-4 px-6 font-semibold">И-мэйл</th>
-                <th className="py-4 px-6 font-semibold">Эрх</th>
-                <th className="py-4 px-6 font-semibold">Салбар</th>
-                <th className="py-4 px-6 font-semibold">Үйлдэл</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loadingUsers
-                ? // Loading skeleton for users
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <tr
-                      key={`user-skeleton-${index}`}
-                      className="animate-pulse"
-                    >
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gray-300"></div>
-                          <div>
-                            <div className="h-4 bg-gray-300 rounded w-24 mb-1"></div>
-                            <div className="h-3 bg-gray-200 rounded w-16"></div>
+          <div className="overflow-hidden rounded-xl border border-gray-200">
+            <table className="min-w-full bg-white">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                <tr className="text-left text-gray-700">
+                  <th className="py-4 px-6 font-semibold">Нэр</th>
+                  <th className="py-4 px-6 font-semibold">И-мэйл</th>
+                  <th className="py-4 px-6 font-semibold">Эрх</th>
+                  <th className="py-4 px-6 font-semibold">Салбар</th>
+                  <th className="py-4 px-6 font-semibold">Үйлдэл</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loadingUsers
+                  ? // Loading skeleton for users
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <tr
+                        key={`user-skeleton-${index}`}
+                        className="animate-pulse"
+                      >
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-300"></div>
+                            <div>
+                              <div className="h-4 bg-gray-300 rounded w-24 mb-1"></div>
+                              <div className="h-3 bg-gray-200 rounded w-16"></div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="h-4 bg-gray-300 rounded w-32"></div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="h-6 bg-gray-300 rounded-full w-16"></div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="h-6 bg-gray-300 rounded-full w-20"></div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex gap-2">
-                          <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
-                          <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                : users.map((u, index) => (
-                    <tr
-                      key={u.id}
-                      className="hover:bg-gray-50 transition-colors duration-150"
-                    >
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm ${
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="h-4 bg-gray-300 rounded w-32"></div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="h-6 bg-gray-300 rounded-full w-16"></div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="h-6 bg-gray-300 rounded-full w-20"></div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex gap-2">
+                            <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
+                            <div className="h-9 bg-gray-300 rounded-lg w-16"></div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  : users.map((u, index) => (
+                      <tr
+                        key={u.id}
+                        className="hover:bg-gray-50 transition-colors duration-150"
+                      >
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm ${
+                                u.role === "Admin"
+                                  ? "bg-gradient-to-br from-red-500 to-red-600"
+                                  : u.role === "Manager"
+                                  ? "bg-gradient-to-br from-blue-500 to-blue-600"
+                                  : "bg-gradient-to-br from-gray-500 to-gray-600"
+                              }`}
+                            >
+                              {u.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900">
+                                {u.name}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                #{u.id.slice(-6)}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-gray-700">{u.email}</td>
+                        <td className="py-4 px-6">
+                          <span
+                            className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
                               u.role === "Admin"
-                                ? "bg-gradient-to-br from-red-500 to-red-600"
+                                ? "bg-red-100 text-red-800"
                                 : u.role === "Manager"
-                                ? "bg-gradient-to-br from-blue-500 to-blue-600"
-                                : "bg-gradient-to-br from-gray-500 to-gray-600"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-green-100 text-green-800"
                             }`}
                           >
-                            {u.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-gray-900">
-                              {u.name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              #{u.id.slice(-6)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-gray-700">{u.email}</td>
-                      <td className="py-4 px-6">
-                        <span
-                          className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                            u.role === "Admin"
-                              ? "bg-red-100 text-red-800"
-                              : u.role === "Manager"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-green-100 text-green-800"
-                          }`}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        {u.role === "Admin" || u.role === "Manager" ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            <svg
-                              className="w-3 h-3 mr-1"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                              />
-                            </svg>
-                            Бүх салбар
+                            {u.role}
                           </span>
-                        ) : u.store_ids?.length ? (
-                          <div className="flex flex-wrap gap-1">
-                            {u.store_ids.slice(0, 2).map((id) => (
-                              <span
-                                key={id}
-                                className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
-                              >
-                                {branchesById[id] || "Unknown"}
-                              </span>
-                            ))}
-                            {u.store_ids.length > 2 && (
-                              <span className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
-                                +{u.store_ids.length - 2}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="py-4 px-6">
-                        {userRole !== "CASHIER" ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => openEdit(u)}
-                              className="h-9 px-4 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors duration-150 font-medium flex items-center gap-1"
-                            >
+                        </td>
+                        <td className="py-4 px-6">
+                          {u.role === "Admin" || u.role === "Manager" ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                               <svg
-                                className="w-4 h-4"
+                                className="w-3 h-3 mr-1"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -837,68 +796,113 @@ export default function ManagementPage() {
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
                                   strokeWidth="2"
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                                 />
                               </svg>
-                              Засах
-                            </button>
-                            <button
-                              onClick={() => confirmDelete(u)}
-                              className="h-9 px-4 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors duration-150 font-medium flex items-center gap-1"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
+                              Бүх салбар
+                            </span>
+                          ) : u.store_ids?.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {u.store_ids.slice(0, 2).map((id) => (
+                                <span
+                                  key={id}
+                                  className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
+                                >
+                                  {branchesById[id] || "Unknown"}
+                                </span>
+                              ))}
+                              {u.store_ids.length > 2 && (
+                                <span className="inline-flex px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-500">
+                                  +{u.store_ids.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          {userRole !== "CASHIER" ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => openEdit(u)}
+                                className="h-9 px-4 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors duration-150 font-medium flex items-center gap-1"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth="2"
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                              Устгах
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-              {users.length === 0 && !loadingUsers && (
-                <tr>
-                  <td className="py-12 text-center text-gray-500" colSpan={5}>
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <svg
-                          className="w-6 h-6 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197V9a3 3 0 00-6 0v2.5a5 5 0 110 11V21z"
-                          />
-                        </svg>
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                  />
+                                </svg>
+                                Засах
+                              </button>
+                              <button
+                                onClick={() => confirmDelete(u)}
+                                className="h-9 px-4 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors duration-150 font-medium flex items-center gap-1"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                                Устгах
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                {users.length === 0 && !loadingUsers && (
+                  <tr>
+                    <td className="py-12 text-center text-gray-500" colSpan={5}>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <svg
+                            className="w-6 h-6 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m3 5.197V9a3 3 0 00-6 0v2.5a5 5 0 110 11V21z"
+                            />
+                          </svg>
+                        </div>
+                        <div className="font-medium">
+                          Хэрэглэгч байхгүй байна
+                        </div>
+                        <div className="text-sm">
+                          Шинэ хэрэглэгч нэмж эхлээрэй
+                        </div>
                       </div>
-                      <div className="font-medium">Хэрэглэгч байхгүй байна</div>
-                      <div className="text-sm">
-                        Шинэ хэрэглэгч нэмж эхлээрэй
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Branches Section */}
       <section className="bg-white rounded-2xl shadow-xl border border-[#E6E6E6] p-6 hover:shadow-2xl transition-shadow duration-300">
