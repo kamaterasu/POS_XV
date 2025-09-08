@@ -31,15 +31,70 @@ export async function getProductByStore(token: string, storeId: string) {
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
 
+  if (!tenant_id) {
+    throw new Error("No tenant_id found in JWT token");
+  }
+
   const url = new URL(
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory?tenant_id=${tenant_id}&scope=store&store_id=${storeId}`
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory`
   );
+
+  url.searchParams.set("tenant_id", tenant_id);
+  url.searchParams.set("scope", "store");
+  url.searchParams.set("store_id", storeId);
+  // Add a higher limit to get more products
+  url.searchParams.set("limit", "500");
+
   const res = await fetch(url.toString(), {
     method: "GET",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
+
+  if (!res.ok) {
+    throw new Error(`Inventory API failed: ${res.status} ${res.statusText}`);
+  }
+
   const data = await res.json();
   console.log("Inventory Response:", data);
+  return data;
+}
+
+// New function to get inventory for all stores (global scope for OWNER)
+export async function getInventoryGlobal(token: string) {
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  if (!tenant_id) {
+    throw new Error("No tenant_id found in JWT token");
+  }
+
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory`
+  );
+
+  url.searchParams.set("tenant_id", tenant_id);
+  url.searchParams.set("scope", "global");
+  url.searchParams.set("limit", "500");
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Global Inventory API failed: ${res.status} ${res.statusText}`
+    );
+  }
+
+  const data = await res.json();
+  console.log("Global Inventory Response:", data);
   return data;
 }
 
@@ -58,7 +113,9 @@ export async function getProduct(token: string) {
   return res.json();
 }
 
-export async function getProductById(token: string, product_id: string) {
+
+export async function getProductById(product_id: string) {
+  const token = await getAccessToken();
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
   const url = new URL(
@@ -109,6 +166,67 @@ export async function createProduct(token: string, product: ProductInput) {
 
   const res = await fetch(url, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return res.json();
+}
+
+type UpdateProductInput = {
+  id: string;
+  name?: string;
+  description?: string | null;
+  category_id?: string | null;
+  img?: string | null;
+  upsert_variants?: Array<{
+    id?: string;
+    name: string;
+    sku: string;
+    price: number;
+    cost: number | null;
+    attrs?: Record<string, string>;
+  }>;
+  remove_variant_ids?: string[];
+};
+
+export async function updateProduct(product: UpdateProductInput) {
+  const token = await getAccessToken();
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`;
+  const payload = { ...product, tenant_id };
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return res.json();
+}
+
+export async function deleteProduct(productId: string) {
+  const token = await getAccessToken();
+  const decoded: any = jwtDecode(token);
+  const tenant_id = decoded?.app_metadata?.tenants?.[0];
+
+  const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`;
+  const payload = {
+    tenant_id,
+    id: productId,
+    confirm: "DELETE",
+  };
+
+  const res = await fetch(url, {
+    method: "DELETE",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,

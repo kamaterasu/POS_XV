@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useRef, useMemo, useState, useEffect, ChangeEvent } from "react";
 import Image from "next/image";
@@ -343,9 +343,7 @@ export default function ProductCreateForm({
   const [loading, setLoading] = useState(false);
 
   const [catsState, setCatsState] = useState<Category[]>(cats ?? []);
-  const [loadingCats, setLoadingCats] = useState<boolean>(
-    !Array.isArray(cats) || cats.length === 0
-  );
+  const [loadingCats, setLoadingCats] = useState<boolean>(false);
   const [resolvedTenantId, setResolvedTenantId] = useState<string | undefined>(
     tenantId
   );
@@ -354,55 +352,93 @@ export default function ProductCreateForm({
   const [stores, setStores] = useState<StoreRow[]>([]);
   const [loadingStores, setLoadingStores] = useState(true);
 
-  useEffect(() => {
-    setCatsState(cats ?? []);
-    setLoadingCats(!cats || cats.length === 0);
-  }, [cats]);
-
+  // Initialize data on mount
   useEffect(() => {
     let alive = true;
-    (async () => {
+
+    const initializeData = async () => {
       try {
         const token = await getAccessToken();
-        if (!token) return;
+        if (!token || !alive) return;
 
+        // 1. Get tenant ID if not provided
         if (!tenantId) {
           try {
             const decoded: any = jwtDecode(token);
-            const t = decoded?.app_metadata?.tenants?.[0];
-            if (t) setResolvedTenantId(String(t));
-          } catch {
-            /* noop */
+            const extractedTenantId = decoded?.app_metadata?.tenants?.[0];
+            if (extractedTenantId && alive) {
+              setResolvedTenantId(String(extractedTenantId));
+            }
+          } catch (error) {
+            console.error("Failed to extract tenant ID:", error);
           }
         }
 
+        // 2. Load categories if not provided
         if (!cats || cats.length === 0) {
           setLoadingCats(true);
-          const raw = await getCategories(token);
-          if (!alive) return;
-          const arr = toArray(raw) as Category[];
-          setCatsState(arr);
+          try {
+            const raw = await getCategories(token);
+            if (alive) {
+              const arr = toArray(raw) as Category[];
+              setCatsState(arr);
+            }
+          } catch (error) {
+            console.error("Failed to load categories:", error);
+            if (alive) setCatsState([]);
+          } finally {
+            if (alive) setLoadingCats(false);
+          }
+        } else {
+          setCatsState(cats);
         }
 
-        // stores авч ID/нэрийг тааруулах
+        // 3. Load stores
         setLoadingStores(true);
-        const s = await listStores(token);
-        if (!alive) return;
-        setStores(toArray(s) as StoreRow[]);
-      } catch (e) {
-        console.error(e);
-        setCatsState([]);
-      } finally {
+        try {
+          const storeData = await listStores(token);
+          if (alive) {
+            const storeArray = toArray(storeData) as StoreRow[];
+            setStores(storeArray);
+          }
+        } catch (error) {
+          console.error("Failed to load stores:", error);
+          if (alive) setStores([]);
+        } finally {
+          if (alive) setLoadingStores(false);
+        }
+      } catch (error) {
+        console.error("Failed to initialize form data:", error);
         if (alive) {
+          setCatsState([]);
+          setStores([]);
           setLoadingCats(false);
           setLoadingStores(false);
         }
       }
-    })();
+    };
+
+    initializeData();
+
     return () => {
       alive = false;
     };
-  }, [cats, tenantId]);
+  }, []); // Remove dependencies to avoid re-running
+
+  // Update categories when prop changes
+  useEffect(() => {
+    if (cats && cats.length > 0) {
+      setCatsState(cats);
+      setLoadingCats(false);
+    }
+  }, [cats]);
+
+  // Update tenant ID when prop changes
+  useEffect(() => {
+    if (tenantId) {
+      setResolvedTenantId(tenantId);
+    }
+  }, [tenantId]);
 
   type NewProduct = {
     name: string;
@@ -411,15 +447,20 @@ export default function ProductCreateForm({
     price?: number;
     cost?: number;
     description?: string;
-    images: string[];      // preview blobs (UI only)
-    imageFiles: File[];    // real files to upload
+    images: string[]; // preview blobs (UI only)
+    imageFiles: File[]; // real files to upload
     variants: Variant[];
-    initialStocks: Record<string, number>; // storeName -> qty
+    initialStocks: Record<string, number>; // storeId -> qty (not storeName)
   };
 
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [selectedPathLabel, setSelectedPathLabel] =
     useState<string>("Ангилал байхгүй");
+
+  // Create initial stocks based on actual store IDs
+  const createInitialStocks = (stores: StoreRow[]) => {
+    return Object.fromEntries(stores.map((store) => [store.id, 0]));
+  };
 
   const [newProd, setNewProd] = useState<NewProduct>({
     name: "",
@@ -431,17 +472,28 @@ export default function ProductCreateForm({
     images: [],
     imageFiles: [],
     variants: [],
-    initialStocks: Object.fromEntries(
-      branches.filter((b) => b !== "Бүх салбар").map((b) => [b, 0])
-    ),
+    initialStocks: {}, // Will be populated when stores load
   });
+
+  // Update initial stocks when stores are loaded
+  useEffect(() => {
+    if (stores.length > 0) {
+      setNewProd((prev) => ({
+        ...prev,
+        initialStocks: {
+          ...createInitialStocks(stores),
+          ...prev.initialStocks, // Keep any existing values
+        },
+      }));
+    }
+  }, [stores]);
 
   function handleImagePick(e: ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || !files.length) return;
 
     const fileArr = Array.from(files);
-    const accepted = ["image/jpeg","image/png","image/webp","image/svg+xml"];
+    const accepted = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
     const maxSizeMB = 8;
 
     const urls: string[] = [];
@@ -473,7 +525,9 @@ export default function ProductCreateForm({
     setNewProd((p) => {
       const url = p.images[i];
       if (url && (url.startsWith("blob:") || url.startsWith("data:"))) {
-        try { URL.revokeObjectURL(url); } catch {}
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
       }
       return {
         ...p,
@@ -493,7 +547,10 @@ export default function ProductCreateForm({
     }));
   }
   function removeVariant(id: string) {
-    setNewProd((p) => ({ ...p, variants: p.variants.filter((v) => v.id !== id) }));
+    setNewProd((p) => ({
+      ...p,
+      variants: p.variants.filter((v) => v.id !== id),
+    }));
   }
   function updateVariant(id: string, patch: Partial<Variant>) {
     setNewProd((p) => ({
@@ -519,36 +576,73 @@ export default function ProductCreateForm({
   }
 
   async function handleCreateSubmit() {
-    if (!newProd.name.trim()) return alert("Барааны нэрийг оруулна уу.");
-    const basePrice = newProd.price;
-    if (basePrice == null || Number.isNaN(basePrice))
-      return alert("Зарах үнийг оруулна уу.");
-    if (!selectedCatId) return alert("Ангиллаа сонгоно уу.");
-
-    const cleanVariants = newProd.variants
-      .map((v) => ({ ...v, price: v.price ?? basePrice }))
-      .filter((v) => v.color?.trim() || v.size?.trim() || v.sku?.trim());
-
-    // ⬇️ SKU давхардлыг шалгах
-    const allSkus = cleanVariants.map(v => v.sku?.trim()).filter(Boolean);
-    const hasDuplicateSku = new Set(allSkus).size !== allSkus.length;
-    if (hasDuplicateSku) {
-      alert("SKU давхардаж байна. Вариант бүрийн SKU-г давхардахгүй оруулна уу.");
+    if (!newProd.name.trim()) {
+      alert("Барааны нэрийг оруулна уу.");
       return;
     }
 
+    const basePrice = newProd.price;
+    if (basePrice == null || Number.isNaN(basePrice) || basePrice <= 0) {
+      alert("Зөв зарах үнийг оруулна уу.");
+      return;
+    }
+
+    if (!selectedCatId) {
+      alert("Ангиллаа сонгоно уу.");
+      return;
+    }
+
+    // Validate and clean variants
+    const cleanVariants = newProd.variants
+      .map((v) => ({
+        ...v,
+        price: v.price && v.price > 0 ? v.price : basePrice,
+        color: v.color?.trim() || "",
+        size: v.size?.trim() || "",
+        sku: v.sku?.trim() || "",
+      }))
+      .filter((v) => v.color || v.size || v.sku); // Keep variants that have at least one attribute
+
+    // SKU validation - check for duplicates and conflicts
+    const allSkus = cleanVariants.map((v) => v.sku).filter(Boolean); // Remove empty SKUs
+
+    if (allSkus.length > 0) {
+      const uniqueSkus = new Set(allSkus);
+      if (uniqueSkus.size !== allSkus.length) {
+        alert(
+          "SKU давхардаж байна. Вариант бүрийн SKU-г давхардахгүй оруулна уу."
+        );
+        return;
+      }
+    }
+
+    // Create variant inputs for API
     const variantInputs = (
-      cleanVariants.length ? cleanVariants : [{ id: rid(), price: basePrice }]
-    ).map((v) => ({
-      name: [v.color, v.size].filter(Boolean).join(" / ") || newProd.name,
-      sku: v.sku ?? "",
-      price: Number(v.price ?? basePrice),
-      cost: Number(newProd.cost ?? 0),
-      attrs: {
-        ...(v.color ? { color: v.color } : {}),
-        ...(v.size ? { size: v.size } : {}),
-      },
-    }));
+      cleanVariants.length
+        ? cleanVariants
+        : [{ id: rid(), price: basePrice, color: "", size: "", sku: "" }]
+    ).map((v, index) => {
+      const hasVariantAttrs = "color" in v && "size" in v && "sku" in v;
+      const color = hasVariantAttrs ? v.color : "";
+      const size = hasVariantAttrs ? v.size : "";
+      const sku = hasVariantAttrs ? v.sku : "";
+
+      const variantName =
+        [color, size].filter(Boolean).join(" / ") || newProd.name;
+      const variantSku =
+        sku || `${newProd.name.substring(0, 3).toUpperCase()}-${index + 1}`;
+
+      return {
+        name: variantName,
+        sku: variantSku,
+        price: Number(v.price || basePrice),
+        cost: Number(newProd.cost || 0),
+        attrs: {
+          ...(color ? { color } : {}),
+          ...(size ? { size } : {}),
+        },
+      };
+    });
 
     // ⬇️ Signed URL бус, path хадгална
     let uploadedPaths: string[] = [];
@@ -577,14 +671,14 @@ export default function ProductCreateForm({
         name: newProd.name,
         category_id: selectedCatId!,
         variants: variantInputs,
-        images: uploadedPaths,               // storage path-ууд
-        img: uploadedPaths[0] ?? "test",     // нийцтэй fallback
+        images: uploadedPaths, // storage path-ууд
+        img: uploadedPaths[0] ?? "test", // нийцтэй fallback
         description: newProd.description,
       };
 
       // 1) Барааг үүсгэнэ
       const res = await createProduct(token, payload);
-      console.log('createProduct response:', res); // ← энэ мөрийг нэм
+      console.log("createProduct response:", res); // ← энэ мөрийг нэм
       const newId =
         res?.id ?? res?.data?.id ?? res?.product?.id ?? res?.result?.id;
       if (!newId) {
@@ -601,52 +695,61 @@ export default function ProductCreateForm({
       const variantIds = extractVariantIds(res);
       if (!variantIds.length) {
         console.warn("No variant ids found in response to seed stock.", res);
+        alert(
+          "Шинэ бараа үүссэн, гэхдээ variant ID олдоогүй тул анхны үлдэгдэл оруулж чадсангүй."
+        );
+        router.push(`/productdetail/${newId}`);
+        return;
       }
 
-      // 3) Салбаруудын нэр -> ID зураглал
-      const nameToId = new Map<string, string>(
-        stores.map((s) => [String((s as any).name ?? (s as any).store_name ?? ""), String(s.id ?? (s as any).store_id ?? "")])
-      );
+      // 3) Анхны үлдэгдлийг SEED хийх (store ID бүрээр)
+      const seedPromises: Promise<any>[] = [];
 
-      // 4) Эхний үлдэгдлийг SEED хийх (вариант бүрээр)
-      const seedOps: Promise<any>[] = [];
       Object.entries(newProd.initialStocks)
-        .filter(([name, qty]) => name !== "Бүх салбар" && Number(qty) > 0)
-        .forEach(([storeName, qty]) => {
-          const store_id =
-            nameToId.get(storeName) ||
-            storeName; // Хэрэв key нь анхнаасаа ID байсан бол шууд ашиглана
-
-          if (!store_id) return;
-
-          if (variantIds.length) {
-            for (const vid of variantIds) {
-              seedOps.push(
-                productAddToInventory(token, {
-                  store_id,
-                  variant_id: vid,
-                  delta: Number(qty),        // Хэрвээ "вариантаар хуваарилах" бол энд логикоороо хуваа
-                  reason: "INITIAL",
-                  note: "SEEDING",
-                })
-              );
-            }
-          }
+        .filter(([storeId, qty]) => Number(qty) > 0)
+        .forEach(([storeId, qty]) => {
+          // Each variant gets the full quantity for now
+          // You might want to distribute quantities among variants differently
+          variantIds.forEach((variantId) => {
+            seedPromises.push(
+              productAddToInventory(token, {
+                store_id: storeId,
+                variant_id: variantId,
+                delta: Number(qty),
+                reason: "INITIAL",
+                note: "Product creation - initial stock",
+              }).catch((error) => {
+                console.error(
+                  `Failed to seed inventory for store ${storeId}, variant ${variantId}:`,
+                  error
+                );
+                return { error, storeId, variantId };
+              })
+            );
+          });
         });
 
-      // Алдаа задаргаа: амжилттай/амжилтгүйг тусад нь тоолоод мэдээлнэ
-      if (seedOps.length) {
-        const results = await Promise.allSettled(seedOps);
-        const ok = results.filter((r) => r.status === "fulfilled").length;
-        const fail = results.length - ok;
-        if (fail) {
-          console.warn(`${fail} seed movement(s) failed`, results);
-          alert(`Бараа үүссэн. Нөөц SEED хийхэд ${fail} алдаа гарлаа (амжилттай: ${ok}).`);
+      // Execute all seeding operations
+      if (seedPromises.length > 0) {
+        const results = await Promise.allSettled(seedPromises);
+        const successful = results.filter(
+          (r) => r.status === "fulfilled" && !r.value?.error
+        ).length;
+        const failed = results.length - successful;
+
+        if (failed > 0) {
+          console.warn(
+            `${failed} inventory seeding operations failed:`,
+            results
+          );
+          alert(
+            `Бараа амжилттай үүсэв! Анхны үлдэгдэл: ${successful} амжилттай, ${failed} алдаатай.`
+          );
         } else {
-          alert("Шинэ бараа үүсэж, эхний нөөц бүртгэгдлээ.");
+          alert("Шинэ бараа болон анхны үлдэгдэл амжилттай бүртгэгдлээ!");
         }
       } else {
-        alert("Шинэ бараа үүссэн. (Эхний нөөц оруулаагүй эсвэл variant_id олдсонгүй)");
+        alert("Шинэ бараа үүсэв! (Анхны үлдэгдэл тохируулаагүй байна)");
       }
 
       // 5) Дундаас буцах/шинэ дэлгэрэнгүй рүү очих
@@ -690,7 +793,13 @@ export default function ProductCreateForm({
             }}
           />
           <div className="text-xs text-[#777]">
-            {loadingCats ? "Ангилал ачаалж байна…" : <>Сонгосон: <b>{selectedPathLabel}</b></>}
+            {loadingCats ? (
+              "Ангилал ачаалж байна…"
+            ) : (
+              <>
+                Сонгосон: <b>{selectedPathLabel}</b>
+              </>
+            )}
           </div>
         </div>
 
@@ -748,7 +857,9 @@ export default function ProductCreateForm({
                   fill
                   sizes="(min-width:768px) 14vw, 30vw"
                   className="object-cover rounded-md border"
-                  unoptimized={src.startsWith("blob:") || src.startsWith("data:")}
+                  unoptimized={
+                    src.startsWith("blob:") || src.startsWith("data:")
+                  }
                   priority={i === 0}
                 />
                 <button
@@ -768,106 +879,155 @@ export default function ProductCreateForm({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Вариант (сонголттой бол)</span>
+          <span className="text-sm font-medium">Варианташ (сонголттой)</span>
           <button
+            type="button"
             onClick={addVariant}
-            className="h-9 px-3 rounded-md border border-[#E6E6E6] bg-white text-sm"
+            className="h-9 px-3 rounded-md border border-[#E6E6E6] bg-white text-sm hover:bg-gray-50"
           >
-            + Variant
+            + Вариант нэмэх
           </button>
         </div>
-        <div className="space-y-2">
-          {newProd.variants.map((v) => (
-            <div
-              key={v.id}
-              className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center border rounded-md p-2"
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  className="h-9 w-12 p-0 border border-[#E6E6E6] rounded-md cursor-pointer"
-                  value={v.color || "#E6E6E6"}
-                  onChange={(e) => updateVariant(v.id, { color: e.target.value })}
-                />
-                <input
-                  placeholder="#000000"
-                  className="h-9 flex-1 rounded-md border border-[#E6E6E6] px-2"
-                  value={v.color || ""}
-                  onChange={(e) => updateVariant(v.id, { color: e.target.value })}
-                />
-                <span
-                  className="inline-block h-6 w-6 rounded-full border border-black/10"
-                  style={{ backgroundColor: v.color || "#E6E6E6" }}
-                />
+
+        {newProd.variants.length > 0 && (
+          <div className="space-y-3">
+            {newProd.variants.map((v, index) => (
+              <div
+                key={v.id}
+                className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end border rounded-lg p-3 bg-gray-50"
+              >
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">
+                    Өнгө
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      className="h-9 w-12 p-0 border border-[#E6E6E6] rounded-md cursor-pointer"
+                      value={v.color || "#E6E6E6"}
+                      onChange={(e) =>
+                        updateVariant(v.id, { color: e.target.value })
+                      }
+                    />
+                    <input
+                      placeholder="Өнгө"
+                      className="h-9 flex-1 rounded-md border border-[#E6E6E6] px-2 text-sm"
+                      value={v.color || ""}
+                      onChange={(e) =>
+                        updateVariant(v.id, { color: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">
+                    Хэмжээ
+                  </label>
+                  <input
+                    placeholder="Хэмжээ (S, M, L...)"
+                    className="h-9 w-full rounded-md border border-[#E6E6E6] px-2 text-sm"
+                    value={v.size ?? ""}
+                    onChange={(e) =>
+                      updateVariant(v.id, { size: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">
+                    SKU код
+                  </label>
+                  <input
+                    placeholder="SKU (сонголттой)"
+                    className="h-9 w-full rounded-md border border-[#E6E6E6] px-2 text-sm"
+                    value={v.sku ?? ""}
+                    onChange={(e) =>
+                      updateVariant(v.id, { sku: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">
+                    Үнэ
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    placeholder="Сонгодог үнэ ашиглана"
+                    className="h-9 w-full rounded-md border border-[#E6E6E6] px-2 text-sm"
+                    value={v.price ?? ""}
+                    onChange={(e) =>
+                      updateVariant(v.id, {
+                        price: Number(e.target.value || 0),
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => removeVariant(v.id)}
+                    className="h-9 px-3 rounded-md border border-red-200 text-red-600 text-sm bg-white hover:bg-red-50"
+                  >
+                    Устгах
+                  </button>
+                </div>
               </div>
-              <input
-                placeholder="Хэмжээ"
-                className="h-9 rounded-md border border-[#E6E6E6] px-2"
-                value={v.size ?? ""}
-                onChange={(e) => updateVariant(v.id, { size: e.target.value })}
-              />
-              <input
-                placeholder="SKU"
-                className="h-9 rounded-md border border-[#E6E6E6] px-2"
-                value={v.sku ?? ""}
-                onChange={(e) => updateVariant(v.id, { sku: e.target.value })}
-              />
-              <input
-                type="number"
-                placeholder="Вариант үнэ (optional)"
-                className="h-9 rounded-md border border-[#E6E6E6] px-2"
-                value={v.price ?? ""}
-                onChange={(e) =>
-                  updateVariant(v.id, { price: Number(e.target.value || 0) })
-                }
-              />
-              <div className="flex justify-end">
-                <button
-                  onClick={() => removeVariant(v.id)}
-                  className="h-9 px-3 rounded-md border border-red-200 text-red-600 text-sm bg-white"
-                >
-                  Устгах
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="text-xs text-[#777]">
-          Хэмжээ/өнгө өөр бол өөр үнэ, SKU тохируулж болно.
+            ))}
+          </div>
+        )}
+
+        <div className="text-xs text-gray-500">
+          {newProd.variants.length === 0
+            ? "Өнгө, хэмжээ эсвэл бусад онцлогоороо ялгаатай бараа байвал вариант нэмнэ үү."
+            : `${newProd.variants.length} вариант нэмэгдсэн. Хоосон талбаруудтай варианташ хасагдана.`}
         </div>
       </div>
 
-      {branches?.length ? (
+      {stores.length > 0 && (
         <div className="space-y-2">
           <span className="text-sm font-medium">
-            Эхний нөөц (UI) — SEED хийхэд ашиглана
+            Анхны үлдэгдэл салбар бүрээр
           </span>
-          <div className="grid md:grid-cols-3 gap-2">
-            {branches
-              .filter((b) => b !== "Бүх салбар")
-              .map((b) => (
-                <div key={b} className="flex items-center gap-2">
-                  <span className="text-sm w-32">{b}</span>
-                  <input
-                    type="number"
-                    className="h-9 w-full rounded-md border border-[#E6E6E6] px-2"
-                    value={newProd.initialStocks[b] ?? 0}
-                    onChange={(e) => {
-                      const n = Math.max(0, Number(e.target.value || 0));
-                      setNewProd((p) => ({
-                        ...p,
-                        initialStocks: { ...p.initialStocks, [b]: n },
-                      }));
-                    }}
-                  />
-                </div>
-              ))}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {stores.map((store) => (
+              <div key={store.id} className="flex items-center gap-2">
+                <span className="text-sm w-32 truncate" title={store.name}>
+                  {store.name}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  className="h-9 w-full rounded-md border border-[#E6E6E6] px-2"
+                  value={newProd.initialStocks[store.id] ?? 0}
+                  onChange={(e) => {
+                    const quantity = Math.max(0, Number(e.target.value || 0));
+                    setNewProd((p) => ({
+                      ...p,
+                      initialStocks: {
+                        ...p.initialStocks,
+                        [store.id]: quantity,
+                      },
+                    }));
+                  }}
+                />
+              </div>
+            ))}
           </div>
           {loadingStores && (
-            <div className="text-xs text-[#777]">Салбарууд ачаалж байна…</div>
+            <div className="text-xs text-amber-600">
+              Салбарууд ачаалж байна...
+            </div>
           )}
+          <div className="text-xs text-gray-500">
+            Энэ тоо хэмжээ нь бараа үүсгэх үед автоматаар нөөцөнд нэмэгдэнэ.
+          </div>
         </div>
-      ) : null}
+      )}
 
       <div className="bg-white rounded-xl border border-[#E6E6E6] shadow-md p-3 flex items-center justify-end gap-3">
         <button
@@ -876,7 +1036,9 @@ export default function ProductCreateForm({
             setSelectedPathLabel("Ангилал байхгүй");
             newProd.images.forEach((u) => {
               if (u.startsWith("blob:") || u.startsWith("data:")) {
-                try { URL.revokeObjectURL(u); } catch {}
+                try {
+                  URL.revokeObjectURL(u);
+                } catch {}
               }
             });
             setNewProd((p) => ({
@@ -890,9 +1052,7 @@ export default function ProductCreateForm({
               images: [],
               imageFiles: [],
               variants: [],
-              initialStocks: Object.fromEntries(
-                branches.filter((b) => b !== "Бүх салбар").map((b) => [b, 0])
-              ),
+              initialStocks: createInitialStocks(stores),
             }));
             if (imgInputRef.current) imgInputRef.current.value = "";
           }}
