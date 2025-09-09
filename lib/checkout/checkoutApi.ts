@@ -68,6 +68,21 @@ export type CheckoutOrdersList = {
   offset: number;
 };
 
+// ---------- Payment method normalize ----------
+const METHOD_ALIASES: Record<string, string> = {
+  cash: "CASH",
+  card: "CARD",
+  bank: "BANK",
+  bank_transfer: "BANK",
+  qpay: "QPAY",
+  pos: "POS",
+  wallet: "WALLET",
+};
+export function normalizeMethod(m: string) {
+  const key = m?.trim().toLowerCase().replace(/\s+/g, "_");
+  return METHOD_ALIASES[key] ?? (key ? key.toUpperCase() : "CASH");
+}
+
 // ---------- Create Order ----------
 /**
  * Cart-оос захиалга үүсгэнэ.
@@ -103,13 +118,14 @@ export async function createCheckoutOrder(
       };
     }),
     payments: payments.map((p) => ({
-      method: p.method,
+      method: normalizeMethod(p.method),
       amount: Math.round(p.amount),
       ref: p.ref,
     })),
     discount: Math.round(opts?.discount ?? 0),
     tax: Math.round(opts?.tax ?? 0),
   };
+  
 
   const res = await fetch(BASE_URL, {
     method: "POST",

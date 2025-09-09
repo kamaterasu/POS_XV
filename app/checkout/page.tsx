@@ -7,7 +7,7 @@ import Image from "next/image";
 
 import { Item, QuickActions, PaymentRow } from "@/lib/sales/salesTypes";
 import { fmt, calcTotals } from "@/lib/sales/salesUtils";
-import { createCheckoutOrder, type PaymentInput } from "@/lib/checkout/checkoutApi";
+import { createCheckoutOrder, type PaymentInput, normalizeMethod } from "@/lib/checkout/checkoutApi";
 
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getStoredID } from "@/lib/store/storeApi";
@@ -41,7 +41,7 @@ type VariantOpt = {
   sku?: string;
 };
 
-// ---------- Image URL resolver (signed/public/absolute + cache) ----------
+// ---------- Image URL resolver ----------
 const imgUrlCache = new Map<string, string>();
 async function resolveImageUrl(raw?: string): Promise<string | undefined> {
   if (!raw) return undefined;
@@ -59,9 +59,6 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
   }
 }
 
-// ======================================================
-// Component
-// ======================================================
 export default function CheckoutPage() {
   const router = useRouter();
 
@@ -88,14 +85,13 @@ export default function CheckoutPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [search, setSearch] = useState("");
 
-  // ===== Variant picker state =====
+  // Variant picker
   const [picker, setPicker] = useState<{ productId: string; name: string; img?: string } | null>(null);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerVars, setPickerVars] = useState<VariantOpt[]>([]);
   const [selColor, setSelColor] = useState<string | null>(null);
   const [selSize,  setSelSize]  = useState<string | null>(null);
 
-  // helpers
   const goToDashboard = () => router.push("/dashboard");
   const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
   const colorLabel = (c?: string) => {
@@ -108,19 +104,14 @@ export default function CheckoutPage() {
   };
   const colorKeyOf = (v: VariantOpt) => v.colorHex ?? v.color ?? "—";
 
-  // normalize variants from product detail
   const normalizeVariants = (det: any): VariantOpt[] => {
     const raw = (det?.variants ?? det?.product?.variants ?? det?.data?.variants ?? []) as any[];
-
     return raw.map((v) => {
       const a = v?.attrs ?? {};
       const [maybeColorFromName, maybeSizeFromName] = String(v?.name ?? '')
         .split('/')
         .map((s: string) => s.trim());
-
-      const colorHex =
-        typeof a.color === 'string' && a.color.startsWith('#') ? a.color : undefined;
-
+      const colorHex = typeof a.color === 'string' && a.color.startsWith('#') ? a.color : undefined;
       return {
         id: String(v.id),
         price: Number(v.price ?? 0),
@@ -139,7 +130,6 @@ export default function CheckoutPage() {
     try {
       const token = await getAccessToken();
       if (!token) throw new Error('no token');
-
       const det = await getProductById(token, p.id, { withStock: true, storeId: storeId ?? undefined });
       const vars = normalizeVariants(det);
       setPickerVars(vars);
@@ -203,12 +193,10 @@ export default function CheckoutPage() {
         if (alive) setStoreId(null);
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, []);
 
-  // 2) тухайн store-ийн inventory + product details join (+ image URL resolve)
+  // 2) тухайн store-ийн inventory + product details
   useEffect(() => {
     if (!storeId) return;
     let alive = true;
@@ -220,10 +208,8 @@ export default function CheckoutPage() {
         if (!token) throw new Error("No token");
 
         const invRes: any = await getProductByStore(token, storeId);
-        const arr: any[] =
-          Array.isArray(invRes) ? invRes : invRes?.items ?? invRes?.data ?? invRes?.products ?? [];
+        const arr: any[] = Array.isArray(invRes) ? invRes : invRes?.items ?? invRes?.data ?? invRes?.products ?? [];
 
-        // merge qty by product id
         const byId = new Map<string, { qty: number; product?: any }>();
         for (const row of arr) {
           const pid = row?.product?.id ?? row?.product_id ?? row?.id;
@@ -234,8 +220,6 @@ export default function CheckoutPage() {
         }
 
         const ids = Array.from(byId.keys());
-
-        // product details
         const details = await Promise.all(
           ids.map(async (id) => {
             try {
@@ -257,10 +241,7 @@ export default function CheckoutPage() {
         });
 
         const withUrls: ProductRow[] = await Promise.all(
-          list.map(async (row) => ({
-            ...row,
-            imgPath: await resolveImageUrl(row.imgPath),
-          }))
+          list.map(async (row) => ({ ...row, imgPath: await resolveImageUrl(row.imgPath) }))
         );
 
         const q = search.trim().toLowerCase();
@@ -275,18 +256,14 @@ export default function CheckoutPage() {
       }
     })();
 
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [storeId, search]);
 
   // 3) төлбөр
   const handleCheckout = async (paymentRows: PaymentRow[], _totalReceived: number, _change: number) => {
     if (items.length === 0) return alert("Захиалгад бүтээгдэхүүн нэмнэ үү");
-
     const missing = items.filter((i) => !i.variantId);
     if (missing.length) return alert("Зарим мөрт variant сонгогдоогүй байна. (size/color)");
-
     if (!storeId) return alert("Store сонгогдоогүй байна");
 
     setIsProcessing(true);
@@ -295,7 +272,7 @@ export default function CheckoutPage() {
       const discount = Math.round(totals.discount);
 
       const payments: PaymentInput[] = paymentRows.map((r) => ({
-        method: r.method,
+        method: normalizeMethod(r.method),   // <-- жижиг/том үсгийг засна
         amount: Math.round(r.amount),
         ref: (r as any).ref,
       }));
@@ -306,7 +283,17 @@ export default function CheckoutPage() {
         { tax, discount },
         storeId
       );
-
+      console.log(
+        "creata order",
+        items.map((it) => ({
+          variantId: it.variantId!,
+          qty: it.qty,
+          price: it.price,
+        })),
+        payments,
+        { tax, discount },
+        storeId
+      );
       setItems([]);
       setQa({ discountPercent: 0, deliveryFee: 0, includeVAT: false });
       setOpenPay(false);
@@ -490,7 +477,6 @@ export default function CheckoutPage() {
         />
       </footer>
 
-      {/* Add item (гараар) */}
       <AddItemModal
         open={openAdd}
         onClose={() => setOpenAdd(false)}
@@ -507,10 +493,8 @@ export default function CheckoutPage() {
         }
       />
 
-      {/* Save draft */}
       <SaveDraftDialog open={openSave} onClose={() => setOpenSave(false)} items={items} />
 
-      {/* Pay */}
       <PayDialogMulti
         open={openPay}
         onClose={() => !isProcessing && setOpenPay(false)}
@@ -519,14 +503,12 @@ export default function CheckoutPage() {
         disabled={isProcessing}
       />
 
-      {/* Checkout History */}
       <CheckoutHistoryDialog
         open={openHistory}
         onClose={() => setOpenHistory(false)}
         onSelectOrder={(order) => router.push(`/receipt?orderId=${order.id}`)}
       />
 
-      {/* ===== Variant Picker Modal ===== */}
       {picker && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
           <div className="w-full max-w-md rounded-xl bg-white p-4 shadow">
