@@ -73,6 +73,24 @@ const mapInventoryItem = (item: any): Product | null => {
   };
 };
 
+// Map products from category API (different structure than inventory items)
+const mapCategoryProduct = (product: any): Product | null => {
+  if (!product?.id) return null;
+
+  // Category API returns products directly, not inventory items
+  return {
+    id: String(product.id),
+    variantId: String(product.id), // Use product ID as variant ID for now
+    name: product.name || "(нэргүй)",
+    variantName: undefined,
+    qty: 0, // Category API doesn't provide quantity, set to 0
+    code: product.sku || undefined,
+    storeId: undefined, // Category API doesn't provide store info
+    img: product.img || undefined,
+    price: product.price || 0,
+  };
+};
+
 // ---------- Utils ----------
 const toArray = (v: any, keys: string[] = []) => {
   if (Array.isArray(v)) return v;
@@ -136,8 +154,14 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
   if (raw.startsWith("/")) return raw;
 
   // Supabase storage object замыг таамаглах
+  // Хэрэв product_img/ prefix байгаа бол устгаад дахин нэмэх (давхар prefix-ээс зайлсхийх)
+  let cleanPath = raw;
+  if (cleanPath.startsWith("product_img/")) {
+    cleanPath = cleanPath.replace("product_img/", "");
+  }
+
   // зөвхөн файл нэр өгөгдсөн бол product_img/ гэж prefix хийнэ
-  const path = raw.includes("/") ? raw : `product_img/${raw}`;
+  const path = cleanPath.includes("/") ? cleanPath : `product_img/${cleanPath}`;
 
   if (imgUrlCache.has(path)) return imgUrlCache.get(path)!;
 
@@ -222,7 +246,9 @@ function CategoryNode({
         )}
         <button
           type="button"
-          onClick={() => onSelect(node)}
+          onClick={() => {
+            onSelect(node);
+          }}
           className={`text-left hover:underline ${
             selected ? "text-blue-600 font-medium" : ""
           }`}
@@ -294,6 +320,7 @@ export default function InventoryPage() {
     id: string;
     name: string;
   } | null>(null);
+
   const [loadingCats, setLoadingCats] = useState(true);
   const [catsOpen, setCatsOpen] = useState(false);
   const [tenantId, setTenantId] = useState<string | undefined>(undefined);
@@ -401,6 +428,7 @@ export default function InventoryPage() {
   // 3) Бараа (+ зураг бүрийн signed URL)
   useEffect(() => {
     let alive = true;
+
     (async () => {
       try {
         setLoadingProducts(true);
@@ -408,12 +436,12 @@ export default function InventoryPage() {
         if (!token) throw new Error("no token");
 
         let arr: Product[] = [];
-
         if (selectedCat?.id) {
           // Категори сонгосон үед: тухайн категорийн (subtree=true) барааг API-аас авч үзүүлнэ
           const raw = await getProductByCategory(token, selectedCat.id);
+
           arr = toArray(raw, ["items", "products", "data"])
-            .map(mapInventoryItem)
+            .map(mapCategoryProduct) // Use category product mapper
             .filter(Boolean) as Product[];
         } else if (storeId === "all") {
           // For "all" stores, we can either:
@@ -586,7 +614,11 @@ export default function InventoryPage() {
       setShowAddCat(false);
     } catch (e: any) {
       console.error(e);
-      addToast("error", "Алдаа", `Ангилал нэмэхэд алдаа гарлаа: ${e?.message ?? e}`);
+      addToast(
+        "error",
+        "Алдаа",
+        `Ангилал нэмэхэд алдаа гарлаа: ${e?.message ?? e}`
+      );
     } finally {
       setCreatingCat(false);
     }
@@ -643,7 +675,11 @@ export default function InventoryPage() {
       // setSelectedCat({ id: pid, name: flattenCats(cats).find(c => c.id === pid)?.label ?? '...' });
     } catch (e: any) {
       console.error("❌ Subcategory creation failed:", e);
-      addToast("error", "Алдаа", `Дэд ангилал нэмэхэд алдаа гарлаа: ${e?.message ?? e}`);
+      addToast(
+        "error",
+        "Алдаа",
+        `Дэд ангилал нэмэхэд алдаа гарлаа: ${e?.message ?? e}`
+      );
     } finally {
       setCreatingSub(false);
     }
@@ -925,7 +961,7 @@ export default function InventoryPage() {
               </svg>
               + Ангилал
             </button>
-            <button
+            {/* <button
               onClick={handleOpenAddSub}
               className="h-10 px-4 rounded-xl bg-white border border-slate-200 text-sm shadow-sm hover:shadow-md hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium text-slate-700"
               title="Дэд ангилал нэмэх"
@@ -944,7 +980,7 @@ export default function InventoryPage() {
                 />
               </svg>
               + Дэд ангилал
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -1167,9 +1203,16 @@ export default function InventoryPage() {
             ) : (
               <CategoryTree
                 nodes={cats}
-                onSelect={(n: any) =>
-                  setSelectedCat({ id: String(n.id), name: String(n.name) })
-                }
+                onSelect={(n: any) => {
+                  console.log("CategoryTree onSelect called with:", n);
+                  // Show toast for debugging
+                  addToast(
+                    "info",
+                    "Category Selected",
+                    `${n.name} (ID: ${n.id})`
+                  );
+                  setSelectedCat({ id: String(n.id), name: String(n.name) });
+                }}
                 selectedId={selectedCat?.id ?? null}
               />
             )}
