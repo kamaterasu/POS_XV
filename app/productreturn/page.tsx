@@ -362,206 +362,324 @@ export default function ProductReturnPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F7F5] p-4 lg:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 p-4 lg:p-8">
       {/* Header */}
-      <div className="max-w-6xl mx-auto mb-6">
-        <button
-          onClick={() => router.back()}
-          className="bg-white rounded-md border border-[#E6E6E6] shadow-md h-10 px-6 text-black inline-flex items-center justify-center hover:bg-gray-50 transition-colors"
-        >
-          ← Буцах
-        </button>
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => router.back()}
+              className="group bg-white/80 backdrop-blur-sm rounded-xl border border-slate-200/60 shadow-lg shadow-slate-900/5 h-12 px-6 text-slate-700 inline-flex items-center justify-center hover:bg-white hover:shadow-xl transition-all duration-300 hover:scale-105"
+            >
+              <svg className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+              Буцах
+            </button>
+            <div className="hidden lg:block h-8 w-px bg-slate-200"></div>
+            <div className="hidden lg:block">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                📦 Бараа буцаах
+              </h1>
+              <p className="text-sm text-slate-600 mt-1">Худалдан авсан барааг буцаах систем</p>
+            </div>
+          </div>
+          <div className="hidden lg:flex items-center space-x-3">
+            <div className="bg-white/60 backdrop-blur-sm rounded-lg px-4 py-2 border border-slate-200/60">
+              <div className="text-xs text-slate-500 uppercase tracking-wide">Өнөөдөр</div>
+              <div className="text-sm font-semibold text-slate-700">
+                {new Date().toLocaleDateString('mn-MN')}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Main Return Form */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-8 space-y-8">
           {/* Document Search */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              🧾 Баримт хайх
-            </h2>
-            <div className="flex gap-3 mb-4">
-              <input
-                type="text"
-                placeholder="№: 1234 эсвэл POS-2025-08-12-1234"
-                value={documentNumber}
-                onChange={(e) => setDocumentNumber(e.target.value)}
-                className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !loading) {
-                    handleSearch();
-                  }
-                }}
-              />
-              {/* <button
-                onClick={handleScan}
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-md"
-                disabled={loading}
-              >
-                📷 Скан
-              </button> */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-900/10 border border-slate-200/60 p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Баримт хайх</h2>
+                <p className="text-sm text-slate-600">Буцаах барааны баримтын дугаарыг оруулна уу</p>
+              </div>
+            </div>
+            <div className="flex gap-4 mb-6">
+              <div className="flex-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="№: 1234 эсвэл POS-2025-08-12-1234"
+                  value={documentNumber}
+                  onChange={(e) => setDocumentNumber(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300 text-base"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !loading) {
+                      handleSearch();
+                    }
+                  }}
+                />
+              </div>
               <button
                 onClick={() => handleSearch()}
-                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium shadow-md"
+                className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-xl hover:shadow-emerald-500/30 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-2"
                 disabled={loading || !documentNumber.trim()}
               >
-                {loading ? "🔄 Хайж байна..." : "🔍 Хайх"}
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Хайж байна...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <span>Хайх</span>
+                  </>
+                )}
               </button>
             </div>
 
             {/* Order Information */}
             {currentOrder && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h3 className="font-semibold text-blue-900 mb-2">
-                  📋 Захиалгын мэдээлэл
-                </h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Дугаар:</span>
-                    <span className="ml-2 font-medium">{currentOrder.id}</span>
+              <div className="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200/60 shadow-inner">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
                   </div>
                   <div>
-                    <span className="text-gray-600">Огноо:</span>
-                    <span className="ml-2 font-medium">
-                      {new Date(currentOrder.created_at).toLocaleDateString(
-                        "mn-MN"
-                      )}
-                    </span>
+                    <h3 className="font-bold text-blue-900 text-lg">Захиалгын мэдээлэл</h3>
+                    <p className="text-sm text-blue-700">Амжилттай олдсон захиалгын дэлгэрэнгүй</p>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Нийт дүн:</span>
-                    <span className="ml-2 font-medium">
-                      ₮{currentOrder.total.toLocaleString()}
-                    </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Дугаар:</span>
+                      <span className="font-bold text-slate-900 bg-white px-3 py-1 rounded-lg shadow-sm">{currentOrder.id}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Огноо:</span>
+                      <span className="font-bold text-slate-900 bg-white px-3 py-1 rounded-lg shadow-sm">
+                        {new Date(currentOrder.created_at).toLocaleDateString("mn-MN")}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Төлөв:</span>
-                    <span className="ml-2 font-medium text-green-600">
-                      {currentOrder.status === "completed"
-                        ? "Дууссан"
-                        : currentOrder.status}
-                    </span>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Нийт дүн:</span>
+                      <span className="font-bold text-emerald-600 bg-white px-3 py-1 rounded-lg shadow-sm">
+                        ₮{currentOrder.total.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600 font-medium">Төлөв:</span>
+                      <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold bg-emerald-100 text-emerald-800 shadow-sm">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
+                        {currentOrder.status === "completed" ? "Дууссан" : currentOrder.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-                <p className="text-red-700 text-sm">{error}</p>
+              <div className="mt-6 p-6 bg-gradient-to-r from-red-50 to-rose-50 rounded-xl border border-red-200/60 shadow-inner">
+                <div className="flex items-start space-x-3">
+                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-red-900 mb-1">Алдаа гарлаа</h4>
+                    <p className="text-red-700 text-sm leading-relaxed">{error}</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
           {/* Return Reason */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              📋 Буцаах шалтгаан
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-900/10 border border-slate-200/60 p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/25">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Буцаах шалтгаан</h2>
+                <p className="text-sm text-slate-600">Та яагаад бараагаа буцааж байгаагаа сонгоно уу</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {reasons.map((reason) => (
                 <button
                   key={reason.id}
                   onClick={() => setSelectedReason(reason.id as ReturnReason)}
-                  className={`p-3 rounded-lg border-2 transition-all duration-200 text-sm font-medium ${
+                  className={`group relative p-6 rounded-xl border-2 transition-all duration-300 text-center ${
                     selectedReason === reason.id
-                      ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md"
-                      : "border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600"
+                      ? "border-purple-500 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg shadow-purple-500/25 scale-105"
+                      : "border-slate-200 bg-white/50 hover:border-purple-300 hover:bg-purple-50/50 hover:scale-102"
                   }`}
                 >
-                  <div className="text-lg mb-1">{reason.icon}</div>
-                  {reason.label}
+                  <div className="text-3xl mb-3 group-hover:scale-110 transition-transform duration-300">
+                    {reason.icon}
+                  </div>
+                  <p className={`font-semibold text-sm ${
+                    selectedReason === reason.id ? "text-purple-700" : "text-slate-700"
+                  }`}>
+                    {reason.label}
+                  </p>
+                  {selectedReason === reason.id && (
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center shadow-lg">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
             {selectedReason === "other" && (
-              <textarea
-                placeholder="Тайлбар бичнэ үү..."
-                value={customReason}
-                onChange={(e) => setCustomReason(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows={3}
-              />
+              <div className="relative">
+                <textarea
+                  placeholder="Тайлбар бичнэ үү..."
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  className="w-full bg-slate-50/50 border border-slate-200 rounded-xl px-4 py-4 text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 resize-none transition-all duration-300"
+                  rows={4}
+                />
+                <div className="absolute bottom-3 right-3 text-xs text-slate-400">
+                  {customReason.length}/500
+                </div>
+              </div>
             )}
           </div>
 
           {/* Product List */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              🛍️ Буцаах барааны жагсаалт
-            </h2>
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-900/10 border border-slate-200/60 p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Буцаах барааны жагсаалт</h2>
+                  <p className="text-sm text-slate-600">
+                    {items.length > 0 ? `${items.length} бараа олдлоо` : "Баримт хайснаар бараанууд харагдана"}
+                  </p>
+                </div>
+              </div>
+              {items.length > 0 && (
+                <div className="bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200">
+                  <p className="text-sm font-semibold text-emerald-700">
+                    {items.filter(item => item.quantity > 0).length} / {items.length} сонгогдсон
+                  </p>
+                </div>
+              )}
+            </div>
+            
             {items.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {items.map((item, index) => (
                   <div
                     key={item.id}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    className="group bg-gradient-to-r from-white to-slate-50/50 border border-slate-200/60 rounded-xl p-6 hover:shadow-lg hover:shadow-slate-900/10 transition-all duration-300 hover:scale-[1.02]"
                   >
-                    <div className="flex justify-between items-center">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded font-medium">
-                            #{index + 1}
-                          </span>
-                          <div>
-                            <p className="font-medium text-gray-800">
-                              {item.name}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              ₮{item.price.toLocaleString()} / ш
-                            </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4 flex-1">
+                        <div className="flex-shrink-0">
+                          <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center group-hover:from-blue-50 group-hover:to-blue-100 transition-all duration-300">
+                            <span className="text-slate-600 font-bold text-sm group-hover:text-blue-600">
+                              #{index + 1}
+                            </span>
                           </div>
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-slate-900 text-lg mb-1 truncate">
+                            {item.name}
+                          </h3>
+                          <p className="text-slate-600 font-medium">
+                            ₮{item.price.toLocaleString()} / ширхэг
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Буцаах боломжтой: <span className="font-semibold text-emerald-600">{item.maxQuantity} ширхэг</span>
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
+                      
+                      <div className="flex items-center space-x-6">
+                        {/* Quantity Controls */}
+                        <div className="flex items-center space-x-2">
                           <button
-                            onClick={() =>
-                              updateQuantity(item.id, item.quantity - 1)
-                            }
-                            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                             disabled={item.quantity <= 0}
                           >
-                            −
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" />
+                            </svg>
                           </button>
-                          <input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateQuantity(
-                                item.id,
-                                parseInt(e.target.value) || 0
-                              )
-                            }
-                            className="w-16 text-center border border-gray-300 rounded-lg py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            min="0"
-                            max={item.maxQuantity}
-                          />
+                          <div className="relative">
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 0)}
+                              className="w-20 text-center bg-white border-2 border-slate-200 rounded-xl py-2 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-300"
+                              min="0"
+                              max={item.maxQuantity}
+                            />
+                          </div>
                           <button
-                            onClick={() =>
-                              updateQuantity(item.id, item.quantity + 1)
-                            }
-                            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all duration-300 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                             disabled={item.quantity >= item.maxQuantity}
                           >
-                            +
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
                           </button>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-gray-800">
+                        
+                        {/* Total Price */}
+                        <div className="text-right min-w-[120px]">
+                          <p className="text-2xl font-bold text-slate-900">
                             ₮{(item.price * item.quantity).toLocaleString()}
                           </p>
-                          <p className="text-xs text-gray-500">
-                            Буцаах боломжтой: {item.maxQuantity}
-                          </p>
+                          <p className="text-xs text-slate-500">нийт дүн</p>
                         </div>
+                        
+                        {/* Remove Button */}
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="text-red-500 hover:text-red-700 p-1 transition-colors"
+                          className="w-10 h-10 rounded-xl bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 hover:text-red-600 transition-all duration-300 hover:scale-110 group/delete"
                           title="Устгах"
                         >
-                          🗑️
+                          <svg className="w-4 h-4 group-hover/delete:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -569,15 +687,17 @@ export default function ProductReturnPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-500">
-                <div className="text-4xl mb-4">📦</div>
-                <p className="text-lg font-medium mb-2">
-                  Барааны жагсаалт хоосон
-                </p>
-                <p className="text-sm">
+              <div className="text-center py-16">
+                <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Барааны жагсаалт хоосон</h3>
+                <p className="text-slate-600 max-w-md mx-auto leading-relaxed">
                   {orderFound
-                    ? "Энэ захиалгад буцаах боломжтой бараа байхгүй байна"
-                    : "Эхлээд баримтын дугаар хайж олоорой"}
+                    ? "Энэ захиалгад буцаах боломжтой бараа байхгүй байна. Бүх бараа аль хэдийн буцаагдсан байж магадгүй."
+                    : "Эхлээд дээр байрлах хайлтын талбараас баримтын дугаараа оруулж хайна уу."}
                 </p>
               </div>
             )}
@@ -585,50 +705,95 @@ export default function ProductReturnPage() {
         </div>
 
         {/* Summary Sidebar */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-4 space-y-8">
           {/* Totals */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              💰 Дүнгийн хураангуй
-            </h2>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Нэгж дүн:</span>
-                <span className="font-medium">
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-900/10 border border-slate-200/60 p-8 sticky top-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/25">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Дүнгийн хураангуй</h2>
+                <p className="text-sm text-slate-600">Буцаах дүнгийн тооцоо</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-3 border-b border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-slate-400 rounded-full"></div>
+                  <span className="text-slate-600 font-medium">Нэгж дүн:</span>
+                </div>
+                <span className="font-bold text-lg text-slate-900">
                   ₮{subtotal.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">НӨАТ бууруулт:</span>
-                <span className="font-medium text-green-600">
+              
+              <div className="flex justify-between items-center py-3 border-b border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  <span className="text-slate-600 font-medium">НӨАТ бууруулт:</span>
+                </div>
+                <span className="font-bold text-lg text-emerald-600">
                   -₮{vatReduction.toLocaleString()}
                 </span>
               </div>
-              <hr className="border-gray-200" />
-              <div className="flex justify-between text-xl font-bold">
-                <span className="text-gray-800">Буцаах дүн:</span>
-                <span className="text-blue-600">
-                  ₮{totalReturn.toLocaleString()}
-                </span>
+              
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200/60">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <span className="text-slate-800 font-bold text-lg">Буцаах дүн:</span>
+                  </div>
+                  <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                    ₮{totalReturn.toLocaleString()}
+                  </span>
+                </div>
               </div>
+              
+              {items.length > 0 && (
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="text-center p-3 bg-slate-50 rounded-lg">
+                      <div className="font-bold text-slate-900 text-lg">{items.length}</div>
+                      <div className="text-slate-600">Нийт бараа</div>
+                    </div>
+                    <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                      <div className="font-bold text-emerald-600 text-lg">
+                        {items.filter(item => item.quantity > 0).length}
+                      </div>
+                      <div className="text-slate-600">Буцаах бараа</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-              ⚡ Үйлдэл
-            </h2>
-            <div className="space-y-3">
-              {/* <button
-                onClick={handlePrint}
-                className="w-full px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                🖨️ Хэвлэх (буцаалтын баримт)
-              </button> */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl shadow-slate-900/10 border border-slate-200/60 p-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/25">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Үйлдэл</h2>
+                <p className="text-sm text-slate-600">Буцаалтыг баталгаажуулах</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
               <button
                 onClick={handleConfirm}
-                className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className={`w-full group relative overflow-hidden px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 transform ${
+                  items.length === 0 || totalReturn <= 0 || loading || items.every((item) => item.quantity === 0)
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 hover:scale-105"
+                }`}
                 disabled={
                   items.length === 0 ||
                   totalReturn <= 0 ||
@@ -636,127 +801,153 @@ export default function ProductReturnPage() {
                   items.every((item) => item.quantity === 0)
                 }
               >
-                {loading
-                  ? "🔄 Төлөв хэвлэж байна..."
-                  : "✅ Буцаалтыг баталгаажуулах"}
+                <div className="relative z-10 flex items-center justify-center space-x-3">
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Төлөв хэвлэж байна...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Буцаалтыг баталгаажуулах</span>
+                    </>
+                  )}
+                </div>
+                {!loading && items.length > 0 && totalReturn > 0 && !items.every((item) => item.quantity === 0) && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                )}
               </button>
+              
+              {/* Help Text */}
+              <div className="text-center">
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {items.length === 0 
+                    ? "Эхлээд баримт хайж, буцаах бараа сонгоно уу"
+                    : items.every((item) => item.quantity === 0)
+                    ? "Буцаах барааны тоо ширхэг оруулна уу"
+                    : totalReturn <= 0
+                    ? "Буцаах дүн 0-ээс их байх ёстой"
+                    : "Бүх мэдээлэл зөв эсэхийг шалгаад дарна уу"
+                  }
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Toast Notifications */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+      <div className="fixed top-6 right-6 z-50 space-y-3 max-w-sm">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`max-w-sm rounded-xl shadow-lg border p-4 transform transition-all duration-300 animate-in slide-in-from-right ${
+            className={`group relative overflow-hidden rounded-2xl shadow-2xl border backdrop-blur-sm transform transition-all duration-500 animate-in slide-in-from-right-5 ${
               toast.type === "success"
-                ? "bg-green-50 border-green-200 text-green-800"
+                ? "bg-emerald-50/90 border-emerald-200/60 shadow-emerald-500/20"
                 : toast.type === "error"
-                ? "bg-red-50 border-red-200 text-red-800"
+                ? "bg-red-50/90 border-red-200/60 shadow-red-500/20"
                 : toast.type === "warning"
-                ? "bg-yellow-50 border-yellow-200 text-yellow-800"
-                : "bg-blue-50 border-blue-200 text-blue-800"
+                ? "bg-amber-50/90 border-amber-200/60 shadow-amber-500/20"
+                : "bg-blue-50/90 border-blue-200/60 shadow-blue-500/20"
             }`}
           >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                {toast.type === "success" && (
-                  <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M5 13l4 4L19 7"
-                      ></path>
-                    </svg>
-                  </div>
-                )}
-                {toast.type === "error" && (
-                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M6 18L18 6M6 6l12 12"
-                      ></path>
-                    </svg>
-                  </div>
-                )}
-                {toast.type === "warning" && (
-                  <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center">
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z"
-                      ></path>
-                    </svg>
-                  </div>
-                )}
-                {toast.type === "info" && (
-                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      ></path>
-                    </svg>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">{toast.title}</p>
-                <p className="text-sm opacity-90">{toast.message}</p>
-              </div>
-              <button
-                onClick={() => removeToast(toast.id)}
-                className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+            {/* Background Pattern */}
+            <div className="absolute inset-0 opacity-5">
+              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white to-transparent"></div>
+            </div>
+            
+            <div className="relative p-6">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  {toast.type === "success" && (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    </div>
+                  )}
+                  {toast.type === "error" && (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/25">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </div>
+                  )}
+                  {toast.type === "warning" && (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/25">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                      </svg>
+                    </div>
+                  )}
+                  {toast.type === "info" && (
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <h4 className={`font-bold text-lg mb-1 ${
+                    toast.type === "success" ? "text-emerald-900" :
+                    toast.type === "error" ? "text-red-900" :
+                    toast.type === "warning" ? "text-amber-900" :
+                    "text-blue-900"
+                  }`}>
+                    {toast.title}
+                  </h4>
+                  <p className={`text-sm leading-relaxed ${
+                    toast.type === "success" ? "text-emerald-800" :
+                    toast.type === "error" ? "text-red-800" :
+                    toast.type === "warning" ? "text-amber-800" :
+                    "text-blue-800"
+                  }`}>
+                    {toast.message}
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => removeToast(toast.id)}
+                  className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 hover:scale-110 group-hover:bg-white/50 ${
+                    toast.type === "success" ? "text-emerald-600 hover:text-emerald-700" :
+                    toast.type === "error" ? "text-red-600 hover:text-red-700" :
+                    toast.type === "warning" ? "text-amber-600 hover:text-amber-700" :
+                    "text-blue-600 hover:text-blue-700"
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  ></path>
-                </svg>
-              </button>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className={`absolute bottom-0 left-0 h-1 rounded-b-2xl transition-all duration-5000 ease-linear ${
+                toast.type === "success" ? "bg-emerald-500" :
+                toast.type === "error" ? "bg-red-500" :
+                toast.type === "warning" ? "bg-amber-500" :
+                "bg-blue-500"
+              }`} style={{ width: '100%', animation: 'shrink 5s linear forwards' }}></div>
             </div>
           </div>
         ))}
       </div>
+      
+      {/* Toast Animation Styles */}
+      <style jsx>{`
+        @keyframes shrink {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}</style>
     </div>
   );
 }

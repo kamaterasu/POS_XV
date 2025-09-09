@@ -961,7 +961,7 @@ export default function InventoryPage() {
               </svg>
               + Ангилал
             </button>
-            {/* <button
+            <button
               onClick={handleOpenAddSub}
               className="h-10 px-4 rounded-xl bg-white border border-slate-200 text-sm shadow-sm hover:shadow-md hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium text-slate-700"
               title="Дэд ангилал нэмэх"
@@ -980,7 +980,7 @@ export default function InventoryPage() {
                 />
               </svg>
               + Дэд ангилал
-            </button> */}
+            </button>
           </div>
         </div>
 
