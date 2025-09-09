@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getOrderById } from '@/lib/order/orderApi';
-import { useRef, useState, type ChangeEvent } from 'react';
 
 type Item = { name: string; qty: number; price: number };
 
@@ -14,6 +13,20 @@ export default function WebSerialPrinter() {
   const [text, setText] = useState(
     'Сайн байна уу?\nPOS_X хэвлэл тест\nНийт: 5000₮'
   );
+  const [order, setOrder] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const sp = useSearchParams();
+  const orderId = sp.get('orderId') || '';
+
+  useEffect(() => {
+    if (!orderId) return;
+    setLoading(true); setErr(null);
+    getOrderById(orderId)
+      .then(setOrder)
+      .catch(e => setErr(e?.message || 'Order fetch error'))
+      .finally(() => setLoading(false));
+  }, [orderId]);
 
   async function connect() {
     if (!('serial' in navigator)) {
@@ -97,6 +110,26 @@ export default function WebSerialPrinter() {
     await printCanvas(lines.join('\n'));
   }
 
+  async function printOrderReceipt() {
+    if (!order) return;
+    const pad = (s: string, n: number) => s.length > n ? s.slice(0, n) : s.padEnd(n);
+    const num = (v: number, n: number) => String(v).padStart(n);
+    const lines = [
+      `Дэлгүүр: ${order.store_id}`,
+      `Захиалга #${order.id}`,
+      `Огноо: ${order.created_at}`,
+      '------------------------------',
+      ...order.items.map((it: any) => {
+        const amt = it.quantity * it.unit_price;
+        return `${pad(it.product_name || '', 12)} ${num(it.quantity,2)} x${num(it.unit_price,6)} = ${num(amt,7)}`;
+      }),
+      '------------------------------',
+      `Нийт: ${order.total}₮`,
+      ''
+    ];
+    await printCanvas(lines.join('\n'));
+  }
+
   async function disconnect() {
     try { await portRef.current?.close(); } finally { setConnected(false); }
   }
@@ -111,19 +144,23 @@ export default function WebSerialPrinter() {
         <button onClick={connect}>Принтер холбох</button>
       ) : (
         <>
-          <textarea rows={5} value={text} onChange={e => setText(e.target.value)} />
-          <button onClick={() => printCanvas(text)}>Текст хэвлэх (Кирилл OK)</button>
-          <button
-            onClick={() =>
-              printReceipt([
-                { name: 'Цай', qty: 2, price: 1000 },
-                { name: 'Сахар', qty: 1, price: 2000 }
-              ])
-            }
-          >
-            Жишээ баримт хэвлэх
-          </button>
-          <button onClick={disconnect}>Салгах</button>
+          {loading && <div>Захиалгын мэдээлэл ачааллаж байна…</div>}
+          {err && <div className="text-red-600">{err}</div>}
+          {order && (
+            <>
+              <div className="mb-2 text-sm">Захиалга: {order.id}</div>
+              <div className="mb-2 text-sm">Дэлгүүр: {order.store_id}</div>
+              <div className="mb-2 text-sm">Огноо: {order.created_at}</div>
+              <ul className="mb-2 text-sm">
+                {order.items.map((it: any, idx: number) => (
+                  <li key={it.id || idx}>{it.product_name} × {it.quantity} @ {it.unit_price}₮</li>
+                ))}
+              </ul>
+              <div className="mb-2 font-bold">Нийт: {order.total}₮</div>
+              <button onClick={printOrderReceipt}>Баримт хэвлэх</button>
+              <button onClick={disconnect}>Салгах</button>
+            </>
+          )}
         </>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { jwtDecode } from "jwt-decode";
+import { getAccessToken } from "../helper/getAccessToken";
 
 export interface OrderItem {
   id: string;
@@ -58,10 +59,8 @@ function transformCheckoutToOrder(data: any, order_id: string): Order | null {
 }
 
 // Get order by ID using the receipt API (which provides order details)
-export async function getOrderById(
-  token: string,
-  order_id: string
-): Promise<Order | null> {
+export async function getOrderById(order_id: string) {
+  const token = await getAccessToken();
   try {
     const decoded: any = jwtDecode(token);
     const tenant_id = decoded?.app_metadata?.tenants?.[0];
