@@ -88,57 +88,57 @@ export function normalizeMethod(m: string) {
  * Cart-оос захиалга үүсгэнэ.
  * items: [{ variantId, qty, price }]
  */
-export async function createCheckoutOrder(
-  items: Array<{ variantId: string; qty: number; price: number }>,
-  payments: PaymentInput[],
-  opts?: { discount?: number; tax?: number },
-  store_id?: string
-): Promise<any> {
-  const token = await getAccessToken();
-  if (!token) throw new Error("NOT_AUTHENTICATED");
+  export async function createCheckoutOrder(
+    items: Array<{ variantId: string; qty: number; price: number }>,
+    payments: PaymentInput[],
+    opts?: { discount?: number; tax?: number },
+    store_id?: string
+  ): Promise<any> {
+    const token = await getAccessToken();
+    if (!token) throw new Error("NOT_AUTHENTICATED");
 
-  const tenant_id = await getTenantId();
-  if (!tenant_id) throw new Error("tenant_id not found");
+    const tenant_id = await getTenantId();
+    if (!tenant_id) throw new Error("tenant_id not found");
 
-  const resolvedStoreId = store_id || (await getStoredID(token));
-  if (!resolvedStoreId) throw new Error("store_id is required");
+    const resolvedStoreId = store_id || (await getStoredID(token));
+    if (!resolvedStoreId) throw new Error("store_id is required");
 
-  if (!items?.length) throw new Error("Cart is empty");
-  if (!payments?.length) throw new Error("payments is empty");
+    if (!items?.length) throw new Error("Cart is empty");
+    if (!payments?.length) throw new Error("payments is empty");
 
-  const payload: CreateOrderPayload = {
-    tenant_id,
-    store_id: resolvedStoreId,
-    items: items.map((it) => {
-      if (!it.variantId) throw new Error("Some cart rows have no variantId");
-      return {
-        variant_id: it.variantId,
-        quantity: Math.max(1, Math.round(it.qty)),
-        unit_price: Math.round(it.price),
-      };
-    }),
-    payments: payments.map((p) => ({
-      method: normalizeMethod(p.method),
-      amount: Math.round(p.amount),
-      ref: p.ref,
-    })),
-    discount: Math.round(opts?.discount ?? 0),
-    tax: Math.round(opts?.tax ?? 0),
-  };
-  
+    const payload: CreateOrderPayload = {
+      tenant_id,
+      store_id: resolvedStoreId,
+      items: items.map((it) => {
+        if (!it.variantId) throw new Error("Some cart rows have no variantId");
+        return {
+          variant_id: it.variantId,
+          quantity: Math.max(1, Math.round(it.qty)),
+          unit_price: Math.round(it.price),
+        };
+      }),
+      payments: payments.map((p) => ({
+        method: normalizeMethod(p.method),
+        amount: Math.round(p.amount),
+        ref: p.ref,
+      })),
+      discount: Math.round(opts?.discount ?? 0),
+      tax: Math.round(opts?.tax ?? 0),
+    };
+    
 
-  const res = await fetch(BASE_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+    const res = await fetch(BASE_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Checkout failed with ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Checkout failed with ${res.status}`);
+    }
+    return res.json();
   }
-  return res.json();
-}
 
 // ---------- Read APIs ----------
 export async function getCheckoutOrders(

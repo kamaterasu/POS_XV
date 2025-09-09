@@ -333,10 +333,12 @@ export default function ProductCreateForm({
   cats,
   branches,
   tenantId,
+  qty = 9999, // Борлуулалтын үед үлдэгдэл
 }: {
   cats?: Category[];
-  branches: string[]; // UI-д харагдах салбарын нэрс (жишээ нь ["Салбар A", "Салбар B", "Бүх салбар"])
+  branches: string[];
   tenantId?: string;
+  qty?: number; // Үлдэгдэл
 }) {
   const router = useRouter();
   const imgInputRef = useRef<HTMLInputElement | null>(null);
@@ -762,6 +764,8 @@ export default function ProductCreateForm({
     }
   }
 
+  const [quantity, setQuantity] = useState(1);
+
   if (loading) return <Loading open label="Уншиж байна…" />;
 
   return (
@@ -1028,6 +1032,22 @@ export default function ProductCreateForm({
           </div>
         </div>
       )}
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Борлуулалтын тоо</label>
+        <input
+          type="number"
+          min={1}
+          max={qty}
+          value={quantity}
+          onChange={(e) =>
+            setQuantity(Math.max(1, Math.min(Number(e.target.value), qty)))
+          }
+          className="h-10 w-full rounded-md border border-[#E6E6E6] px-3"
+          placeholder={`Хамгийн их: ${qty}`}
+        />
+        <div className="text-xs text-gray-500">Үлдэгдэл: {qty} ширхэг</div>
+      </div>
 
       <div className="bg-white rounded-xl border border-[#E6E6E6] shadow-md p-3 flex items-center justify-end gap-3">
         <button
