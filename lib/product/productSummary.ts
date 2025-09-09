@@ -19,16 +19,3 @@ export interface ProductStockSummary {
   }>;
   totalStock?: number;
 }
-
-export async function getProductById(
-  id: string
-): Promise<ProductStockSummary | null> {
-  try {
-    // TODO: Implement actual product fetching logic
-    // For now, return a mock product or null
-    return null;
-  } catch (error) {
-    console.error("Error fetching product:", error);
-    return null;
-  }
-}
