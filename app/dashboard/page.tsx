@@ -10,6 +10,7 @@ import { FaRegUser } from "react-icons/fa";
 import { IoExitOutline } from "react-icons/io5";
 import { MdOutlineShoppingCart } from "react-icons/md";
 import { TbTransfer } from "react-icons/tb";
+import { MdOutlineCalculate } from "react-icons/md";
 import type { IconType } from "react-icons";
 import { supabase } from "@/lib/supabaseClient";
 import { Loading } from "@/components/Loading";
@@ -67,6 +68,7 @@ export default function DashboardPage() {
   const goToProductReturn = () => router.push("/productreturn");
   // const goToOrderCount = () => router.push("/order");
   const goToTransferItems = () => router.push("/transfer");
+  const goToCount = () => router.push("/count");
 
   const handleLogout = async () => {
     try {
@@ -176,6 +178,7 @@ export default function DashboardPage() {
 
         {/* Feature cards grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* Updated to 3 columns to fit 6 cards better */}
           <div className="fade-in-up stagger-1">
             <FeatureCard
               onClick={goTocheckout}
@@ -233,6 +236,19 @@ export default function DashboardPage() {
               iconBg="bg-teal-50"
               iconColor="text-teal-600"
               disabled={!canAccessFeature(userRole, "transfer")}
+            />
+          </div>
+
+          <div className="fade-in-up stagger-6">
+            <FeatureCard
+              onClick={goToCount}
+              Icon={MdOutlineCalculate}
+              label="Тооллого"
+              description="Агуулахын тооллого хийх"
+              gradient="from-indigo-500 to-blue-500"
+              iconBg="bg-indigo-50"
+              iconColor="text-indigo-600"
+              disabled={!canAccessFeature(userRole, "inventory")}
             />
           </div>
         </div>
