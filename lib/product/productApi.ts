@@ -364,3 +364,132 @@ export async function getAllProductVariants(token: string) {
   console.log(`🎉 Total variants extracted: ${variants.length}`);
   return variants;
 }
+
+/**
+ * Get product variants filtered by specific store ID (for transfers)
+ */
+export async function getProductVariantsByStore(
+  token: string,
+  storeId: string
+) {
+  console.log(`🏪 Fetching products for store: ${storeId}`);
+
+  const tenant_id = getTenantIdFromToken(token);
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
+  );
+
+  // Set required parameters including store filter
+  url.searchParams.set("tenant_id", tenant_id);
+  url.searchParams.set("store_id", storeId); // Filter by specific store
+  url.searchParams.set("withVariants", "true");
+  url.searchParams.set("limit", "200");
+  url.searchParams.set("offset", "0");
+
+  console.log("🎯 Store-filtered fetch:", url.toString());
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("Store product API error:", errorText);
+    throw new Error(
+      `Failed to fetch store products: ${res.status} ${res.statusText}`
+    );
+  }
+
+  const data = await res.json();
+  console.log(`📦 Store ${storeId} products:`, data);
+
+  const variants: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    price: number;
+    product_name?: string;
+    store_id?: string;
+  }> = [];
+
+  if (data.items && Array.isArray(data.items)) {
+    console.log(
+      `📋 Processing ${data.items.length} products for store ${storeId}`
+    );
+
+    // Same logic as getAllProductVariants but store-filtered
+    const firstProduct = data.items[0];
+    if (
+      firstProduct &&
+      firstProduct.variants &&
+      Array.isArray(firstProduct.variants)
+    ) {
+      console.log("✅ FAST PATH: Store variants are included");
+
+      for (const product of data.items) {
+        if (product.variants && Array.isArray(product.variants)) {
+          for (const variant of product.variants) {
+            variants.push({
+              id: variant.id,
+              name: `${product.name}${
+                variant.name ? ` - ${variant.name}` : ""
+              }`,
+              sku: variant.sku || "",
+              price: variant.price || 0,
+              product_name: product.name,
+              store_id: storeId,
+            });
+          }
+        }
+      }
+    } else {
+      console.log("⚡ STORE PATH: Fetching store variants individually");
+
+      for (const product of data.items) {
+        try {
+          const productUrl = new URL(url.toString());
+          productUrl.searchParams.set("id", product.id);
+          productUrl.searchParams.set("withVariants", "true");
+
+          const productRes = await fetch(productUrl.toString(), {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          if (productRes.ok) {
+            const productData = await productRes.json();
+            const productVariants = productData.variants || [];
+
+            for (const variant of productVariants) {
+              variants.push({
+                id: variant.id,
+                name: `${product.name}${
+                  variant.name ? ` - ${variant.name}` : ""
+                }`,
+                sku: variant.sku || "",
+                price: variant.price || 0,
+                product_name: product.name,
+                store_id: storeId,
+              });
+            }
+          }
+        } catch (err) {
+          console.error(
+            `Failed to fetch variants for product ${product.id}:`,
+            err
+          );
+        }
+      }
+    }
+  }
+
+  console.log(`🎯 Store ${storeId} variants: ${variants.length}`);
+  return variants;
+}
