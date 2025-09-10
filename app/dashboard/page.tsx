@@ -178,7 +178,7 @@ export default function DashboardPage() {
 
         {/* Feature cards grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {/* Updated to 3 columns to fit 6 cards better */}
+          {/* Updated to 3 columns to fit available cards */}
           <div className="fade-in-up stagger-1">
             <FeatureCard
               onClick={goTocheckout}
@@ -201,56 +201,58 @@ export default function DashboardPage() {
               iconColor="text-emerald-600"
             />
           </div>
-          <div className="fade-in-up stagger-3">
-            <FeatureCard
-              onClick={goToProductReturn}
-              Icon={FaArrowRotateLeft}
-              label="Буцаалт"
-              description="Бараа буцаах үйл ажиллагаа"
-              gradient="from-orange-500 to-red-500"
-              iconBg="bg-orange-50"
-              iconColor="text-orange-600"
-              disabled={!canAccessFeature(userRole, "productReturn")}
-            />
-          </div>
-          <div className="fade-in-up stagger-4">
-            <FeatureCard
-              onClick={goToReport}
-              Icon={VscGraph}
-              label="Тайлан"
-              description="Борлуулалтын тайлан статистик"
-              gradient="from-purple-500 to-pink-500"
-              iconBg="bg-purple-50"
-              iconColor="text-purple-600"
-              disabled={!canAccessFeature(userRole, "report")}
-            />
-          </div>
-
-          <div className="fade-in-up stagger-5">
-            <FeatureCard
-              onClick={goToTransferItems}
-              Icon={TbTransfer}
-              label="Шилжүүлэг"
-              description="Бараа материал шилжүүлэх"
-              gradient="from-teal-500 to-green-500"
-              iconBg="bg-teal-50"
-              iconColor="text-teal-600"
-              disabled={!canAccessFeature(userRole, "transfer")}
-            />
-          </div>
-
-          <div className="fade-in-up stagger-6">
-            <FeatureCard
-              onClick={goToCount}
-              Icon={MdOutlineCalculate}
-              label="Тооллого"
-              description="Агуулахын тооллого хийх"
-              gradient="from-indigo-500 to-blue-500"
-              iconBg="bg-indigo-50"
-              iconColor="text-indigo-600"
-              disabled={!canAccessFeature(userRole, "inventory")}
-            />
-          </div>
+          {canAccessFeature(userRole, "productReturn") && (
+            <div className="fade-in-up stagger-3">
+              <FeatureCard
+                onClick={goToProductReturn}
+                Icon={FaArrowRotateLeft}
+                label="Буцаалт"
+                description="Бараа буцаах үйл ажиллагаа"
+                gradient="from-orange-500 to-red-500"
+                iconBg="bg-orange-50"
+                iconColor="text-orange-600"
+              />
+            </div>
+          )}
+          {canAccessFeature(userRole, "report") && (
+            <div className="fade-in-up stagger-4">
+              <FeatureCard
+                onClick={goToReport}
+                Icon={VscGraph}
+                label="Тайлан"
+                description="Борлуулалтын тайлан статистик"
+                gradient="from-purple-500 to-pink-500"
+                iconBg="bg-purple-50"
+                iconColor="text-purple-600"
+              />
+            </div>
+          )}
+          {canAccessFeature(userRole, "transfer") && (
+            <div className="fade-in-up stagger-5">
+              <FeatureCard
+                onClick={goToTransferItems}
+                Icon={TbTransfer}
+                label="Шилжүүлэг"
+                description="Бараа материал шилжүүлэх"
+                gradient="from-teal-500 to-green-500"
+                iconBg="bg-teal-50"
+                iconColor="text-teal-600"
+              />
+            </div>
+          )}
+          {canAccessFeature(userRole, "inventory") && (
+            <div className="fade-in-up stagger-6">
+              <FeatureCard
+                onClick={goToCount}
+                Icon={MdOutlineCalculate}
+                label="Тооллого"
+                description="Агуулахын тооллого хийх"
+                gradient="from-indigo-500 to-blue-500"
+                iconBg="bg-indigo-50"
+                iconColor="text-indigo-600"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -272,7 +274,6 @@ function FeatureCard({
   gradient,
   iconBg,
   iconColor,
-  disabled = false,
 }: {
   onClick: () => void;
   Icon: IconType;
@@ -281,36 +282,24 @@ function FeatureCard({
   gradient: string;
   iconBg: string;
   iconColor: string;
-  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
-      title={disabled ? "Тун удахгүй" : undefined}
-      className={`group relative w-full rounded-2xl bg-white/60 backdrop-blur-sm border border-white/40 shadow-sm 
+      onClick={onClick}
+      className="group relative w-full rounded-2xl bg-white/60 backdrop-blur-sm border border-white/40 shadow-sm 
                   p-6 text-left transition-all duration-300 overflow-hidden
-                  ${
-                    disabled
-                      ? "opacity-50 cursor-not-allowed"
-                      : "hover:shadow-xl hover:scale-[1.02] hover:bg-white/80 active:scale-[0.98]"
-                  }`}
-      aria-disabled={disabled}
+                  hover:shadow-xl hover:scale-[1.02] hover:bg-white/80 active:scale-[0.98]"
     >
       {/* Gradient overlay on hover */}
-      {!disabled && (
-        <div
-          className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
-        />
-      )}
+      <div
+        className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
+      />
 
       {/* Icon container */}
       <div
         className={`w-12 h-12 rounded-xl ${iconBg} flex items-center justify-center mb-4 
-                      ${
-                        !disabled && "group-hover:scale-110"
-                      } transition-transform duration-300`}
+                      group-hover:scale-110 transition-transform duration-300`}
       >
         <Icon size={24} className={iconColor} />
       </div>
@@ -326,36 +315,25 @@ function FeatureCard({
       </div>
 
       {/* Arrow indicator */}
-      {!disabled && (
-        <div
-          className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center
-                        opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 
-                        transition-all duration-300"
+      <div
+        className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center
+                      opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 
+                      transition-all duration-300"
+      >
+        <svg
+          className="w-3 h-3 text-gray-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
-          <svg
-            className="w-3 h-3 text-gray-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </div>
-      )}
-
-      {/* Disabled overlay */}
-      {disabled && (
-        <div className="absolute inset-0 bg-gray-100/50 backdrop-blur-[1px] rounded-2xl flex items-center justify-center">
-          <span className="text-xs text-gray-500 bg-white/80 px-2 py-1 rounded-full">
-            Тун удахгүй
-          </span>
-        </div>
-      )}
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+      </div>
     </button>
   );
 }

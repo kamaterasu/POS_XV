@@ -49,14 +49,19 @@ export function canAccessFeature(
 
   switch (feature) {
     case "productReturn":
-      return true;
+      return true; // All roles can access product returns
     case "management":
       // Only Admin and OWNER can access management
-      return true;
+      return userRole === "Admin" || userRole === "OWNER";
     case "checkout":
+      // All roles can access checkout
+      return true;
     case "inventory":
+      // Inventory count feature - only Admin and OWNER
+      return userRole === "Admin" || userRole === "OWNER";
     case "report":
-      // All roles can access these features
+    case "transfer":
+      // Only Admin and OWNER can access reports and transfers
       return userRole === "Admin" || userRole === "OWNER";
     default:
       return true;
