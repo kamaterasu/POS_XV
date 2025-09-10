@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { Plus, Minus, X, Search } from "lucide-react";
 import { createTransfer } from "@/lib/transfer/transferApi";
-import { getProductVariantsByStore, getProductByStore } from "@/lib/product/productApi";
+import {
+  getProductVariantsByStore,
+  getProductByStore,
+} from "@/lib/product/productApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 
 type Store = {
@@ -65,31 +68,37 @@ export default function TransferCreateForm({
     try {
       console.log(`🔄 Loading products for store: ${storeId}`);
       const token = await getAccessToken();
-      
+
       // Use the same approach as inventory page for better compatibility
       const raw = await getProductByStore(token, storeId);
       const items = Array.isArray(raw.items) ? raw.items : [];
-      
+
       const storeVariants: ProductVariant[] = [];
-      
+
       // Convert inventory items to variants format similar to inventory page logic
       for (const item of items) {
         if (!item?.variant_id || !item?.product) continue;
-        
+
         const variant = item.variant || {};
         const product = item.product || {};
-        
+
         storeVariants.push({
           id: String(item.variant_id),
-          name: `${product.name || '(нэргүй)'}${variant.name && variant.name !== product.name ? ` - ${variant.name}` : ''}`,
-          sku: variant.sku || '',
+          name: `${product.name || "(нэргүй)"}${
+            variant.name && variant.name !== product.name
+              ? ` - ${variant.name}`
+              : ""
+          }`,
+          sku: variant.sku || "",
           price: variant.price || 0,
           product_name: product.name,
         });
       }
-      
+
       setVariants(storeVariants);
-      console.log(`✅ Loaded ${storeVariants.length} products for store ${storeId}`);
+      console.log(
+        `✅ Loaded ${storeVariants.length} products for store ${storeId}`
+      );
 
       // Clear selected items since available products changed
       setItems([{ variant_id: "", qty: 1 }]);
@@ -179,7 +188,8 @@ export default function TransferCreateForm({
     return (
       variant.name.toLowerCase().includes(query) ||
       variant.sku.toLowerCase().includes(query) ||
-      (variant.product_name && variant.product_name.toLowerCase().includes(query))
+      (variant.product_name &&
+        variant.product_name.toLowerCase().includes(query))
     );
   });
 
@@ -200,7 +210,9 @@ export default function TransferCreateForm({
             <div>Дэлгүүр: {stores.length} ширхэг</div>
             <div>Сонгогдсон дэлгүүрийн бараа: {variants.length} ширхэг</div>
             {searchQuery && (
-              <div>Шүүлтүүрийн дараах бараа: {filteredVariants.length} ширхэг</div>
+              <div>
+                Шүүлтүүрийн дараах бараа: {filteredVariants.length} ширхэг
+              </div>
             )}
             <div>Илгээх дэлгүүр: {formData.src_store_id || "Сонгогдоогүй"}</div>
             {loadingProducts && (
