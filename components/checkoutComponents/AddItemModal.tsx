@@ -4,15 +4,17 @@ import { Item } from "@/lib/sales/salesTypes";
 import { FiHeart } from "react-icons/fi";
 import { FaShoppingCart } from "react-icons/fa";
 import Image from "next/image";
-import { getProduct } from "@/lib/product/productApi";
+import { getProductByStore } from "@/lib/product/productApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
+import { getStoredID } from "@/lib/store/storeApi";
+import { getImageShowUrl } from "@/lib/product/productImages";
 
-type Variant = { 
+type Variant = {
   variant_id: string; // Made required since we need real IDs
-  color?: string; 
-  size?: string; 
-  stock: number; 
-  price: number; 
+  color?: string;
+  size?: string;
+  stock: number;
+  price: number;
   name?: string; // Add name for variant
   sku?: string; // Add SKU
   attrs?: Record<string, string>; // Add attributes
@@ -21,8 +23,27 @@ type Product = {
   id: string;
   name: string;
   img?: string;
+  rawImg?: string; // Add rawImg property for image URL resolution
   variants: Variant[];
 };
+
+// ---------- Image URL resolver ----------
+const imgUrlCache = new Map<string, string>();
+async function resolveImageUrl(raw?: string): Promise<string | undefined> {
+  if (!raw) return undefined;
+  if (/^https?:\/\//i.test(raw) || /^data:/i.test(raw)) return raw;
+  if (raw.startsWith("/")) return raw;
+  const path = raw.includes("/") ? raw : `product_img/${raw}`;
+  if (imgUrlCache.has(path)) return imgUrlCache.get(path)!;
+  try {
+    const signed = await getImageShowUrl(path);
+    imgUrlCache.set(path, signed);
+    return signed;
+  } catch (e) {
+    console.error("Failed to sign image url for", path, e);
+    return undefined;
+  }
+}
 
 export default function AddItemModal({
   open,
@@ -41,43 +62,155 @@ export default function AddItemModal({
   // Fetch products when modal opens
   useEffect(() => {
     if (open && catalog.length === 0) {
+      console.log("🛒 AddItemModal - Starting to load products...");
       setLoading(true);
       (async () => {
         try {
+          console.log("🛒 AddItemModal - Getting access token...");
           const token = await getAccessToken();
           if (!token) {
-            console.error("No access token available");
+            console.error("🛒 AddItemModal - No access token available");
+            setCatalog([]);
             return;
           }
-          
-          const response = await getProduct(token);
-          console.log("Product API response:", response);
-          
-          if (response?.products) {
-            const products: Product[] = response.products.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              img: p.img || "/default.png",
-              variants: (p.variants || []).map((v: any) => ({
-                variant_id: v.id, // Use the actual variant ID
-                color: v.attrs?.color || v.attrs?.Color,
-                size: v.attrs?.size || v.attrs?.Size,
-                stock: v.stock || 0,
-                price: v.price || 0,
-                name: v.name,
-                sku: v.sku,
-                attrs: v.attrs,
-              }))
-            }));
-            
-            setCatalog(products);
-            if (products.length > 0) {
-              setActiveId(products[0].id);
+          console.log(
+            "🛒 AddItemModal - Token obtained:",
+            token.substring(0, 20) + "..."
+          );
+
+          // Get store ID first, then fetch products by store (includes stock)
+          console.log("🛒 AddItemModal - Getting store ID...");
+          const storeId = await getStoredID(token);
+          if (!storeId) {
+            console.warn(
+              "🛒 AddItemModal - No store ID available, modal will show empty catalog"
+            );
+            setCatalog([]);
+            return;
+          }
+          console.log("🛒 AddItemModal - Store ID obtained:", storeId);
+
+          console.log("🛒 AddItemModal - Fetching products by store...");
+          const response = await getProductByStore(token, storeId);
+          console.log("🛒 AddItemModal - Raw API response:", response);
+          console.log(
+            "🛒 AddItemModal - Response items count:",
+            response?.items?.length || 0
+          );
+
+          // Process inventory response to build product catalog
+          if (response?.items && response.items.length > 0) {
+            console.log("🛒 AddItemModal - Processing inventory items...");
+            const productMap = new Map<string, any>();
+
+            // Group inventory items by product
+            for (const item of response.items) {
+              const product = item.product;
+              const variant = item.variant;
+
+              console.log("🛒 Processing item:", {
+                product: product?.name,
+                variant: variant?.name,
+                qty: item.qty,
+              });
+
+              if (!product?.id || !variant?.id) {
+                console.warn(
+                  "🛒 Skipping item - missing product or variant ID:",
+                  item
+                );
+                continue;
+              }
+
+              if (!productMap.has(product.id)) {
+                productMap.set(product.id, {
+                  id: product.id,
+                  name: product.name,
+                  img: product.img || "/default.png",
+                  rawImg: product.img, // Store original path for URL resolution
+                  variants: [],
+                });
+              }
+
+              // Add variant with stock from inventory
+              productMap.get(product.id).variants.push({
+                variant_id: variant.id,
+                color:
+                  variant.attrs?.color ||
+                  variant.attrs?.Color ||
+                  variant.attrs?.colorName ||
+                  "Default",
+                size:
+                  variant.attrs?.size ||
+                  variant.attrs?.Size ||
+                  variant.attrs?.Хэмжээ ||
+                  "Default",
+                stock: item.qty || 0, // Stock from inventory
+                price: variant.price || 0,
+                name: variant.name,
+                sku: variant.sku,
+                attrs: variant.attrs,
+              });
             }
+
+            const products: Product[] = Array.from(productMap.values());
+
+            console.log("🛒 AddItemModal - Product map size:", productMap.size);
+            console.log("🛒 AddItemModal - Resolving image URLs...");
+
+            // Resolve image URLs for all products
+            const productsWithUrls: Product[] = await Promise.all(
+              products.map(async (product) => ({
+                ...product,
+                img: (await resolveImageUrl(product.rawImg)) || "/default.png",
+              }))
+            );
+
+            console.log(
+              "🛒 AddItemModal - Processed products with resolved images:",
+              productsWithUrls
+            );
+            console.log(
+              "🛒 AddItemModal - Total products:",
+              productsWithUrls.length
+            );
+            productsWithUrls.forEach((p, i) => {
+              console.log(
+                `🛒 Product ${i + 1}: ${p.name} (${
+                  p.variants.length
+                } variants) - Image: ${p.img}`
+              );
+              p.variants.forEach((v, j) => {
+                console.log(
+                  `  🛒 Variant ${j + 1}: ${v.color}/${v.size} - Stock: ${
+                    v.stock
+                  }, Price: ${v.price}`
+                );
+              });
+            });
+
+            setCatalog(productsWithUrls);
+            if (productsWithUrls.length > 0) {
+              setActiveId(productsWithUrls[0].id);
+              console.log(
+                "🛒 AddItemModal - Set active product:",
+                productsWithUrls[0].name
+              );
+            }
+          } else {
+            console.warn(
+              "🛒 AddItemModal - No items in response or empty array"
+            );
+            console.log("🛒 AddItemModal - Response:", response);
+            setCatalog([]);
           }
         } catch (error) {
-          console.error("Error fetching products:", error);
+          console.error("🛒 AddItemModal - Error fetching products:", error);
+          setCatalog([]);
         } finally {
+          console.log(
+            "🛒 AddItemModal - Finished loading, setting loading to false"
+          );
           setLoading(false);
         }
       })();
@@ -90,11 +223,25 @@ export default function AddItemModal({
   );
 
   const colors = useMemo(
-    () => Array.from(new Set((active?.variants ?? []).map((v) => v.color).filter((c): c is string => Boolean(c)))),
+    () =>
+      Array.from(
+        new Set(
+          (active?.variants ?? [])
+            .map((v) => v.color)
+            .filter((c): c is string => Boolean(c))
+        )
+      ),
     [active]
   );
   const sizes = useMemo(
-    () => Array.from(new Set((active?.variants ?? []).map((v) => v.size).filter((s): s is string => Boolean(s)))),
+    () =>
+      Array.from(
+        new Set(
+          (active?.variants ?? [])
+            .map((v) => v.size)
+            .filter((s): s is string => Boolean(s))
+        )
+      ),
     [active]
   );
 
@@ -130,9 +277,30 @@ export default function AddItemModal({
   const canAdd = !!active && !!selectedVariant && qty > 0 && qty <= remaining;
 
   const handleAdd = () => {
-    if (!canAdd || !active || !selectedVariant) return;
+    if (!canAdd || !active || !selectedVariant) {
+      console.warn("🛒 Cannot add item:", {
+        canAdd,
+        active: !!active,
+        selectedVariant: !!selectedVariant,
+      });
+      return;
+    }
+
+    console.log("🛒 Adding item to cart:", {
+      product: active.name,
+      variant: selectedVariant.variant_id,
+      color: selectedVariant.color,
+      size: selectedVariant.size,
+      qty,
+      price: selectedVariant.price,
+    });
+
     onAdd({
-      id: crypto.randomUUID?.() ?? `${active.id}-${selectedVariant.color}-${selectedVariant.size}-${Date.now()}`,
+      id:
+        crypto.randomUUID?.() ??
+        `${active.id}-${selectedVariant.color}-${
+          selectedVariant.size
+        }-${Date.now()}`,
       variant_id: selectedVariant.variant_id, // Use the actual variant_id
       name: active.name,
       qty,
@@ -256,106 +424,128 @@ export default function AddItemModal({
                   <div className="flex items-center justify-center h-48">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                      <p className="text-gray-600">Бүтээгдэхүүн ачаалж байна...</p>
+                      <p className="text-gray-600">
+                        Бүтээгдэхүүн ачаалж байна...
+                      </p>
                     </div>
                   </div>
                 ) : catalog.length === 0 ? (
                   <div className="flex items-center justify-center h-48">
-                    <p className="text-gray-600">Бүтээгдэхүүн олдсонгүй</p>
+                    <div className="text-center">
+                      <svg
+                        className="w-12 h-12 text-gray-400 mx-auto mb-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-3.5m-9 0h3.5m0 0v1.5M12 14l3-3-3-3m-5 3h8"
+                        />
+                      </svg>
+                      <p className="text-gray-600 font-medium">
+                        Бүтээгдэхүүн олдсонгүй
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Дэлгүүрт бүтээгдэхүүн байхгүй эсвэл API холболт алдаатай
+                      </p>
+                    </div>
                   </div>
                 ) : (
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">
-                        Брэнд
-                      </th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-700">
-                        Ширхэг
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filtered.map((p) => {
-                      const totalStock = p.variants.reduce(
-                        (s, v) => s + v.stock,
-                        0
-                      );
-                      const activeRow = p.id === active?.id;
-                      return (
-                        <tr
-                          key={p.id}
-                          className={
-                            "cursor-pointer transition-all duration-200 " +
-                            (activeRow
-                              ? "bg-blue-50 border-l-4 border-blue-500"
-                              : "hover:bg-gray-50")
-                          }
-                          onClick={() => selectProduct(p.id)}
-                        >
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 overflow-hidden flex items-center justify-center">
-                                <svg
-                                  className="w-4 h-4 text-blue-600"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                                  />
-                                </svg>
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-4 py-3 font-semibold text-gray-700">
+                          Брэнд
+                        </th>
+                        <th className="text-right px-4 py-3 font-semibold text-gray-700">
+                          Ширхэг
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filtered.map((p) => {
+                        const totalStock = p.variants.reduce(
+                          (s, v) => s + v.stock,
+                          0
+                        );
+                        const activeRow = p.id === active?.id;
+                        return (
+                          <tr
+                            key={p.id}
+                            className={
+                              "cursor-pointer transition-all duration-200 " +
+                              (activeRow
+                                ? "bg-blue-50 border-l-4 border-blue-500"
+                                : "hover:bg-gray-50")
+                            }
+                            onClick={() => selectProduct(p.id)}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 overflow-hidden flex items-center justify-center">
+                                  <svg
+                                    className="w-4 h-4 text-blue-600"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                                    />
+                                  </svg>
+                                </div>
+                                <span className="font-medium text-gray-900 truncate">
+                                  {p.name}
+                                </span>
                               </div>
-                              <span className="font-medium text-gray-900 truncate">
-                                {p.name}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  totalStock > 0
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {totalStock}
                               </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filtered.length === 0 && (
+                        <tr>
+                          <td
+                            className="px-4 py-8 text-center text-gray-500"
+                            colSpan={2}
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <svg
+                                className="w-8 h-8 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33"
+                                />
+                              </svg>
+                              <span>Илэрц олдсонгүй.</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                totalStock > 0
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {totalStock}
-                            </span>
-                          </td>
                         </tr>
-                      );
-                    })}
-                    {filtered.length === 0 && (
-                      <tr>
-                        <td
-                          className="px-4 py-8 text-center text-gray-500"
-                          colSpan={2}
-                        >
-                          <div className="flex flex-col items-center gap-2">
-                            <svg
-                              className="w-8 h-8 text-gray-400"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33"
-                              />
-                            </svg>
-                            <span>Илэрц олдсонгүй.</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                      )}
+                    </tbody>
+                  </table>
                 )}
               </div>
 
