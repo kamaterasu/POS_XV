@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Minus, X } from "lucide-react";
+import { Plus, Minus, X, Search } from "lucide-react";
 import { createTransfer } from "@/lib/transfer/transferApi";
-import { getProductVariantsByStore } from "@/lib/product/productApi";
+import { getProductVariantsByStore, getProductByStore } from "@/lib/product/productApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 
 type Store = {
@@ -38,6 +38,7 @@ export default function TransferCreateForm({
   const [loading, setLoading] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     src_store_id: "",
     dst_store_id: "",
@@ -64,11 +65,31 @@ export default function TransferCreateForm({
     try {
       console.log(`🔄 Loading products for store: ${storeId}`);
       const token = await getAccessToken();
-      const storeVariants = await getProductVariantsByStore(token, storeId);
+      
+      // Use the same approach as inventory page for better compatibility
+      const raw = await getProductByStore(token, storeId);
+      const items = Array.isArray(raw.items) ? raw.items : [];
+      
+      const storeVariants: ProductVariant[] = [];
+      
+      // Convert inventory items to variants format similar to inventory page logic
+      for (const item of items) {
+        if (!item?.variant_id || !item?.product) continue;
+        
+        const variant = item.variant || {};
+        const product = item.product || {};
+        
+        storeVariants.push({
+          id: String(item.variant_id),
+          name: `${product.name || '(нэргүй)'}${variant.name && variant.name !== product.name ? ` - ${variant.name}` : ''}`,
+          sku: variant.sku || '',
+          price: variant.price || 0,
+          product_name: product.name,
+        });
+      }
+      
       setVariants(storeVariants);
-      console.log(
-        `✅ Loaded ${storeVariants.length} products for store ${storeId}`
-      );
+      console.log(`✅ Loaded ${storeVariants.length} products for store ${storeId}`);
 
       // Clear selected items since available products changed
       setItems([{ variant_id: "", qty: 1 }]);
@@ -151,6 +172,17 @@ export default function TransferCreateForm({
     }
   };
 
+  // Filter variants based on search query
+  const filteredVariants = variants.filter((variant) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      variant.name.toLowerCase().includes(query) ||
+      variant.sku.toLowerCase().includes(query) ||
+      (variant.product_name && variant.product_name.toLowerCase().includes(query))
+    );
+  });
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 w-full max-w-2xl mx-auto">
       <div className="mb-6">
@@ -167,6 +199,9 @@ export default function TransferCreateForm({
           <div className="text-blue-700 space-y-1">
             <div>Дэлгүүр: {stores.length} ширхэг</div>
             <div>Сонгогдсон дэлгүүрийн бараа: {variants.length} ширхэг</div>
+            {searchQuery && (
+              <div>Шүүлтүүрийн дараах бараа: {filteredVariants.length} ширхэг</div>
+            )}
             <div>Илгээх дэлгүүр: {formData.src_store_id || "Сонгогдоогүй"}</div>
             {loadingProducts && (
               <div className="text-blue-600 font-medium">
@@ -277,6 +312,30 @@ export default function TransferCreateForm({
             </button>
           </div>
 
+          {/* Search filter for products */}
+          {formData.src_store_id && variants.length > 0 && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Бараа хайх
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Барааны нэр, SKU эсвэл бүтээгдэхүүний нэрээр хайх..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {searchQuery && (
+                <div className="text-sm text-gray-600">
+                  {filteredVariants.length} / {variants.length} бараа олдлоо
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Product loading and status messages */}
           {!formData.src_store_id && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -386,9 +445,11 @@ export default function TransferCreateForm({
                         ? "Бараа ачааллаж байна..."
                         : variants.length === 0
                         ? "Энэ дэлгүүрт бараа байхгүй байна"
+                        : filteredVariants.length === 0 && searchQuery
+                        ? "Хайлтанд тохирох бараа олдсонгүй"
                         : "Бараа сонгох"}
                     </option>
-                    {variants.map((variant: ProductVariant) => (
+                    {filteredVariants.map((variant: ProductVariant) => (
                       <option key={variant.id} value={variant.id}>
                         {variant.name} ({variant.sku})
                       </option>

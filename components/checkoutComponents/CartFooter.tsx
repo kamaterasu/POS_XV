@@ -11,6 +11,7 @@ export default function CartFooter({
   onPay,
   onHistory,
   onPrint,
+  onDraftManager,
 }: {
   onQuick: () => void;
   onAdd: () => void;
@@ -18,9 +19,10 @@ export default function CartFooter({
   onPay: () => void;
   onHistory?: () => void;
   onPrint?: () => void;
+  onDraftManager?: () => void;
 }) {
   return (
-    <div className="grid grid-cols-4 gap-2 p-4">
+    <div className="grid grid-cols-5 gap-2 p-4">
       <button
         onClick={onAdd}
         className="group h-12 px-3 bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm rounded-xl hover:shadow-md hover:bg-white/90 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1"
@@ -40,6 +42,30 @@ export default function CartFooter({
         </span>
         <span className="font-medium text-gray-900 text-xs">Хадгалах</span>
       </button>
+
+      {onDraftManager && (
+        <button
+          onClick={onDraftManager}
+          className="group h-12 px-3 bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm rounded-xl hover:shadow-md hover:bg-white/90 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1"
+        >
+          <span className="text-blue-600 group-hover:text-blue-700 transition-colors">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </span>
+          <span className="font-medium text-gray-900 text-xs">Ачаалах</span>
+        </button>
+      )}
 
       {onHistory && (
         <button

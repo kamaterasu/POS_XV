@@ -8,6 +8,14 @@ import { getProductByStore } from "@/lib/product/productApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getStoredID } from "@/lib/store/storeApi";
 import { getImageShowUrl } from "@/lib/product/productImages";
+import { getCategories } from "@/lib/category/categoryApi";
+import { getProductByCategory } from "@/lib/product/productApi";
+
+type Category = {
+  id: string;
+  name: string;
+  children?: Category[];
+};
 
 type Variant = {
   variant_id: string; // Made required since we need real IDs
@@ -24,6 +32,8 @@ type Product = {
   name: string;
   img?: string;
   rawImg?: string; // Add rawImg property for image URL resolution
+  category?: string; // Add category
+  categoryId?: string; // Add category ID
   variants: Variant[];
 };
 
@@ -45,25 +55,155 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
   }
 }
 
+// Category Tree Components (similar to inventory page)
+function CategoryNode({
+  node,
+  onSelect,
+  selectedId,
+}: {
+  node: Category;
+  onSelect: (n: Category) => void;
+  selectedId?: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasChildren = Array.isArray(node?.children) && node.children.length > 0;
+  const selected = selectedId === node?.id;
+
+  return (
+    <li>
+      <div className="flex items-center gap-2 text-sm py-1.5">
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="inline-flex w-6 h-6 justify-center items-center select-none text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200"
+            aria-label={open ? "Collapse" : "Expand"}
+            aria-expanded={open}
+          >
+            <svg
+              className={`w-3 h-3 transition-transform duration-200 ${
+                open ? "rotate-90" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-6 h-6 flex items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            onSelect(node);
+          }}
+          className={`flex-1 text-left px-2 py-1.5 rounded-lg transition-all duration-200 text-sm ${
+            selected
+              ? "bg-blue-100 text-blue-700 font-medium shadow-sm border border-blue-200"
+              : "hover:bg-white hover:text-blue-600 text-gray-700"
+          }`}
+          title="Энэ ангиллаар шүүх"
+        >
+          <span className="flex items-center gap-2">
+            {selected && (
+              <svg
+                className="w-3 h-3 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            )}
+            {node?.name}
+          </span>
+        </button>
+      </div>
+
+      {hasChildren && open && (
+        <ul className="pl-4 ml-3 border-l-2 border-blue-100 space-y-0.5 mt-1">
+          {node.children!.map((child: Category) => (
+            <CategoryNode
+              key={child.id}
+              node={child}
+              onSelect={onSelect}
+              selectedId={selectedId}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function CategoryTree({
+  nodes,
+  onSelect,
+  selectedId,
+}: {
+  nodes: Category[];
+  onSelect: (n: Category) => void;
+  selectedId?: string | null;
+}) {
+  if (!nodes?.length) return null;
+  return (
+    <ul className="space-y-1">
+      {nodes.map((n: Category) => (
+        <CategoryNode
+          key={n.id}
+          node={n}
+          onSelect={onSelect}
+          selectedId={selectedId}
+        />
+      ))}
+    </ul>
+  );
+}
+
 export default function AddItemModal({
   open,
   onClose,
   onAdd,
+  storeId, // Add storeId prop from parent
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (it: Item) => void;
+  storeId?: string | null; // Add storeId prop type
 }) {
   const [query, setQuery] = useState("");
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCat, setSelectedCat] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
-  // Fetch products when modal opens
+  // Fetch products when modal opens or storeId/category changes
   useEffect(() => {
-    if (open && catalog.length === 0) {
+    if (open) {
       console.log("🛒 AddItemModal - Starting to load products...");
       setLoading(true);
+      setCatalog([]); // Clear previous catalog
+      // Don't clear categories here - they are loaded separately
+      // Only reset category selection when modal first opens, not on category changes
+
       (async () => {
         try {
           console.log("🛒 AddItemModal - Getting access token...");
@@ -78,20 +218,56 @@ export default function AddItemModal({
             token.substring(0, 20) + "..."
           );
 
-          // Get store ID first, then fetch products by store (includes stock)
-          console.log("🛒 AddItemModal - Getting store ID...");
-          const storeId = await getStoredID(token);
-          if (!storeId) {
+          // Use the storeId passed from parent, fallback to getStoredID
+          let effectiveStoreId = storeId;
+          if (!effectiveStoreId) {
+            console.log(
+              "🛒 AddItemModal - No storeId prop, getting from API..."
+            );
+            effectiveStoreId = await getStoredID(token);
+          }
+
+          if (!effectiveStoreId) {
             console.warn(
               "🛒 AddItemModal - No store ID available, modal will show empty catalog"
             );
             setCatalog([]);
             return;
           }
-          console.log("🛒 AddItemModal - Store ID obtained:", storeId);
+          console.log("🛒 AddItemModal - Using store ID:", effectiveStoreId);
 
-          console.log("🛒 AddItemModal - Fetching products by store...");
-          const response = await getProductByStore(token, storeId);
+          // Handle "all" stores vs specific store
+          let response: any;
+
+          // Always fetch inventory first (not category API)
+          if (effectiveStoreId === "all") {
+            console.log("🛒 AddItemModal - Fetching from global inventory...");
+            // Use global inventory for "all stores"
+            const { jwtDecode } = await import("jwt-decode");
+            const decoded: any = jwtDecode(token);
+            const tenantId = decoded?.app_metadata?.tenants?.[0];
+
+            const globalResponse = await fetch(
+              `${
+                process.env.NEXT_PUBLIC_SUPABASE_URL
+              }/functions/v1/inventory?tenant_id=${encodeURIComponent(
+                tenantId
+              )}&scope=global&limit=500`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+
+            if (globalResponse.ok) {
+              response = await globalResponse.json();
+            } else {
+              throw new Error("Global inventory fetch failed");
+            }
+          } else {
+            console.log("🛒 AddItemModal - Fetching products by store...");
+            response = await getProductByStore(token, effectiveStoreId);
+          }
+
           console.log("🛒 AddItemModal - Raw API response:", response);
           console.log(
             "🛒 AddItemModal - Response items count:",
@@ -123,11 +299,23 @@ export default function AddItemModal({
               }
 
               if (!productMap.has(product.id)) {
+                const categoryName =
+                  product.category?.name || product.category || "Бусад";
+                const categoryId = product.category?.id || null;
+                console.log("🛒 Product category info:", {
+                  productName: product.name,
+                  categoryRaw: product.category,
+                  categoryName: categoryName,
+                  categoryId: categoryId,
+                });
+
                 productMap.set(product.id, {
                   id: product.id,
                   name: product.name,
                   img: product.img || "/default.png",
                   rawImg: product.img, // Store original path for URL resolution
+                  category: categoryName, // Add category
+                  categoryId: categoryId, // Add category ID
                   variants: [],
                 });
               }
@@ -174,6 +362,7 @@ export default function AddItemModal({
               "🛒 AddItemModal - Total products:",
               productsWithUrls.length
             );
+
             productsWithUrls.forEach((p, i) => {
               console.log(
                 `🛒 Product ${i + 1}: ${p.name} (${
@@ -215,7 +404,45 @@ export default function AddItemModal({
         }
       })();
     }
-  }, [open, catalog.length]);
+  }, [open, storeId]); // React to modal open and store changes, not category (category filtering is client-side)
+
+  // Load categories when modal opens
+  useEffect(() => {
+    if (open) {
+      // Reset category selection when modal first opens
+      setSelectedCat(null);
+
+      (async () => {
+        try {
+          const token = await getAccessToken();
+          if (!token) return;
+
+          const raw = await getCategories(token);
+          const normalizeTree = (nodes: any[]): Category[] => {
+            if (!Array.isArray(nodes)) return [];
+            return nodes.map((node) => ({
+              id: String(node.id),
+              name: String(node.name || node.title || "Unknown"),
+              children: node.children
+                ? normalizeTree(node.children)
+                : undefined,
+            }));
+          };
+
+          const tree = Array.isArray(raw?.tree) ? raw.tree : [];
+          const normalizedCategories = normalizeTree(tree);
+          setCategories(normalizedCategories);
+        } catch (error) {
+          console.error("🛒 AddItemModal - Error loading categories:", error);
+          setCategories([]);
+        }
+      })();
+    } else {
+      // Clear categories when modal closes to save memory
+      setCategories([]);
+      setSelectedCat(null);
+    }
+  }, [open]);
 
   const active = useMemo(
     () => catalog.find((p) => p.id === activeId) ?? null,
@@ -253,6 +480,7 @@ export default function AddItemModal({
     setSelColor(null);
     setSelSize(null);
     setQty(1);
+    // Don't reset category when selecting a product
   };
   const selectProduct = (id: string) => {
     setActiveId(id);
@@ -261,9 +489,80 @@ export default function AddItemModal({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return catalog;
-    return catalog.filter((p) => p.name.toLowerCase().includes(q));
-  }, [catalog, query]);
+    let products = catalog;
+
+    console.log("🛒 AddItemModal - Filtering products:", {
+      totalProducts: products.length,
+      selectedCategory: selectedCat?.name,
+      searchQuery: q,
+      sampleProduct: products[0]
+        ? {
+            name: products[0].name,
+            category: products[0].category,
+          }
+        : null,
+    });
+
+    // Filter by category if one is selected
+    if (selectedCat?.id) {
+      const beforeFilter = products.length;
+      products = products.filter((p) => {
+        // Check if product category matches selected category
+        const productCategory = p.category;
+        const productCategoryId = p.categoryId;
+
+        // Try multiple matching strategies:
+        // 1. Category ID match (most reliable)
+        // 2. Exact name match
+        // 3. Case-insensitive match
+        // 4. Partial matches
+        const matches =
+          (productCategoryId &&
+            selectedCat.id &&
+            productCategoryId === selectedCat.id) ||
+          productCategory === selectedCat.name ||
+          (productCategory &&
+            selectedCat.name &&
+            productCategory.toLowerCase() === selectedCat.name.toLowerCase()) ||
+          (productCategory &&
+            selectedCat.name &&
+            productCategory
+              .toLowerCase()
+              .includes(selectedCat.name.toLowerCase())) ||
+          (productCategory &&
+            selectedCat.name &&
+            selectedCat.name
+              .toLowerCase()
+              .includes(productCategory.toLowerCase()));
+
+        if (!matches) {
+          console.log("🛒 Category mismatch:", {
+            productName: p.name,
+            productCategory: productCategory,
+            productCategoryId: productCategoryId,
+            selectedCategory: selectedCat.name,
+            selectedCategoryId: selectedCat.id,
+            matches,
+          });
+        }
+
+        return matches;
+      });
+
+      console.log("🛒 Category filtering result:", {
+        before: beforeFilter,
+        after: products.length,
+        selectedCategory: selectedCat.name,
+      });
+    }
+
+    // Filter by search query
+    if (q) {
+      products = products.filter((p) => p.name.toLowerCase().includes(q));
+    }
+
+    return products;
+  }, [catalog, query, selectedCat]);
 
   const selectedVariant: Variant | null = useMemo(() => {
     if (!active || !selColor || !selSize) return null;
@@ -400,22 +699,94 @@ export default function AddItemModal({
                     />
                   </svg>
                 </div>
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {["Бүгд", "Гутал", "Амал драк хүргэв", "Цамц", "Цүнх"].map(
-                    (t, i) => (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4 text-blue-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 11H5m14-7l-7 7 7 7M5 4l7 7-7 7"
+                          />
+                        </svg>
+                        Ангилал
+                      </span>
+                      {selectedCat && (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                          {selectedCat.name}
+                        </span>
+                      )}
+                    </div>
+                    {selectedCat && (
                       <button
-                        key={t}
-                        className={
-                          "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 " +
-                          (i === 0
-                            ? "bg-blue-500 text-white shadow-md hover:bg-blue-600"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200")
-                        }
+                        onClick={() => setSelectedCat(null)}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-full transition-colors duration-200"
                       >
-                        {t}
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                        Бүгдийг харах
                       </button>
-                    )
-                  )}
+                    )}
+                  </div>
+                  <div className="max-h-40 overflow-y-auto bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-gray-200 shadow-inner">
+                    {categories.length === 0 ? (
+                      <div className="flex items-center justify-center p-6">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                          <div className="text-sm text-gray-500">
+                            Ангилал ачаалж байна...
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3">
+                        {!selectedCat && (
+                          <button
+                            onClick={() => setSelectedCat(null)}
+                            className="w-full text-left px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:text-blue-600 rounded-lg mb-2 transition-all duration-200 flex items-center gap-2 bg-white/50"
+                          >
+                            <svg
+                              className="w-4 h-4 text-blue-500"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 11H5m14-7l-7 7 7 7M5 4l7 7-7 7"
+                              />
+                            </svg>
+                            Бүгд
+                          </button>
+                        )}
+                        <CategoryTree
+                          nodes={categories}
+                          onSelect={(cat) => setSelectedCat(cat)}
+                          selectedId={selectedCat?.id}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

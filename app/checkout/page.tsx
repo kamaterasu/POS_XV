@@ -14,13 +14,14 @@ import {
 } from "@/lib/checkout/checkoutApi";
 
 import { getAccessToken } from "@/lib/helper/getAccessToken";
-import { getStoredID } from "@/lib/store/storeApi";
+import { getStoredID, getStore } from "@/lib/store/storeApi";
 import { getProductByStore, getProductById } from "@/lib/product/productApi";
 import { getImageShowUrl } from "@/lib/product/productImages";
 
 import CartFooter from "@/components/checkoutComponents/CartFooter";
 import AddItemModal from "@/components/checkoutComponents/AddItemModal";
 import SaveDraftDialog from "@/components/checkoutComponents/SaveDraftDialog";
+import DraftManagerDialog from "@/components/checkoutComponents/DraftManagerDialog";
 import PayDialogMulti from "@/components/checkoutComponents/PayDialogMulti";
 import CheckoutHistoryDialog from "@/components/checkoutComponents/CheckoutHistoryDialog";
 
@@ -31,6 +32,8 @@ type ProductRow = {
   imgPath?: string;
   price: number;
   qty: number;
+  variantId?: string;
+  productId?: string;
 };
 
 type CartItem = Item & { size?: string; color?: string };
@@ -79,6 +82,7 @@ export default function CheckoutPage() {
   const [openSave, setOpenSave] = useState(false);
   const [openPay, setOpenPay] = useState(false);
   const [openHistory, setOpenHistory] = useState(false);
+  const [openDraftManager, setOpenDraftManager] = useState(false);
   const [showPrintConfirm, setShowPrintConfirm] = useState(false);
 
   // processing
@@ -86,9 +90,14 @@ export default function CheckoutPage() {
 
   // store + products
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingStores, setLoadingStores] = useState(true);
   const [productList, setProductList] = useState<ProductRow[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [search, setSearch] = useState("");
+  const [dataSource, setDataSource] = useState<"global" | "store-specific">(
+    "store-specific"
+  );
 
   // Variant picker
   const [picker, setPicker] = useState<{
@@ -141,52 +150,32 @@ export default function CheckoutPage() {
   };
 
   const openVariantPicker = async (p: ProductRow) => {
-    setPicker({ productId: p.id, name: p.name, img: p.imgPath });
-    setPickerLoading(true);
-    try {
-      const token = await getAccessToken();
-      if (!token) throw new Error("no token");
-      const det = await getProductById(token, p.id, {
-        withStock: true,
-        storeId: storeId ?? undefined,
-      });
-      const vars = normalizeVariants(det);
-      setPickerVars(vars);
+    // Since each item is now a specific variant, we can add it directly to cart
+    const variantId = p.variantId || p.id.split("-")[1] || p.id;
+    const productId = p.productId || p.id.split("-")[0] || p.id;
 
-      const first = vars.find((v) => v.stock > 0) ?? vars[0];
-      if (first) {
-        setSelColor(colorKeyOf(first));
-        setSelSize(first.size ?? null);
+    // Add directly to cart since this is already a specific variant
+    setItems((prev) => {
+      const i = prev.findIndex((it) => it.variant_id === variantId);
+      if (i > -1) {
+        const copy = [...prev];
+        copy[i] = { ...copy[i], qty: copy[i].qty + 1 };
+        return copy;
       }
-
-      if (vars.length === 1 && vars[0].stock > 0) {
-        const v = vars[0];
-        setItems((prev) => {
-          const i = prev.findIndex((it) => it.variant_id === v.id);
-          if (i > -1) {
-            const copy = [...prev];
-            copy[i] = { ...copy[i], qty: copy[i].qty + 1 };
-            return copy;
-          }
-          return [
-            {
-              id: p.id,
-              variant_id: v.id,
-              name: p.name,
-              price: v.price,
-              qty: 1,
-              imgPath: p.imgPath || "/default.png",
-              size: v.size,
-              color: v.color,
-            },
-            ...prev,
-          ];
-        });
-        setPicker(null);
-      }
-    } finally {
-      setPickerLoading(false);
-    }
+      return [
+        {
+          id: productId,
+          variant_id: variantId,
+          name: p.name,
+          price: p.price,
+          qty: 1,
+          imgPath: p.imgPath || "/default.png",
+          size: "", // Will be filled from actual variant data if needed
+          color: "", // Will be filled from actual variant data if needed
+        },
+        ...prev,
+      ];
+    });
   };
 
   // totals
@@ -195,6 +184,36 @@ export default function CheckoutPage() {
     [items]
   );
   const totals = useMemo(() => calcTotals(items, qa), [items, qa]);
+
+  // 0) Load available stores
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token) throw new Error("No token");
+        const storeList = await getStore(token);
+        if (alive) {
+          // Add "All stores" option at the beginning
+          setStores([
+            { id: "all", name: "Бүх дэлгүүр" },
+            ...storeList.map((s: any) => ({
+              id: s.id,
+              name: s.name || s.id.slice(0, 8),
+            })),
+          ]);
+        }
+      } catch (e) {
+        console.error("Load stores error:", e);
+        if (alive) setStores([{ id: "all", name: "Бүх дэлгүүр" }]);
+      } finally {
+        if (alive) setLoadingStores(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // 1) storeId resolve
   useEffect(() => {
@@ -205,14 +224,41 @@ export default function CheckoutPage() {
           typeof window !== "undefined"
             ? localStorage.getItem("storeId")
             : null;
-        if (fromLS && fromLS !== "all") {
+        if (fromLS) {
           if (alive) setStoreId(fromLS);
           return;
         }
         const token = await getAccessToken();
         if (!token) throw new Error("No token");
         const sid = await getStoredID(token);
-        if (alive) setStoreId(sid ?? null);
+        if (alive) setStoreId(sid ?? "all"); // Default to "all" if no specific store
+      } catch (e) {
+        console.error("Resolve storeId error:", e);
+        if (alive) setStoreId(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 1) storeId resolve
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const fromLS =
+          typeof window !== "undefined"
+            ? localStorage.getItem("storeId")
+            : null;
+        if (fromLS) {
+          if (alive) setStoreId(fromLS);
+          return;
+        }
+        const token = await getAccessToken();
+        if (!token) throw new Error("No token");
+        const sid = await getStoredID(token);
+        if (alive) setStoreId(sid ?? "all"); // Use the specific store as default, fallback to "all"
       } catch (e) {
         console.error("Resolve storeId error:", e);
         if (alive) setStoreId(null);
@@ -234,64 +280,96 @@ export default function CheckoutPage() {
         const token = await getAccessToken();
         if (!token) throw new Error("No token");
 
-        const invRes: any = await getProductByStore(token, storeId);
+        // Try to get products based on selected store
+        let invRes: any;
+        let dataSource = "store-specific";
+
+        if (storeId === "all") {
+          // Use global scope for "all stores"
+          try {
+            const { jwtDecode } = await import("jwt-decode");
+            const decoded: any = jwtDecode(token);
+            const tenantId = decoded?.app_metadata?.tenants?.[0];
+
+            const globalResponse = await fetch(
+              `${
+                process.env.NEXT_PUBLIC_SUPABASE_URL
+              }/functions/v1/inventory?tenant_id=${encodeURIComponent(
+                tenantId
+              )}&scope=global&limit=500`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+
+            if (globalResponse.ok) {
+              invRes = await globalResponse.json();
+              dataSource = "global";
+              setDataSource("global");
+              console.log("✅ Using global inventory (all stores)");
+            } else {
+              throw new Error("Global scope not available");
+            }
+          } catch (globalError) {
+            console.log("⚠️ Global scope not available, fallback failed");
+            invRes = { items: [] }; // Empty fallback
+            dataSource = "store-specific";
+            setDataSource("store-specific");
+          }
+        } else {
+          // Use store-specific inventory for selected store
+          try {
+            invRes = await getProductByStore(token, storeId);
+            dataSource = "store-specific";
+            setDataSource("store-specific");
+            console.log(
+              `✅ Using store-specific inventory for store: ${storeId}`
+            );
+          } catch (storeError) {
+            console.log("⚠️ Store-specific inventory failed:", storeError);
+            invRes = { items: [] };
+            dataSource = "store-specific";
+            setDataSource("store-specific");
+          }
+        }
+
+        // Use the same logic as inventory page
         const arr: any[] = Array.isArray(invRes)
           ? invRes
           : invRes?.items ?? invRes?.data ?? invRes?.products ?? [];
 
-        const byId = new Map<string, { qty: number; product?: any }>();
-        for (const row of arr) {
-          const pid = row?.product?.id ?? row?.product_id ?? row?.id;
-          if (!pid) continue;
-          const qty = Number(row?.qty ?? row?.stock ?? 0);
-          const prev = byId.get(String(pid));
-          byId.set(String(pid), {
-            qty: (prev?.qty ?? 0) + qty,
-            product: row?.product ?? prev?.product,
-          });
-        }
-
-        const ids = Array.from(byId.keys());
-        const details = await Promise.all(
-          ids.map(async (id) => {
-            try {
-              const det = await getProductById(token, id, {
-                withStock: true,
-                storeId,
-              });
-              return { id, det };
-            } catch {
-              return { id, det: null as any };
-            }
+        // Show all variants as separate products instead of grouping
+        const list: ProductRow[] = arr
+          .filter((item) => {
+            const productId = item?.product?.id;
+            const variantId = item?.variant_id;
+            return productId && variantId;
           })
-        );
+          .map((item) => {
+            const product = item.product;
+            const variant = item.variant;
+            const qty = Number(item?.qty ?? item?.stock ?? 0);
+            const price = Number(variant?.price ?? 0);
 
-        const list: ProductRow[] = details.map(({ id, det }) => {
-          const inv = byId.get(id)!;
-          const variants =
-            det?.variants ??
-            det?.product?.variants ??
-            det?.data?.variants ??
-            [];
-          const price = variants.length
-            ? Math.min(...variants.map((v: any) => Number(v?.price ?? 0)))
-            : 0;
-          const name =
-            det?.product?.name ?? det?.name ?? inv?.product?.name ?? "(нэргүй)";
-          const img =
-            det?.product?.img ??
-            det?.img ??
-            inv?.product?.img ??
-            inv?.product?.image ??
-            undefined;
-          return {
-            id,
-            name: String(name),
-            imgPath: img,
-            price,
-            qty: inv?.qty ?? 0,
-          };
-        });
+            // Create unique display name for variants
+            const baseName = String(product?.name ?? "(нэргүй)");
+            const variantName = variant?.name;
+            const displayName =
+              variantName && variantName !== baseName
+                ? `${baseName} - ${variantName}`
+                : baseName;
+
+            return {
+              id: `${product.id}-${item.variant_id}`, // Unique ID for each variant
+              name: displayName,
+              imgPath: product?.img,
+              price: price,
+              qty: qty,
+              // Store the actual variant ID for cart operations
+              variantId: item.variant_id,
+              productId: product.id,
+            };
+          });
 
         const withUrls: ProductRow[] = await Promise.all(
           list.map(async (row) => ({
@@ -423,14 +501,35 @@ export default function CheckoutPage() {
           <span className="font-medium text-gray-900">Борлуулалт</span>
         </button>
 
-        <div className="px-3 py-1.5 rounded-lg bg-white/80 border border-white/40 shadow-sm text-sm text-gray-700">
-          {storeId ? (
-            <>
-              Дэлгүүр:{" "}
-              <span className="font-semibold">{storeId.slice(0, 8)}…</span>
-            </>
-          ) : (
-            "Store ачааллаж байна…"
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Дэлгүүр:</label>
+          <select
+            value={storeId || ""}
+            onChange={(e) => {
+              const newStoreId = e.target.value;
+              setStoreId(newStoreId);
+              // Save to localStorage
+              if (typeof window !== "undefined") {
+                localStorage.setItem("storeId", newStoreId);
+              }
+            }}
+            disabled={loadingStores}
+            className="px-3 py-1.5 rounded-lg bg-white/80 border border-white/40 shadow-sm text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+          >
+            {loadingStores ? (
+              <option>Ачааллаж байна...</option>
+            ) : (
+              stores.map((store) => (
+                <option key={store.id} value={store.id}>
+                  {store.name}
+                </option>
+              ))
+            )}
+          </select>
+          {dataSource === "global" && (
+            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+              Бүх дэлгүүр
+            </span>
           )}
         </div>
       </header>
@@ -473,7 +572,7 @@ export default function CheckoutPage() {
                   onClick={() => openVariantPicker(p)}
                   className="group text-left p-3 rounded-2xl bg-white/70 hover:bg-white/90 border border-white/40 shadow-sm hover:shadow-md transition-all duration-200"
                   disabled={(p.qty ?? 0) <= 0}
-                  title={(p.qty ?? 0) <= 0 ? "Нөөц дууссан" : "Вариант сонгох"}
+                  title={(p.qty ?? 0) <= 0 ? "Нөөц дууссан" : "Сагслах"}
                 >
                   <div className="flex items-center gap-3">
                     <Image
@@ -642,12 +741,14 @@ export default function CheckoutPage() {
           onPay={() => setOpenPay(true)}
           onHistory={() => setOpenHistory(true)}
           onPrint={handlePrintClick}
+          onDraftManager={() => setOpenDraftManager(true)}
         />
       </footer>
 
       <AddItemModal
         open={openAdd}
         onClose={() => setOpenAdd(false)}
+        storeId={stores.length > 1 ? storeId : null}
         onAdd={(it) =>
           setItems((prev) => {
             // Better matching: use variant_id if available, otherwise fallback to name+price
@@ -939,6 +1040,12 @@ export default function CheckoutPage() {
           </div>
         </div>
       )}
+
+      <DraftManagerDialog
+        open={openDraftManager}
+        onClose={() => setOpenDraftManager(false)}
+        onLoadDraft={(draftItems) => setItems(draftItems)}
+      />
     </div>
   );
 }
