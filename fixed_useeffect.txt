@@ -1,0 +1,149 @@
+// Fixed useEffect for product loading
+useEffect(() => {
+  if (!open) return; // Don't load if modal is closed
+  
+  // Wait for store to be loaded before making API calls
+  if (loadingStores || !storeId) {
+    console.log("🛒 AddItemModal - Waiting for store to be selected...", { loadingStores, storeId });
+    return;
+  }
+
+  console.log("🛒 AddItemModal - Starting to load products...");
+  setLoading(true);
+  setCatalog([]); // Clear previous catalog
+
+  (async () => {
+    try {
+      console.log("🛒 AddItemModal - Getting access token...");
+      const token = await getAccessToken();
+      if (!token) {
+        console.error("🛒 AddItemModal - No access token available");
+        setCatalog([]);
+        return;
+      }
+
+      console.log("🛒 AddItemModal - Using store ID:", storeId);
+
+      // Set store info for UI display  
+      if (storeId && storeId !== "all") {
+        setStoreInfo({
+          id: storeId,
+          name: `Store ${storeId.substring(0, 8)}`,
+        });
+      } else {
+        setStoreInfo(null);
+      }
+
+      // Build API parameters
+      const apiParams: any = {
+        limit: 500,
+      };
+
+      // Add store filtering (skip if "all")
+      if (storeId && storeId !== "all") {
+        apiParams.store_id = storeId;
+        console.log("🛒 AddItemModal - Store filtering ACTIVE:", storeId);
+      } else {
+        console.log("🛒 AddItemModal - Store filtering DISABLED (showing all stores)");
+      }
+
+      // Add category filtering if selected
+      if (selectedCat?.id) {
+        apiParams.category_id = selectedCat.id;
+        apiParams.subtree = true; // Include subcategories
+      }
+
+      // Add search filtering if there's a query
+      if (debouncedQuery.trim()) {
+        apiParams.search = debouncedQuery.trim();
+      }
+
+      console.log("🛒 AddItemModal - API parameters:", apiParams);
+
+      // Fetch products using the new product API (includes variants and inventory in bulk)
+      const response = await getProductsForModal(token, apiParams);
+
+      console.log("🛒 AddItemModal - Raw API response:", response);
+
+      // Process product API response - the edge function returns products with variants already included
+      if (response?.items && response.items.length > 0) {
+        console.log("🛒 AddItemModal - Processing products from bulk product API...");
+
+        const products: Product[] = response.items
+          .map((productItem: any) => {
+            console.log("🛒 Processing product:", {
+              id: productItem.id,
+              name: productItem.name,
+              category_id: productItem.category_id,
+              variants_count: productItem.variants?.length || 0,
+            });
+
+            // Skip products without variants
+            if (!productItem.variants || productItem.variants.length === 0) {
+              console.warn("🛒 Skipping product without variants:", productItem.name);
+              return null;
+            }
+
+            const variants: Variant[] = productItem.variants.map(
+              (variant: any) => ({
+                variant_id: variant.id,
+                color:
+                  variant.attrs?.color ||
+                  variant.attrs?.Color ||
+                  variant.attrs?.colorName ||
+                  "Default",
+                size:
+                  variant.attrs?.size ||
+                  variant.attrs?.Size ||
+                  variant.attrs?.Хэмжээ ||
+                  "Default",
+                stock: variant.qty || 0,
+                price: variant.price || 0,
+                name: variant.name,
+                sku: variant.sku,
+                attrs: variant.attrs,
+              })
+            );
+
+            return {
+              id: productItem.id,
+              name: productItem.name,
+              img: productItem.img || "/default.png",
+              rawImg: productItem.img,
+              category: "Unknown",
+              categoryId: productItem.category_id,
+              variants: variants,
+            };
+          })
+          .filter(Boolean) as Product[];
+
+        console.log("🛒 AddItemModal - Processed products count:", products.length);
+
+        // Resolve image URLs for all products
+        const productsWithUrls: Product[] = await Promise.all(
+          products.map(async (product) => ({
+            ...product,
+            img: (await resolveImageUrl(product.rawImg)) || "/default.png",
+          }))
+        );
+
+        console.log("🛒 AddItemModal - Total products:", productsWithUrls.length);
+
+        setCatalog(productsWithUrls);
+        if (productsWithUrls.length > 0) {
+          setActiveId(productsWithUrls[0].id);
+          console.log("🛒 AddItemModal - Set active product:", productsWithUrls[0].name);
+        }
+      } else {
+        console.warn("🛒 AddItemModal - No items in response or empty array");
+        setCatalog([]);
+      }
+    } catch (error) {
+      console.error("🛒 AddItemModal - Error fetching products:", error);
+      setCatalog([]);
+    } finally {
+      console.log("🛒 AddItemModal - Finished loading, setting loading to false");
+      setLoading(false);
+    }
+  })();
+}, [open, storeId, selectedCat?.id, debouncedQuery, loadingStores]);

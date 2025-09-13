@@ -76,15 +76,15 @@ export default function PayDialogMulti({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
       <div
-        className="absolute inset-0 bg-gradient-to-br from-slate-900/60 via-blue-900/50 to-indigo-900/60 backdrop-blur-md"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white/98 backdrop-blur-xl text-black w-full max-w-xl rounded-3xl shadow-2xl border border-white/30 overflow-hidden animate-in slide-in-from-bottom duration-400">
-        {/* Enhanced Header */}
-        <div className="relative px-8 py-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b border-gray-200/50">
+      <div className="relative bg-white text-black w-full max-w-xl rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-in slide-in-from-bottom duration-400">
+        {/* Clean Header */}
+        <div className="relative px-6 py-4 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
                 {disabled ? (
                   <div className="w-6 h-6 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
                 ) : (
@@ -117,7 +117,7 @@ export default function PayDialogMulti({
             <button
               onClick={onClose}
               disabled={disabled}
-              className={`group w-10 h-10 rounded-xl bg-white/80 hover:bg-white border border-gray-200/50 hover:border-gray-300 flex items-center justify-center transition-all duration-200 hover:shadow-md ${
+              className={`group w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 ${
                 disabled ? "cursor-not-allowed opacity-50" : ""
               }`}
             >
@@ -137,14 +137,12 @@ export default function PayDialogMulti({
             </button>
           </div>
 
-          {/* Subtle gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none"></div>
         </div>
 
-        {/* Enhanced Payment Rows */}
-        <div className="px-8 py-6 bg-gradient-to-b from-white/50 to-gray-50/50">
+        {/* Clean Payment Rows */}
+        <div className="px-6 py-6 bg-gray-50">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
               <svg
                 className="w-4 h-4 text-white"
                 fill="none"
@@ -171,13 +169,13 @@ export default function PayDialogMulti({
             {rows.map((r, i) => (
               <div
                 key={i}
-                className="bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200"
+                className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200"
               >
                 <div className="grid grid-cols-[140px_1fr_40px] gap-4 items-center">
                   {/* Payment Method Selector */}
                   <div className="relative">
                     <select
-                      className="w-full h-12 border-2 border-gray-200 rounded-xl px-4 bg-white/90 text-gray-800 font-medium focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200 appearance-none cursor-pointer"
+                      className="w-full h-12 border border-gray-300 rounded-lg px-4 bg-white text-gray-800 font-medium focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 appearance-none cursor-pointer"
                       value={r.method}
                       disabled={disabled}
                       onChange={(e) =>
@@ -215,7 +213,7 @@ export default function PayDialogMulti({
                       ref={i === 0 ? firstAmountRef : null}
                       type="number"
                       inputMode="numeric"
-                      className="w-full h-12 border-2 border-gray-200 rounded-xl px-4 pr-8 bg-white/90 text-gray-800 font-semibold focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                      className="w-full h-12 border border-gray-300 rounded-lg px-4 pr-8 bg-white text-gray-800 font-semibold focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
                       value={r.amount ?? 0}
                       disabled={disabled}
                       placeholder="0"
@@ -233,7 +231,7 @@ export default function PayDialogMulti({
 
                   {/* Remove Button */}
                   <button
-                    className="w-10 h-10 rounded-xl bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 hover:from-red-100 hover:to-pink-100 hover:border-red-300 text-red-600 hover:text-red-700 flex items-center justify-center transition-all duration-200 hover:shadow-md disabled:opacity-50 group"
+                    className="w-10 h-10 rounded-lg bg-red-50 border border-red-200 hover:bg-red-100 hover:border-red-300 text-red-600 hover:text-red-700 flex items-center justify-center transition-all duration-200 disabled:opacity-50 group"
                     onClick={() => removeRow(i)}
                     disabled={disabled}
                     title="Устгах"
@@ -260,12 +258,12 @@ export default function PayDialogMulti({
             <div className="flex items-center gap-3 pt-4">
               <div className="flex items-center gap-2">
                 <button
-                  className="group flex items-center gap-2 h-11 px-4 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 hover:border-blue-300 rounded-xl transition-all duration-200 hover:shadow-md text-blue-700 font-medium"
+                  className="group flex items-center gap-2 h-10 px-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 rounded-lg transition-all duration-200 text-blue-700 font-medium"
                   onClick={() => addRow("card")}
                   disabled={disabled}
                 >
                   <svg
-                    className="w-4 h-4 group-hover:scale-110 transition-transform"
+                    className="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -281,12 +279,12 @@ export default function PayDialogMulti({
                 </button>
 
                 <button
-                  className="group flex items-center gap-2 h-11 px-4 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border border-purple-200 hover:border-purple-300 rounded-xl transition-all duration-200 hover:shadow-md text-purple-700 font-medium"
+                  className="group flex items-center gap-2 h-10 px-4 bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 rounded-lg transition-all duration-200 text-purple-700 font-medium"
                   onClick={() => addRow("qpay")}
                   disabled={disabled}
                 >
                   <svg
-                    className="w-4 h-4 group-hover:scale-110 transition-transform"
+                    className="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -302,12 +300,12 @@ export default function PayDialogMulti({
                 </button>
 
                 <button
-                  className="group flex items-center gap-2 h-11 px-4 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 border border-green-200 hover:border-green-300 rounded-xl transition-all duration-200 hover:shadow-md text-green-700 font-medium"
+                  className="group flex items-center gap-2 h-10 px-4 bg-green-50 hover:bg-green-100 border border-green-200 hover:border-green-300 rounded-lg transition-all duration-200 text-green-700 font-medium"
                   onClick={() => addRow("cash")}
                   disabled={disabled}
                 >
                   <svg
-                    className="w-4 h-4 group-hover:scale-110 transition-transform"
+                    className="w-4 h-4"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -324,7 +322,7 @@ export default function PayDialogMulti({
               </div>
 
               <button
-                className="group ml-auto flex items-center gap-2 h-11 px-6 bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 border-2 border-orange-200 hover:border-orange-300 rounded-xl transition-all duration-200 hover:shadow-lg text-orange-700 font-bold disabled:opacity-50"
+                className="group ml-auto flex items-center gap-2 h-10 px-4 bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 rounded-lg transition-all duration-200 text-orange-700 font-medium disabled:opacity-50"
                 onClick={() => {
                   // one-click fill remaining into last row
                   setRows((prev) => {
@@ -341,7 +339,7 @@ export default function PayDialogMulti({
                 disabled={remaining === 0 || disabled}
               >
                 <svg
-                  className="w-4 h-4 group-hover:scale-110 transition-transform"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -359,11 +357,11 @@ export default function PayDialogMulti({
           </div>
         </div>
 
-        {/* Enhanced Summary Section */}
-        <div className="px-8 py-6 bg-gradient-to-r from-gray-50 via-blue-50/30 to-indigo-50/30 border-t border-gray-200/50">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/60 shadow-sm">
+        {/* Clean Summary Section */}
+        <div className="px-6 py-6 bg-white border-t border-gray-200">
+          <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <svg
                   className="w-4 h-4 text-white"
                   fill="none"
@@ -423,11 +421,11 @@ export default function PayDialogMulti({
           </div>
         </div>
 
-        {/* Enhanced Action Buttons */}
-        <div className="px-8 py-6 bg-gradient-to-r from-white/60 to-gray-50/60 border-t border-gray-200/50">
-          <div className="flex gap-4">
+        {/* Clean Action Buttons */}
+        <div className="px-6 py-4 bg-white border-t border-gray-200">
+          <div className="flex gap-3">
             <button
-              className="flex-1 h-14 px-6 rounded-2xl border-2 border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center justify-center gap-2 shadow-sm hover:shadow-md disabled:opacity-50"
+              className="flex-1 h-12 px-6 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
               onClick={onClose}
               disabled={disabled}
             >
@@ -448,10 +446,10 @@ export default function PayDialogMulti({
             </button>
 
             <button
-              className={`flex-1 h-14 px-6 rounded-2xl font-bold transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl ${
+              className={`flex-1 h-12 px-6 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center gap-3 ${
                 canConfirm
-                  ? "bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 text-white hover:from-blue-600 hover:via-indigo-700 hover:to-purple-700 active:scale-95 border-2 border-blue-400"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-2 border-gray-200"
+                  ? "bg-blue-600 text-white hover:bg-blue-700 border border-blue-600"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-200"
               }`}
               disabled={!canConfirm}
               onClick={handleConfirm}
@@ -484,7 +482,7 @@ export default function PayDialogMulti({
 
           {/* Status indicator */}
           {remaining > 0 && (
-            <div className="mt-4 p-3 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl">
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-center gap-2">
                 <svg
                   className="w-4 h-4 text-red-600"
@@ -507,7 +505,7 @@ export default function PayDialogMulti({
           )}
 
           {change > 0 && (
-            <div className="mt-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center gap-2">
                 <svg
                   className="w-4 h-4 text-green-600"

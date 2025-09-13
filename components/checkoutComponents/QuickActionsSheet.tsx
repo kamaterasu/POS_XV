@@ -85,24 +85,24 @@ export default function QuickActionsSheet({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg flex items-end justify-center animate-in fade-in duration-500"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-300"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-4xl bg-white/98 backdrop-blur-2xl rounded-t-[2rem] p-0 shadow-2xl border-t border-white/30 animate-in slide-in-from-bottom duration-600 ease-out"
+        className="w-full max-w-4xl bg-white rounded-t-2xl p-0 shadow-xl border-t border-gray-200 animate-in slide-in-from-bottom duration-400 ease-out"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Enhanced Tabs */}
+        {/* Clean Tabs */}
         <div className="px-6 pt-6">
-          <div className="h-2 w-16 bg-gradient-to-r from-gray-300 to-gray-400 rounded-full mx-auto mb-6" />
-          <div className="flex gap-3 text-sm">
+          <div className="h-1 w-12 bg-gray-300 rounded-full mx-auto mb-6" />
+          <div className="flex gap-2 text-sm">
             <button
-              className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-300 ${
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                 tab === "settings"
-                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30"
-                  : "border-2 border-gray-200 hover:border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
               }`}
               onClick={() => setTab("settings")}
             >
@@ -110,10 +110,10 @@ export default function QuickActionsSheet({
             </button>
             {Boolean(favorites?.length) && (
               <button
-                className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-300 ${
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   tab === "favorites"
-                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30"
-                    : "border-2 border-gray-200 hover:border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    ? "bg-blue-600 text-white"
+                    : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
                 onClick={() => setTab("favorites")}
               >

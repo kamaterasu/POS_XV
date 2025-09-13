@@ -115,16 +115,16 @@ export default function CheckoutHistoryDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg animate-in fade-in duration-500">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-white/98 backdrop-blur-2xl text-black w-full max-w-4xl max-h-[90vh] rounded-[2rem] shadow-2xl border border-white/30 overflow-hidden animate-in slide-in-from-bottom duration-600 ease-out">
-        {/* Enhanced Modern Header */}
-        <div className="relative p-8 border-b border-gray-200/30 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50">
+      <div className="relative bg-white text-black w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-in slide-in-from-bottom duration-400 ease-out">
+        {/* Clean Header */}
+        <div className="relative p-6 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
                 <svg
-                  className="w-7 h-7 text-white"
+                  className="w-6 h-6 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -138,20 +138,20 @@ export default function CheckoutHistoryDialog({
                 </svg>
               </div>
               <div className="flex flex-col">
-                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                <h2 className="text-xl font-bold text-gray-900 tracking-tight">
                   Захиалгын түүх
                 </h2>
-                <p className="text-sm text-gray-600 mt-1 font-medium">
+                <p className="text-sm text-gray-600 mt-1">
                   Хийсэн захиалгуудын түүх болон дэлгэрэнгүй мэдээлэл
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="group w-12 h-12 rounded-2xl bg-white/90 hover:bg-white border border-gray-200/50 hover:border-gray-300 flex items-center justify-center transition-all duration-300 hover:shadow-xl"
+              className="w-10 h-10 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center transition-all duration-200"
             >
               <svg
-                className="w-6 h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
+                className="w-5 h-5 text-gray-600 hover:text-gray-800 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -159,14 +159,14 @@ export default function CheckoutHistoryDialog({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
             </button>
           </div>
 
-          {/* Enhanced Search Bar */}
+          {/* Clean Search Bar */}
           {onSearchChange && (
             <div className="relative group">
               <input
@@ -174,10 +174,10 @@ export default function CheckoutHistoryDialog({
                 placeholder="🔍 Захиалгын дугаар эсвэл огноогоор хайх..."
                 value={orderSearchTerm}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full h-14 border-2 border-gray-200/60 rounded-2xl px-6 pl-14 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-white/90 backdrop-blur-sm font-medium placeholder:text-gray-500 shadow-sm"
+                className="w-full h-12 border border-gray-300 rounded-lg px-4 pl-12 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white placeholder:text-gray-500"
               />
               <svg
-                className="absolute left-5 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400 group-focus-within:text-blue-500 transition-colors"
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -185,7 +185,7 @@ export default function CheckoutHistoryDialog({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
@@ -213,13 +213,23 @@ export default function CheckoutHistoryDialog({
             </div>
           )}
 
-          {/* Elegant gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-t-[2rem] pointer-events-none"></div>
         </div>
 
-        {/* Enhanced Content */}
-        <div className="overflow-y-auto max-h-[60vh] bg-gradient-to-br from-gray-50/50 to-white">
+        {/* Clean Content */}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
           {displayLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+                <span className="text-lg font-medium text-gray-700">
+                  Ачаалж байна...
+                </span>
+                <p className="text-sm text-gray-500 mt-1">
+                  Захиалгын түүх ачаалж байна
+                </p>
+              </div>
+            </div>
+          ) : displayLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>

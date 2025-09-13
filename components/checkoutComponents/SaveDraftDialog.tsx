@@ -133,22 +133,22 @@ export default function SaveDraftDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg flex items-center justify-center p-4 animate-in fade-in duration-500"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-xl bg-white/98 backdrop-blur-2xl rounded-[2rem] shadow-2xl border border-white/30 overflow-hidden animate-in slide-in-from-bottom duration-600 ease-out"
+        className="w-full max-w-xl bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden animate-in slide-in-from-bottom duration-400 ease-out"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Enhanced Modern Header */}
-        <div className="relative p-8 pb-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b border-gray-200/30">
+        {/* Clean Header */}
+        <div className="relative p-6 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
                 <svg
-                  className="w-7 h-7 text-white"
+                  className="w-6 h-6 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

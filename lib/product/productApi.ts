@@ -158,6 +158,8 @@ export async function getProductByCategory(token: string, category_id: string) {
 }
 
 // New function for AddItemModal - gets products with variants and inventory
+// This function works around the API limitation by fetching products list first,
+// then fetching variants for each product individually
 export async function getProductsForModal(
   token: string,
   params?: {
@@ -170,13 +172,15 @@ export async function getProductsForModal(
   }
 ) {
   const tenant_id = getTenantIdFromToken(token);
+
+  // Step 1: Get the list of products (without variants)
   const url = new URL(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
   );
 
   // Required parameters
   url.searchParams.set("tenant_id", tenant_id);
-  url.searchParams.set("withVariants", "true"); // Always get variants for modal
+  // Don't set withVariants=true here - it doesn't work for lists
 
   // Store ID for inventory quantities (backend will include qty in variant objects)
   if (params?.store_id) {
@@ -195,7 +199,7 @@ export async function getProductsForModal(
   }
 
   // Pagination
-  url.searchParams.set("limit", String(params?.limit ?? 200));
+  url.searchParams.set("limit", String(params?.limit ?? 50)); // Reduced limit for performance
   url.searchParams.set("offset", String(params?.offset ?? 0));
 
   const res = await fetch(url.toString(), {
@@ -203,7 +207,83 @@ export async function getProductsForModal(
     headers: { Authorization: `Bearer ${token}` },
   });
   assertOk(res);
-  return res.json();
+  const productsResponse = await res.json();
+
+  // Step 2: For each product, fetch its variants with inventory
+  if (productsResponse?.items && Array.isArray(productsResponse.items)) {
+    const productsWithVariants = await Promise.all(
+      productsResponse.items.map(async (product: any) => {
+        try {
+          // Fetch individual product with variants
+          const productUrl = new URL(
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
+          );
+          productUrl.searchParams.set("tenant_id", tenant_id);
+          productUrl.searchParams.set("id", product.id);
+          productUrl.searchParams.set("withVariants", "true");
+
+          // Always pass store_id for inventory quantities
+          if (params?.store_id) {
+            productUrl.searchParams.set("store_id", params.store_id);
+          }
+
+          const variantRes = await fetch(productUrl.toString(), {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (variantRes.ok) {
+            const variantData = await variantRes.json();
+            const variants = variantData.variants || [];
+
+            // Store filtering logic: if a specific store is selected,
+            // only include products that have inventory in that store
+            if (params?.store_id && params.store_id !== "all") {
+              const hasInventoryInStore = variants.some(
+                (v: any) => (v.qty || 0) > 0
+              );
+              if (!hasInventoryInStore) {
+                // Skip this product - no inventory in selected store
+                return null;
+              }
+            }
+
+            return {
+              ...product,
+              variants: variants,
+            };
+          } else {
+            // If variants fetch fails, return product without variants
+            console.warn(`Failed to fetch variants for product ${product.id}`);
+            return {
+              ...product,
+              variants: [],
+            };
+          }
+        } catch (error) {
+          console.warn(
+            `Error fetching variants for product ${product.id}:`,
+            error
+          );
+          return {
+            ...product,
+            variants: [],
+          };
+        }
+      })
+    );
+
+    // Filter out null entries (products without inventory in selected store)
+    const filteredProducts = productsWithVariants.filter(Boolean);
+
+    return {
+      ...productsResponse,
+      items: filteredProducts,
+      count: filteredProducts.length, // Update count to reflect filtering
+    };
+  }
+
+  return productsResponse;
 }
 
 export async function createProduct(token: string, product: ProductInput) {

@@ -757,36 +757,40 @@ export default function CheckoutPage() {
           <span className="font-medium text-gray-900">Борлуулалт</span>
         </button>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Дэлгүүр:</label>
-          <select
-            value={storeId || ""}
-            onChange={(e) => {
-              const newStoreId = e.target.value;
-              setStoreId(newStoreId);
-              // Save to localStorage
-              if (typeof window !== "undefined") {
-                localStorage.setItem("storeId", newStoreId);
-              }
-            }}
-            disabled={loadingStores}
-            className="px-3 py-1.5 rounded-lg bg-white/80 border border-white/40 shadow-sm text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-          >
-            {loadingStores ? (
-              <option>Ачааллаж байна...</option>
-            ) : (
-              stores.map((store) => (
-                <option key={store.id} value={store.id}>
-                  {store.name}
-                </option>
-              ))
-            )}
-          </select>
-          {dataSource === "global" && (
-            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-              Бүх дэлгүүр
-            </span>
-          )}
+        <div className="flex items-center gap-4">
+          {/* Store Filter for Order History */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500">Дэлгүүрийн түүх:</label>
+            <select
+              value={storeId || "all"}
+              onChange={(e) => {
+                const newStoreId =
+                  e.target.value === "all" ? null : e.target.value;
+                setStoreId(newStoreId);
+                // Save to localStorage
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("storeId", newStoreId || "all");
+                }
+              }}
+              disabled={loadingStores}
+              className="px-2 py-1 rounded bg-white/80 border border-white/40 shadow-sm text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]"
+            >
+              {loadingStores ? (
+                <option>...</option>
+              ) : (
+                <>
+                  <option value="all">Бүх дэлгүүр</option>
+                  {stores
+                    .filter((s) => s.id !== "all")
+                    .map((store) => (
+                      <option key={store.id} value={store.id}>
+                        {store.name}
+                      </option>
+                    ))}
+                </>
+              )}
+            </select>
+          </div>
 
           {/* Quick Order Stats */}
           {orderHistory && (
@@ -814,7 +818,7 @@ export default function CheckoutPage() {
 
       <main className="flex-1 flex flex-col text-black">
         {/* Search + grid */}
-        <section className="mb-4">
+        {/* <section className="mb-4">
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 relative">
               <input
@@ -978,7 +982,7 @@ export default function CheckoutPage() {
               )}
             </div>
           )}
-        </section>
+        </section> */}
 
         {/* Cart header */}
         <div className="flex flex-col gap-2 px-6 py-3 mb-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm">
@@ -1242,7 +1246,6 @@ export default function CheckoutPage() {
       <AddItemModal
         open={openAdd}
         onClose={() => setOpenAdd(false)}
-        storeId={stores.length > 1 ? storeId : null}
         onAdd={(it) =>
           setItems((prev) => {
             // Better matching: use variant_id if available, otherwise fallback to name+price

@@ -6,7 +6,7 @@ import { FaShoppingCart } from "react-icons/fa";
 import Image from "next/image";
 import { getProductsForModal } from "@/lib/product/productApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
-import { getStoredID } from "@/lib/store/storeApi";
+import { getStoredID, getStore } from "@/lib/store/storeApi";
 import { getImageShowUrl } from "@/lib/product/productImages";
 import { getCategories } from "@/lib/category/categoryApi";
 
@@ -177,12 +177,10 @@ export default function AddItemModal({
   open,
   onClose,
   onAdd,
-  storeId, // Add storeId prop from parent
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (it: Item) => void;
-  storeId?: string | null; // Add storeId prop type
 }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -191,6 +189,16 @@ export default function AddItemModal({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCat, setSelectedCat] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table"); // Add view mode state
+
+  // Store management state (moved from checkout page)
+  const [storeId, setStoreId] = useState<string | null>(null);
+  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingStores, setLoadingStores] = useState(true);
+  const [storeInfo, setStoreInfo] = useState<{
     id: string;
     name: string;
   } | null>(null);
@@ -204,217 +212,320 @@ export default function AddItemModal({
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Fetch products when modal opens or storeId/category changes
+  // Fetch products when modal opens and we have a storeId, or when filters change
   useEffect(() => {
-    if (open) {
-      console.log("🛒 AddItemModal - Starting to load products...");
-      setLoading(true);
-      setCatalog([]); // Clear previous catalog
+    if (!open) return; // Don't load if modal is closed
 
-      (async () => {
-        try {
-          console.log("🛒 AddItemModal - Getting access token...");
-          const token = await getAccessToken();
-          if (!token) {
-            console.error("🛒 AddItemModal - No access token available");
-            setCatalog([]);
-            return;
-          }
+    // Wait for store to be loaded before making API calls
+    if (loadingStores) {
+      console.log("🛒 AddItemModal - Waiting for stores to load...", {
+        loadingStores,
+      });
+      return;
+    }
+
+    // If no storeId is set after stores loaded, default to "all"
+    if (!storeId) {
+      console.log("🛒 AddItemModal - No store selected, defaulting to 'all'");
+      setStoreId("all");
+      return;
+    }
+
+    console.log("🛒 AddItemModal - Starting to load products...");
+    setLoading(true);
+    setCatalog([]); // Clear previous catalog
+
+    (async () => {
+      try {
+        console.log("🛒 AddItemModal - Getting access token...");
+        const token = await getAccessToken();
+        if (!token) {
+          console.error("🛒 AddItemModal - No access token available");
+          setCatalog([]);
+          return;
+        }
+        console.log(
+          "🛒 AddItemModal - Token obtained:",
+          token.substring(0, 20) + "..."
+        );
+
+        console.log("🛒 AddItemModal - Using store ID:", storeId);
+
+        // Set store info for UI display
+        if (storeId && storeId !== "all") {
+          setStoreInfo({
+            id: storeId,
+            name: `Store ${storeId.substring(0, 8)}`,
+          });
+        } else {
+          setStoreInfo(null);
+        }
+
+        // Build API parameters
+        const apiParams: any = {
+          limit: 500,
+        };
+
+        // Add store filtering (skip if "all")
+        if (storeId && storeId !== "all") {
+          apiParams.store_id = storeId;
+          console.log("🛒 AddItemModal - Store filtering ACTIVE:", storeId);
+        } else {
           console.log(
-            "🛒 AddItemModal - Token obtained:",
-            token.substring(0, 20) + "..."
+            "🛒 AddItemModal - Store filtering DISABLED (showing all stores)"
           );
+        }
 
-          // Use the storeId passed from parent, fallback to getStoredID
-          let effectiveStoreId = storeId;
-          if (!effectiveStoreId) {
-            console.log(
-              "🛒 AddItemModal - No storeId prop, getting from API..."
-            );
-            effectiveStoreId = await getStoredID(token);
-          }
+        // Add category filtering if selected
+        if (selectedCat?.id) {
+          apiParams.category_id = selectedCat.id;
+          apiParams.subtree = true; // Include subcategories
+        }
 
-          console.log("🛒 AddItemModal - Using store ID:", effectiveStoreId);
+        // Add search filtering if there's a query
+        if (debouncedQuery.trim()) {
+          apiParams.search = debouncedQuery.trim();
+        }
 
-          // Build API parameters
-          const apiParams: any = {
-            limit: 500,
-          };
+        console.log("🛒 AddItemModal - API parameters:", apiParams);
+        console.log("🛒 AddItemModal - Store filtering:", {
+          storeId: storeId,
+          isFiltering: storeId && storeId !== "all",
+          filterType:
+            storeId === "all" ? "show all stores" : "filter by inventory",
+        });
 
-          // Add store filtering (skip if "all")
-          if (effectiveStoreId && effectiveStoreId !== "all") {
-            apiParams.store_id = effectiveStoreId;
-          }
+        // Fetch products using the new product API (includes variants and inventory in bulk)
+        const response = await getProductsForModal(token, apiParams);
 
-          // Add category filtering if selected
-          if (selectedCat?.id) {
-            apiParams.category_id = selectedCat.id;
-            apiParams.subtree = true; // Include subcategories
-          }
+        console.log("🛒 AddItemModal - Raw API response:", response);
+        console.log("🛒 AddItemModal - Response type:", typeof response);
+        console.log(
+          "🛒 AddItemModal - Response keys:",
+          Object.keys(response || {})
+        );
+        console.log(
+          "🛒 AddItemModal - Response items count:",
+          response?.items?.length || 0
+        );
 
-          // Add search filtering if there's a query
-          if (debouncedQuery.trim()) {
-            apiParams.search = debouncedQuery.trim();
-          }
+        if (response?.error) {
+          console.error("🛒 AddItemModal - API Error:", response.error);
+        }
 
-          console.log("🛒 AddItemModal - API parameters:", apiParams);
-
-          // Fetch products using the new product API
-          const response = await getProductsForModal(token, apiParams);
-
-          console.log("🛒 AddItemModal - Raw API response:", response);
+        // Process product API response - now includes variants from updated API function
+        if (response?.items && response.items.length > 0) {
           console.log(
-            "🛒 AddItemModal - Response items count:",
-            response?.items?.length || 0
+            "🛒 AddItemModal - Processing products with variants from API..."
           );
+          console.log("🛒 AddItemModal - Store filter applied in API:", {
+            storeId: storeId,
+            productsAfterStoreFilter: response.items.length,
+          });
 
-          // Process product API response - your edge function returns products, each needs variants loaded separately
-          if (response?.items && response.items.length > 0) {
-            console.log(
-              "🛒 AddItemModal - Processing products from product API..."
-            );
+          const products: Product[] = response.items
+            .map((productItem: any) => {
+              const totalStock = (productItem.variants || []).reduce(
+                (sum: number, v: any) => sum + (v.qty || 0),
+                0
+              );
 
-            const products: Product[] = [];
-
-            // Load each product with its variants and inventory
-            for (const productItem of response.items) {
               console.log("🛒 Processing product:", {
                 id: productItem.id,
                 name: productItem.name,
                 category_id: productItem.category_id,
+                variants_count: productItem.variants?.length || 0,
+                totalStock: totalStock,
+                hasVariants: !!productItem.variants,
+                storeFiltered:
+                  storeId !== "all"
+                    ? `Stock in ${storeId}: ${totalStock}`
+                    : "All stores",
               });
 
-              try {
-                // Get full product details with variants and inventory from your edge function
-                const { jwtDecode } = await import("jwt-decode");
-                const decoded: any = jwtDecode(token);
-                const tenantId = decoded?.app_metadata?.tenants?.[0];
-
-                const productUrl = new URL(
-                  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
-                );
-                productUrl.searchParams.set("tenant_id", tenantId);
-                productUrl.searchParams.set("id", productItem.id);
-                productUrl.searchParams.set("withVariants", "true");
-
-                if (effectiveStoreId && effectiveStoreId !== "all") {
-                  productUrl.searchParams.set("store_id", effectiveStoreId);
-                }
-
-                const productResponse = await fetch(productUrl.toString(), {
-                  headers: { Authorization: `Bearer ${token}` },
+              // Skip products without variants (but be more lenient for debugging)
+              if (!productItem.variants || productItem.variants.length === 0) {
+                console.warn("🛒 Skipping product without variants:", {
+                  product: productItem.name,
+                  id: productItem.id,
+                  variants_count: productItem.variants?.length || 0,
                 });
-
-                if (productResponse.ok) {
-                  const productData = await productResponse.json();
-
-                  if (productData.product && productData.variants) {
-                    const variants: Variant[] = productData.variants.map(
-                      (variant: any) => ({
-                        variant_id: variant.id,
-                        color:
-                          variant.attrs?.color ||
-                          variant.attrs?.Color ||
-                          variant.attrs?.colorName ||
-                          "Default",
-                        size:
-                          variant.attrs?.size ||
-                          variant.attrs?.Size ||
-                          variant.attrs?.Хэмжээ ||
-                          "Default",
-                        stock: variant.qty || 0, // qty comes from inventory view in your edge function
-                        price: variant.price || 0,
-                        name: variant.name,
-                        sku: variant.sku,
-                        attrs: variant.attrs,
-                      })
-                    );
-
-                    products.push({
-                      id: productData.product.id,
-                      name: productData.product.name,
-                      img: productData.product.img || "/default.png",
-                      rawImg: productData.product.img,
-                      category: "Unknown", // Will be resolved with category API
-                      categoryId: productData.product.category_id,
-                      variants: variants,
-                    });
-                  }
-                }
-              } catch (error) {
-                console.warn(
-                  "🛒 Failed to load product details:",
-                  productItem.id,
-                  error
-                );
+                return null;
               }
-            }
-
-            console.log(
-              "🛒 AddItemModal - Processed products count:",
-              products.length
-            );
-            console.log("🛒 AddItemModal - Resolving image URLs...");
-
-            // Resolve image URLs for all products
-            const productsWithUrls: Product[] = await Promise.all(
-              products.map(async (product) => ({
-                ...product,
-                img: (await resolveImageUrl(product.rawImg)) || "/default.png",
-              }))
-            );
-
-            console.log(
-              "🛒 AddItemModal - Processed products with resolved images:",
-              productsWithUrls
-            );
-            console.log(
-              "🛒 AddItemModal - Total products:",
-              productsWithUrls.length
-            );
-
-            productsWithUrls.forEach((p, i) => {
-              console.log(
-                `🛒 Product ${i + 1}: ${p.name} (${
-                  p.variants.length
-                } variants) - Image: ${p.img}`
+              const variants: Variant[] = productItem.variants.map(
+                (variant: any) => ({
+                  variant_id: variant.id,
+                  color:
+                    variant.attrs?.color ||
+                    variant.attrs?.Color ||
+                    variant.attrs?.colorName ||
+                    "Default",
+                  size:
+                    variant.attrs?.size ||
+                    variant.attrs?.Size ||
+                    variant.attrs?.Хэмжээ ||
+                    "Default",
+                  stock: variant.qty || 0, // qty comes from inventory view in your edge function
+                  price: variant.price || 0,
+                  name: variant.name,
+                  sku: variant.sku,
+                  attrs: variant.attrs,
+                })
               );
-              p.variants.forEach((v, j) => {
-                console.log(
-                  `  🛒 Variant ${j + 1}: ${v.color}/${v.size} - Stock: ${
-                    v.stock
-                  }, Price: ${v.price}`
-                );
-              });
+
+              return {
+                id: productItem.id,
+                name: productItem.name,
+                img: productItem.img || "/default.png",
+                rawImg: productItem.img,
+                category: "Unknown", // Category names can be resolved from the category API
+                categoryId: productItem.category_id,
+                variants: variants,
+              };
+            })
+            .filter(Boolean) as Product[]; // Remove null entries
+
+          console.log(
+            "🛒 AddItemModal - Raw products from API:",
+            response.items.length
+          );
+          console.log(
+            "🛒 AddItemModal - Products with variants:",
+            products.length
+          );
+          console.log(
+            "🛒 AddItemModal - Products without variants (filtered out):",
+            response.items.length - products.length
+          );
+          console.log("🛒 AddItemModal - Resolving image URLs...");
+
+          // Resolve image URLs for all products
+          const productsWithUrls: Product[] = await Promise.all(
+            products.map(async (product) => ({
+              ...product,
+              img: (await resolveImageUrl(product.rawImg)) || "/default.png",
+            }))
+          );
+
+          console.log(
+            "🛒 AddItemModal - Processed products with resolved images:",
+            productsWithUrls
+          );
+          console.log(
+            "🛒 AddItemModal - Total products:",
+            productsWithUrls.length
+          );
+
+          productsWithUrls.forEach((p, i) => {
+            console.log(
+              `🛒 Product ${i + 1}: ${p.name} (${
+                p.variants.length
+              } variants) - Image: ${p.img}`
+            );
+            p.variants.forEach((v, j) => {
+              console.log(
+                `  🛒 Variant ${j + 1}: ${v.color}/${v.size} - Stock: ${
+                  v.stock
+                }, Price: ${v.price}`
+              );
             });
+          });
 
-            setCatalog(productsWithUrls);
-            if (productsWithUrls.length > 0) {
-              setActiveId(productsWithUrls[0].id);
+          setCatalog(productsWithUrls);
+          if (productsWithUrls.length > 0) {
+            setActiveId(productsWithUrls[0].id);
+            console.log(
+              "🛒 AddItemModal - Set active product:",
+              productsWithUrls[0].name
+            );
+          }
+        } else {
+          console.warn("🛒 AddItemModal - No items in response or empty array");
+          console.log(
+            "🛒 AddItemModal - Full response:",
+            JSON.stringify(response, null, 2)
+          );
+          console.log(
+            "🛒 AddItemModal - API URL that was called:",
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
+          );
+          console.log(
+            "🛒 AddItemModal - API params sent:",
+            JSON.stringify(apiParams, null, 2)
+          );
+          setCatalog([]);
+        }
+      } catch (error) {
+        console.error("🛒 AddItemModal - Error fetching products:", error);
+        setCatalog([]);
+      } finally {
+        console.log(
+          "🛒 AddItemModal - Finished loading, setting loading to false"
+        );
+        setLoading(false);
+      }
+    })();
+  }, [open, storeId, selectedCat?.id, debouncedQuery, loadingStores]); // React to modal open, store changes, category changes, and debounced search (all server-side filtering)
+
+  // Load stores when modal opens
+  useEffect(() => {
+    if (open) {
+      (async () => {
+        setLoadingStores(true);
+        try {
+          const token = await getAccessToken();
+          if (!token) return;
+
+          const storeList = await getStore(token);
+          if (storeList && Array.isArray(storeList)) {
+            setStores(storeList);
+            console.log("🛒 AddItemModal - Loaded stores:", storeList);
+
+            // Try to get saved store from localStorage or user default
+            const fromLS =
+              typeof window !== "undefined"
+                ? localStorage.getItem("storeId")
+                : null;
+            console.log("🛒 AddItemModal - Store from localStorage:", fromLS);
+
+            if (fromLS && storeList.some((s) => s.id === fromLS)) {
               console.log(
-                "🛒 AddItemModal - Set active product:",
-                productsWithUrls[0].name
+                "🛒 AddItemModal - Using store from localStorage:",
+                fromLS
               );
+              setStoreId(fromLS);
+            } else {
+              const defaultStore = await getStoredID(token);
+              console.log(
+                "🛒 AddItemModal - Default store from API:",
+                defaultStore
+              );
+              const finalStoreId = defaultStore || "all";
+              console.log("🛒 AddItemModal - Final store ID:", finalStoreId);
+              setStoreId(finalStoreId);
             }
           } else {
             console.warn(
-              "🛒 AddItemModal - No items in response or empty array"
+              "🛒 AddItemModal - No stores returned or not an array:",
+              storeList
             );
-            console.log("🛒 AddItemModal - Response:", response);
-            setCatalog([]);
+            setStores([]);
+            setStoreId("all");
           }
         } catch (error) {
-          console.error("🛒 AddItemModal - Error fetching products:", error);
-          setCatalog([]);
+          console.error("🛒 AddItemModal - Error loading stores:", error);
+          setStores([]);
+          setStoreId("all");
         } finally {
-          console.log(
-            "🛒 AddItemModal - Finished loading, setting loading to false"
-          );
-          setLoading(false);
+          setLoadingStores(false);
         }
       })();
+    } else {
+      // Clear stores when modal closes to save memory
+      setStores([]);
+      setStoreId(null);
     }
-  }, [open, storeId, selectedCat?.id, debouncedQuery]); // React to modal open, store changes, category changes, and debounced search (all server-side filtering)
+  }, [open]);
 
   // Load categories when modal opens
   useEffect(() => {
@@ -498,17 +609,21 @@ export default function AddItemModal({
   };
 
   const filtered = useMemo(() => {
-    // All filtering is now server-side (category, search, store)
-    // This just returns the catalog as-is
+    // All filtering is done server-side via getProductsForModal API
+    // The catalog already contains only products matching:
+    // - Selected store (if not "all")
+    // - Selected category (if any)
+    // - Search query (if any)
     console.log("🛒 AddItemModal - Server-side filtered catalog:", {
       totalProducts: catalog.length,
       selectedCategory: selectedCat?.name,
-      searchQuery: query,
-      note: "All filtering handled server-side via product API",
+      selectedStore: storeId,
+      searchQuery: debouncedQuery,
+      note: "All filtering handled server-side - no client-side filtering needed",
     });
 
     return catalog;
-  }, [catalog, selectedCat?.name, query]);
+  }, [catalog, selectedCat?.name, storeId, debouncedQuery]);
 
   const selectedVariant: Variant | null = useMemo(() => {
     if (!active || !selColor || !selSize) return null;
@@ -520,6 +635,37 @@ export default function AddItemModal({
 
   const remaining = selectedVariant?.stock ?? 0;
   const canAdd = !!active && !!selectedVariant && qty > 0 && qty <= remaining;
+
+  // Format currency helper function
+  const fmt = (n: number) => {
+    return new Intl.NumberFormat("mn-MN", {
+      style: "currency",
+      currency: "MNT",
+      minimumFractionDigits: 0,
+    }).format(n);
+  };
+
+  // Add to cart functionality for grid view
+  const addToCartFromGrid = (product: Product, quantity: number = 1) => {
+    // Find the first available variant
+    const availableVariant = product.variants.find((v) => v.stock > 0);
+
+    if (!availableVariant) {
+      console.warn("No available variants for product:", product.name);
+      return;
+    }
+
+    onAdd({
+      id: crypto.randomUUID?.() ?? `${product.id}-${Date.now()}`,
+      variant_id: availableVariant.variant_id,
+      name: product.name,
+      qty: quantity,
+      price: availableVariant.price,
+      size: availableVariant.size,
+      color: availableVariant.color,
+      imgPath: product.img || "/default.png",
+    });
+  };
 
   const handleAdd = () => {
     if (!canAdd || !active || !selectedVariant) {
@@ -560,28 +706,28 @@ export default function AddItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg flex items-center justify-center p-4 overscroll-contain text-black animate-in fade-in duration-500"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 overscroll-contain text-black animate-in fade-in duration-300"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
         className="
-          w-full max-w-7xl bg-white/98 backdrop-blur-2xl
-          h-[95dvh] md:max-h-[90vh]
-          rounded-3xl md:rounded-[2rem]
-          shadow-2xl border border-white/30 flex flex-col overflow-hidden
-          animate-in slide-in-from-bottom duration-600 ease-out
+          w-full max-w-7xl bg-white
+          h-[98vh] md:h-[92vh] md:max-h-[90vh]
+          rounded-2xl md:rounded-3xl
+          shadow-xl border border-gray-200 flex flex-col overflow-hidden
+          animate-in slide-in-from-bottom duration-400 ease-out
         "
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Enhanced Modern Header */}
-        <div className="relative p-8 border-b border-gray-200/30 shrink-0 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50">
+        {/* Clean Modern Header */}
+        <div className="relative p-6 md:p-8 border-b border-gray-200 shrink-0 bg-white">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
                 <svg
-                  className="w-7 h-7 text-white"
+                  className="w-6 h-6 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -595,20 +741,20 @@ export default function AddItemModal({
                 </svg>
               </div>
               <div className="flex flex-col">
-                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">
                   Бүтээгдэхүүн сонгох
                 </h2>
-                <p className="text-sm text-gray-600 mt-1 font-medium">
+                <p className="text-sm text-gray-600 mt-1">
                   Дэлгүүрээс бүтээгдэхүүн хайж, сагсанд нэмэх
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="group w-12 h-12 rounded-2xl bg-white/90 hover:bg-white border border-gray-200/50 hover:border-gray-300 flex items-center justify-center transition-all duration-300 hover:shadow-xl"
+              className="group w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200"
             >
               <svg
-                className="w-6 h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
+                className="w-5 h-5 md:w-6 md:h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -616,32 +762,30 @@ export default function AddItemModal({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2.5}
+                  strokeWidth={2}
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
             </button>
           </div>
-
-          {/* Elegant gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-t-[2rem] pointer-events-none"></div>
         </div>
 
-        {/* Enhanced Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Enhanced Product Search & Selection */}
-            <div className="bg-white/80 backdrop-blur-xl border border-white/50 rounded-3xl overflow-hidden flex flex-col h-full shadow-lg shadow-blue-500/10">
-              <div className="p-6 border-b border-gray-200/40 shrink-0 bg-gradient-to-br from-white/90 to-blue-50/60">
-                <div className="relative group">
+        {/* Clean Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            {/* Clean Product Search & Selection */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
+              <div className="p-4 md:p-6 border-b border-gray-200 shrink-0 bg-white">
+                {/* Search Bar */}
+                <div className="relative group mb-4">
                   <input
-                    className="h-14 w-full border-2 border-gray-200/60 rounded-2xl px-6 pl-14 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-white/90 backdrop-blur-sm font-medium placeholder:text-gray-500 shadow-sm"
+                    className="h-12 w-full border border-gray-300 rounded-lg px-4 pl-12 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white placeholder:text-gray-500"
                     placeholder="🔍 Хайх: нэр, код, бренд..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <svg
-                    className="absolute left-5 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400 group-focus-within:text-blue-500 transition-colors"
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -649,7 +793,7 @@ export default function AddItemModal({
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={2.5}
+                      strokeWidth={2}
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
@@ -674,6 +818,159 @@ export default function AddItemModal({
                       </svg>
                     </button>
                   )}
+                </div>
+
+                {/* Store Selector */}
+                <div className="mb-4 p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-purple-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
+                        />
+                      </svg>
+                      <label className="text-sm font-semibold text-purple-800">
+                        Дэлгүүр:
+                      </label>
+                    </div>
+                  </div>
+                  <select
+                    value={storeId || ""}
+                    onChange={(e) => {
+                      const newStoreId = e.target.value;
+                      setStoreId(newStoreId);
+                      // Save to localStorage
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("storeId", newStoreId);
+                      }
+                    }}
+                    disabled={loadingStores}
+                    className="mt-2 w-full px-3 py-2 rounded-lg bg-white border border-purple-200 shadow-sm text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    {loadingStores ? (
+                      <option>Ачааллаж байна...</option>
+                    ) : (
+                      <>
+                        <option value="all">Бүх дэлгүүр</option>
+                        {stores.map((store) => (
+                          <option key={store.id} value={store.id}>
+                            {store.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                  {storeId === "all" && (
+                    <div className="mt-2 text-xs text-purple-700 flex items-center gap-1">
+                      <svg
+                        className="w-3 h-3"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Бүх дэлгүүрийн бүтээгдэхүүн харагдана
+                    </div>
+                  )}
+                  {storeId &&
+                    storeId !== "all" &&
+                    stores.find((s) => s.id === storeId) && (
+                      <div className="mt-2 text-xs text-purple-700 flex items-center gap-1">
+                        <svg
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Сонгосон: {stores.find((s) => s.id === storeId)?.name}
+                      </div>
+                    )}
+                </div>
+
+                {/* View Toggle */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-700">
+                      Харах:
+                    </span>
+                    <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                      <button
+                        onClick={() => setViewMode("table")}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          viewMode === "table"
+                            ? "bg-white text-blue-600 shadow-sm"
+                            : "text-gray-600 hover:text-gray-800"
+                        }`}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 10h18M3 6h18M3 14h18M3 18h18"
+                          />
+                        </svg>
+                        Жагсаалт
+                      </button>
+                      <button
+                        onClick={() => setViewMode("grid")}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          viewMode === "grid"
+                            ? "bg-white text-blue-600 shadow-sm"
+                            : "text-gray-600 hover:text-gray-800"
+                        }`}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                          />
+                        </svg>
+                        График
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-600 whitespace-nowrap">
+                    {!storeId ? (
+                      "Дэлгүүр сонгоно уу"
+                    ) : loading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        Ачааллаж...
+                      </div>
+                    ) : (
+                      `${catalog.length} олдлоо`
+                    )}
+                  </div>
                 </div>
                 <div className="mt-4">
                   <div className="flex items-center justify-between mb-3">
@@ -765,50 +1062,6 @@ export default function AddItemModal({
                       </div>
                     )}
                   </div>
-
-                  {/* Debug Info - Remove this in production */}
-                  {process.env.NODE_ENV === "development" && (
-                    <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200 text-xs">
-                      <div className="font-semibold text-green-800 mb-2">
-                        Debug Info (New Server-Side Filtering):
-                      </div>
-                      <div className="text-green-700">
-                        <div>Store ID: {storeId || "all"}</div>
-                        <div>
-                          Search Query: "{query}" {query ? "✓" : ""}
-                        </div>
-                        <div>
-                          Selected Category:{" "}
-                          {selectedCat
-                            ? `${selectedCat.name} (ID: ${selectedCat.id}) ✓`
-                            : "None"}
-                        </div>
-                        <div>
-                          Products Loaded: {catalog.length} (server-filtered)
-                        </div>
-                        <div>Categories Available: {categories.length}</div>
-                        <div className="mt-2 font-medium text-green-800">
-                          API Filters Active:
-                        </div>
-                        <div className="ml-2">
-                          • Store Filter:{" "}
-                          {storeId && storeId !== "all"
-                            ? `✓ ${storeId}`
-                            : "○ All stores"}
-                        </div>
-                        <div className="ml-2">
-                          • Category Filter:{" "}
-                          {selectedCat?.id
-                            ? `✓ ${selectedCat.name}`
-                            : "○ All categories"}
-                        </div>
-                        <div className="ml-2">
-                          • Search Filter:{" "}
-                          {query.trim() ? `✓ "${query}"` : "○ No search"}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -846,7 +1099,8 @@ export default function AddItemModal({
                       </p>
                     </div>
                   </div>
-                ) : (
+                ) : viewMode === "table" ? (
+                  // Table View (existing)
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                       <tr>
@@ -912,54 +1166,179 @@ export default function AddItemModal({
                           </tr>
                         );
                       })}
-                      {filtered.length === 0 && (
-                        <tr>
-                          <td
-                            className="px-4 py-8 text-center text-gray-500"
-                            colSpan={2}
-                          >
-                            <div className="flex flex-col items-center gap-2">
-                              <svg
-                                className="w-8 h-8 text-gray-400"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33"
-                                />
-                              </svg>
-                              <span>Илэрц олдсонгүй.</span>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
+                ) : (
+                  // Grid View (from checkout page)
+                  <div className="p-4">
+                    {/* Grid View Instructions */}
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                      <div className="flex items-center gap-2 text-sm text-blue-800">
+                        <svg
+                          className="w-4 h-4 text-blue-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
+                        </svg>
+                        <span className="font-medium">График харах:</span>
+                        <span>
+                          Бүтээгдэхүүн сонгоод баруун талд өнгө/хэмжээ сонгоно
+                          уу эсвэл "Түргэн нэмэх" товчийг дарна уу
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {filtered.map((p) => {
+                        const totalStock = p.variants.reduce(
+                          (s, v) => s + v.stock,
+                          0
+                        );
+                        const lowestPrice = Math.min(
+                          ...p.variants.map((v) => v.price)
+                        );
+
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => selectProduct(p.id)}
+                            className={`group text-left p-3 rounded-2xl border shadow-sm transition-all duration-200 ${
+                              totalStock <= 0
+                                ? "bg-gray-50 border-gray-200 cursor-not-allowed opacity-60"
+                                : p.id === active?.id
+                                ? "bg-blue-50 border-blue-300 shadow-md ring-2 ring-blue-200"
+                                : "bg-white/70 hover:bg-white/90 border-white/40 hover:shadow-md"
+                            }`}
+                            disabled={totalStock <= 0}
+                            title={totalStock <= 0 ? "Нөөц дууссан" : "Сонгох"}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="relative">
+                                <Image
+                                  src={p.img || "/default.png"}
+                                  alt={p.name}
+                                  width={56}
+                                  height={56}
+                                  className="w-14 h-14 rounded-xl object-cover bg-gray-100"
+                                  unoptimized
+                                />
+                                {totalStock <= 0 && (
+                                  <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
+                                    <span className="text-xs text-white font-medium">
+                                      Дууссан
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-semibold text-gray-900 truncate">
+                                  {p.name}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Үнэ: {fmt(lowestPrice)}
+                                </div>
+                                <div
+                                  className={`text-xs font-medium ${
+                                    totalStock <= 0
+                                      ? "text-red-500"
+                                      : "text-green-600"
+                                  }`}
+                                >
+                                  Үлд: {totalStock}
+                                </div>
+                              </div>
+                              {totalStock > 0 && (
+                                <div className="flex-shrink-0">
+                                  <div
+                                    className={`w-6 h-6 text-white rounded-full flex items-center justify-center text-xs transition-all duration-200 ${
+                                      p.id === active?.id
+                                        ? "bg-blue-500 opacity-100"
+                                        : "bg-blue-500 opacity-0 group-hover:opacity-100"
+                                    }`}
+                                  >
+                                    {p.id === active?.id ? "✓" : "+"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
 
-              <div className="p-4 shrink-0 flex justify-center">
-                <button
-                  type="button"
-                  className="relative w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-200"
-                  title="Сагс"
-                >
-                  <FaShoppingCart className="w-6 h-6 text-white" />
-                  <span className="absolute -top-2 -right-2 w-6 h-6 text-xs rounded-full bg-red-500 text-white flex items-center justify-center font-bold shadow-lg">
-                    1
-                  </span>
-                </button>
-              </div>
+              {/* Quick Add Button for Grid View */}
+              {viewMode === "grid" && (
+                <div className="p-4 shrink-0 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (active && active.variants.length > 0) {
+                        const availableVariant = active.variants.find(
+                          (v) => v.stock > 0
+                        );
+                        if (availableVariant) {
+                          addToCartFromGrid(active, 1);
+                          onClose();
+                        }
+                      }
+                    }}
+                    disabled={
+                      !active || active.variants.every((v) => v.stock <= 0)
+                    }
+                    className={`relative w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-200 ${
+                      active && active.variants.some((v) => v.stock > 0)
+                        ? "bg-gradient-to-r from-green-500 to-emerald-600"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
+                    title={
+                      active
+                        ? active.variants.some((v) => v.stock > 0)
+                          ? "Түргэн нэмэх"
+                          : "Нөөц дууссан"
+                        : "Бүтээгдэхүүн сонгоно уу"
+                    }
+                  >
+                    {active && active.variants.some((v) => v.stock > 0) ? (
+                      <>
+                        <FaShoppingCart className="w-6 h-6 text-white" />
+                        <span className="absolute -top-2 -right-2 w-6 h-6 text-xs rounded-full bg-blue-500 text-white flex items-center justify-center font-bold shadow-lg">
+                          +
+                        </span>
+                      </>
+                    ) : (
+                      <svg
+                        className="w-6 h-6 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* RIGHT */}
-            <div className="bg-white/60 backdrop-blur-sm border border-white/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-sm">
-              <div className="p-6 border-b border-gray-200/50 shrink-0 flex items-start gap-4">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-sm text-gray-500 overflow-hidden shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
+              <div className="p-4 md:p-6 border-b border-gray-200 shrink-0 flex items-start gap-4">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-gray-100 flex items-center justify-center text-sm text-gray-500 overflow-hidden">
                   {active?.img ? (
                     <Image
                       src={active.img}
@@ -970,7 +1349,7 @@ export default function AddItemModal({
                     />
                   ) : (
                     <svg
-                      className="w-8 h-8"
+                      className="w-6 h-6 md:w-8 md:h-8"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1007,13 +1386,13 @@ export default function AddItemModal({
                 </div>
                 <button
                   type="button"
-                  className="w-10 h-10 rounded-full bg-gray-100 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-all duration-200"
+                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gray-50 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-all duration-200 border border-gray-200"
                 >
-                  <FiHeart className="w-5 h-5" />
+                  <FiHeart className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
               </div>
 
-              <div className="p-6 border-b border-gray-200/50 shrink-0">
+              <div className="p-4 md:p-6 border-b border-gray-200 shrink-0 bg-gray-50">
                 <div className="text-sm font-semibold mb-4 text-gray-900">
                   Өнгө:
                 </div>
