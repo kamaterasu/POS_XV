@@ -4,12 +4,11 @@ import { Item } from "@/lib/sales/salesTypes";
 import { FiHeart } from "react-icons/fi";
 import { FaShoppingCart } from "react-icons/fa";
 import Image from "next/image";
-import { getProductByStore } from "@/lib/product/productApi";
+import { getProductsForModal } from "@/lib/product/productApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getStoredID } from "@/lib/store/storeApi";
 import { getImageShowUrl } from "@/lib/product/productImages";
 import { getCategories } from "@/lib/category/categoryApi";
-import { getProductByCategory } from "@/lib/product/productApi";
 
 type Category = {
   id: string;
@@ -186,6 +185,7 @@ export default function AddItemModal({
   storeId?: string | null; // Add storeId prop type
 }) {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -195,14 +195,21 @@ export default function AddItemModal({
     name: string;
   } | null>(null);
 
+  // Debounce search query to prevent too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
   // Fetch products when modal opens or storeId/category changes
   useEffect(() => {
     if (open) {
       console.log("🛒 AddItemModal - Starting to load products...");
       setLoading(true);
       setCatalog([]); // Clear previous catalog
-      // Don't clear categories here - they are loaded separately
-      // Only reset category selection when modal first opens, not on category changes
 
       (async () => {
         try {
@@ -227,46 +234,33 @@ export default function AddItemModal({
             effectiveStoreId = await getStoredID(token);
           }
 
-          if (!effectiveStoreId) {
-            console.warn(
-              "🛒 AddItemModal - No store ID available, modal will show empty catalog"
-            );
-            setCatalog([]);
-            return;
-          }
           console.log("🛒 AddItemModal - Using store ID:", effectiveStoreId);
 
-          // Handle "all" stores vs specific store
-          let response: any;
+          // Build API parameters
+          const apiParams: any = {
+            limit: 500,
+          };
 
-          // Always fetch inventory first (not category API)
-          if (effectiveStoreId === "all") {
-            console.log("🛒 AddItemModal - Fetching from global inventory...");
-            // Use global inventory for "all stores"
-            const { jwtDecode } = await import("jwt-decode");
-            const decoded: any = jwtDecode(token);
-            const tenantId = decoded?.app_metadata?.tenants?.[0];
-
-            const globalResponse = await fetch(
-              `${
-                process.env.NEXT_PUBLIC_SUPABASE_URL
-              }/functions/v1/inventory?tenant_id=${encodeURIComponent(
-                tenantId
-              )}&scope=global&limit=500`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-
-            if (globalResponse.ok) {
-              response = await globalResponse.json();
-            } else {
-              throw new Error("Global inventory fetch failed");
-            }
-          } else {
-            console.log("🛒 AddItemModal - Fetching products by store...");
-            response = await getProductByStore(token, effectiveStoreId);
+          // Add store filtering (skip if "all")
+          if (effectiveStoreId && effectiveStoreId !== "all") {
+            apiParams.store_id = effectiveStoreId;
           }
+
+          // Add category filtering if selected
+          if (selectedCat?.id) {
+            apiParams.category_id = selectedCat.id;
+            apiParams.subtree = true; // Include subcategories
+          }
+
+          // Add search filtering if there's a query
+          if (debouncedQuery.trim()) {
+            apiParams.search = debouncedQuery.trim();
+          }
+
+          console.log("🛒 AddItemModal - API parameters:", apiParams);
+
+          // Fetch products using the new product API
+          const response = await getProductsForModal(token, apiParams);
 
           console.log("🛒 AddItemModal - Raw API response:", response);
           console.log(
@@ -274,76 +268,92 @@ export default function AddItemModal({
             response?.items?.length || 0
           );
 
-          // Process inventory response to build product catalog
+          // Process product API response - your edge function returns products, each needs variants loaded separately
           if (response?.items && response.items.length > 0) {
-            console.log("🛒 AddItemModal - Processing inventory items...");
-            const productMap = new Map<string, any>();
+            console.log(
+              "🛒 AddItemModal - Processing products from product API..."
+            );
 
-            // Group inventory items by product
-            for (const item of response.items) {
-              const product = item.product;
-              const variant = item.variant;
+            const products: Product[] = [];
 
-              console.log("🛒 Processing item:", {
-                product: product?.name,
-                variant: variant?.name,
-                qty: item.qty,
+            // Load each product with its variants and inventory
+            for (const productItem of response.items) {
+              console.log("🛒 Processing product:", {
+                id: productItem.id,
+                name: productItem.name,
+                category_id: productItem.category_id,
               });
 
-              if (!product?.id || !variant?.id) {
-                console.warn(
-                  "🛒 Skipping item - missing product or variant ID:",
-                  item
+              try {
+                // Get full product details with variants and inventory from your edge function
+                const { jwtDecode } = await import("jwt-decode");
+                const decoded: any = jwtDecode(token);
+                const tenantId = decoded?.app_metadata?.tenants?.[0];
+
+                const productUrl = new URL(
+                  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
                 );
-                continue;
-              }
+                productUrl.searchParams.set("tenant_id", tenantId);
+                productUrl.searchParams.set("id", productItem.id);
+                productUrl.searchParams.set("withVariants", "true");
 
-              if (!productMap.has(product.id)) {
-                const categoryName =
-                  product.category?.name || product.category || "Бусад";
-                const categoryId = product.category?.id || null;
-                console.log("🛒 Product category info:", {
-                  productName: product.name,
-                  categoryRaw: product.category,
-                  categoryName: categoryName,
-                  categoryId: categoryId,
+                if (effectiveStoreId && effectiveStoreId !== "all") {
+                  productUrl.searchParams.set("store_id", effectiveStoreId);
+                }
+
+                const productResponse = await fetch(productUrl.toString(), {
+                  headers: { Authorization: `Bearer ${token}` },
                 });
 
-                productMap.set(product.id, {
-                  id: product.id,
-                  name: product.name,
-                  img: product.img || "/default.png",
-                  rawImg: product.img, // Store original path for URL resolution
-                  category: categoryName, // Add category
-                  categoryId: categoryId, // Add category ID
-                  variants: [],
-                });
-              }
+                if (productResponse.ok) {
+                  const productData = await productResponse.json();
 
-              // Add variant with stock from inventory
-              productMap.get(product.id).variants.push({
-                variant_id: variant.id,
-                color:
-                  variant.attrs?.color ||
-                  variant.attrs?.Color ||
-                  variant.attrs?.colorName ||
-                  "Default",
-                size:
-                  variant.attrs?.size ||
-                  variant.attrs?.Size ||
-                  variant.attrs?.Хэмжээ ||
-                  "Default",
-                stock: item.qty || 0, // Stock from inventory
-                price: variant.price || 0,
-                name: variant.name,
-                sku: variant.sku,
-                attrs: variant.attrs,
-              });
+                  if (productData.product && productData.variants) {
+                    const variants: Variant[] = productData.variants.map(
+                      (variant: any) => ({
+                        variant_id: variant.id,
+                        color:
+                          variant.attrs?.color ||
+                          variant.attrs?.Color ||
+                          variant.attrs?.colorName ||
+                          "Default",
+                        size:
+                          variant.attrs?.size ||
+                          variant.attrs?.Size ||
+                          variant.attrs?.Хэмжээ ||
+                          "Default",
+                        stock: variant.qty || 0, // qty comes from inventory view in your edge function
+                        price: variant.price || 0,
+                        name: variant.name,
+                        sku: variant.sku,
+                        attrs: variant.attrs,
+                      })
+                    );
+
+                    products.push({
+                      id: productData.product.id,
+                      name: productData.product.name,
+                      img: productData.product.img || "/default.png",
+                      rawImg: productData.product.img,
+                      category: "Unknown", // Will be resolved with category API
+                      categoryId: productData.product.category_id,
+                      variants: variants,
+                    });
+                  }
+                }
+              } catch (error) {
+                console.warn(
+                  "🛒 Failed to load product details:",
+                  productItem.id,
+                  error
+                );
+              }
             }
 
-            const products: Product[] = Array.from(productMap.values());
-
-            console.log("🛒 AddItemModal - Product map size:", productMap.size);
+            console.log(
+              "🛒 AddItemModal - Processed products count:",
+              products.length
+            );
             console.log("🛒 AddItemModal - Resolving image URLs...");
 
             // Resolve image URLs for all products
@@ -404,7 +414,7 @@ export default function AddItemModal({
         }
       })();
     }
-  }, [open, storeId]); // React to modal open and store changes, not category (category filtering is client-side)
+  }, [open, storeId, selectedCat?.id, debouncedQuery]); // React to modal open, store changes, category changes, and debounced search (all server-side filtering)
 
   // Load categories when modal opens
   useEffect(() => {
@@ -488,81 +498,17 @@ export default function AddItemModal({
   };
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let products = catalog;
-
-    console.log("🛒 AddItemModal - Filtering products:", {
-      totalProducts: products.length,
+    // All filtering is now server-side (category, search, store)
+    // This just returns the catalog as-is
+    console.log("🛒 AddItemModal - Server-side filtered catalog:", {
+      totalProducts: catalog.length,
       selectedCategory: selectedCat?.name,
-      searchQuery: q,
-      sampleProduct: products[0]
-        ? {
-            name: products[0].name,
-            category: products[0].category,
-          }
-        : null,
+      searchQuery: query,
+      note: "All filtering handled server-side via product API",
     });
 
-    // Filter by category if one is selected
-    if (selectedCat?.id) {
-      const beforeFilter = products.length;
-      products = products.filter((p) => {
-        // Check if product category matches selected category
-        const productCategory = p.category;
-        const productCategoryId = p.categoryId;
-
-        // Try multiple matching strategies:
-        // 1. Category ID match (most reliable)
-        // 2. Exact name match
-        // 3. Case-insensitive match
-        // 4. Partial matches
-        const matches =
-          (productCategoryId &&
-            selectedCat.id &&
-            productCategoryId === selectedCat.id) ||
-          productCategory === selectedCat.name ||
-          (productCategory &&
-            selectedCat.name &&
-            productCategory.toLowerCase() === selectedCat.name.toLowerCase()) ||
-          (productCategory &&
-            selectedCat.name &&
-            productCategory
-              .toLowerCase()
-              .includes(selectedCat.name.toLowerCase())) ||
-          (productCategory &&
-            selectedCat.name &&
-            selectedCat.name
-              .toLowerCase()
-              .includes(productCategory.toLowerCase()));
-
-        if (!matches) {
-          console.log("🛒 Category mismatch:", {
-            productName: p.name,
-            productCategory: productCategory,
-            productCategoryId: productCategoryId,
-            selectedCategory: selectedCat.name,
-            selectedCategoryId: selectedCat.id,
-            matches,
-          });
-        }
-
-        return matches;
-      });
-
-      console.log("🛒 Category filtering result:", {
-        before: beforeFilter,
-        after: products.length,
-        selectedCategory: selectedCat.name,
-      });
-    }
-
-    // Filter by search query
-    if (q) {
-      products = products.filter((p) => p.name.toLowerCase().includes(q));
-    }
-
-    return products;
-  }, [catalog, query, selectedCat]);
+    return catalog;
+  }, [catalog, selectedCat?.name, query]);
 
   const selectedVariant: Variant | null = useMemo(() => {
     if (!active || !selColor || !selSize) return null;
@@ -614,27 +560,28 @@ export default function AddItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/40 via-blue-900/40 to-indigo-900/40 backdrop-blur-sm flex items-end md:items-center justify-center p-0 overscroll-contain text-black"
+      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg flex items-center justify-center p-4 overscroll-contain text-black animate-in fade-in duration-500"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
         className="
-          w-full max-w-5xl bg-white/95 backdrop-blur-md
-          h-[90dvh] md:h-auto md:max-h-[90vh]
-          rounded-t-3xl md:rounded-3xl
-          shadow-2xl border border-white/20 flex flex-col overflow-hidden
+          w-full max-w-7xl bg-white/98 backdrop-blur-2xl
+          h-[95dvh] md:max-h-[90vh]
+          rounded-3xl md:rounded-[2rem]
+          shadow-2xl border border-white/30 flex flex-col overflow-hidden
+          animate-in slide-in-from-bottom duration-600 ease-out
         "
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200/50 shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50">
+        {/* Enhanced Modern Header */}
+        <div className="relative p-8 border-b border-gray-200/30 shrink-0 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
                 <svg
-                  className="w-5 h-5 text-white"
+                  className="w-7 h-7 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -647,16 +594,21 @@ export default function AddItemModal({
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Бүтээгдэхүүн сонгох
-              </h2>
+              <div className="flex flex-col">
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                  Бүтээгдэхүүн сонгох
+                </h2>
+                <p className="text-sm text-gray-600 mt-1 font-medium">
+                  Дэлгүүрээс бүтээгдэхүүн хайж, сагсанд нэмэх
+                </p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              className="group w-12 h-12 rounded-2xl bg-white/90 hover:bg-white border border-gray-200/50 hover:border-gray-300 flex items-center justify-center transition-all duration-300 hover:shadow-xl"
             >
               <svg
-                className="w-5 h-5 text-gray-600"
+                className="w-6 h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -664,29 +616,32 @@ export default function AddItemModal({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
             </button>
           </div>
+
+          {/* Elegant gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-t-[2rem] pointer-events-none"></div>
         </div>
 
-        {/* Scrollable content */}
+        {/* Enhanced Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* LEFT */}
-            <div className="bg-white/60 backdrop-blur-sm border border-white/40 rounded-2xl overflow-hidden flex flex-col h-full shadow-sm">
-              <div className="p-4 border-b border-gray-200/50 shrink-0">
-                <div className="relative">
+            {/* Enhanced Product Search & Selection */}
+            <div className="bg-white/80 backdrop-blur-xl border border-white/50 rounded-3xl overflow-hidden flex flex-col h-full shadow-lg shadow-blue-500/10">
+              <div className="p-6 border-b border-gray-200/40 shrink-0 bg-gradient-to-br from-white/90 to-blue-50/60">
+                <div className="relative group">
                   <input
-                    className="h-12 w-full border-2 border-gray-200 rounded-xl px-4 pl-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                    placeholder="Хайх: нэр, код"
+                    className="h-14 w-full border-2 border-gray-200/60 rounded-2xl px-6 pl-14 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-white/90 backdrop-blur-sm font-medium placeholder:text-gray-500 shadow-sm"
+                    placeholder="🔍 Хайх: нэр, код, бренд..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <svg
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                    className="absolute left-5 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400 group-focus-within:text-blue-500 transition-colors"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -694,10 +649,31 @@ export default function AddItemModal({
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
+                  {/* Clear button when search has content */}
+                  {query && (
+                    <button
+                      onClick={() => setQuery("")}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4 text-gray-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 <div className="mt-4">
                   <div className="flex items-center justify-between mb-3">
@@ -758,27 +734,29 @@ export default function AddItemModal({
                       </div>
                     ) : (
                       <div className="p-3">
-                        {!selectedCat && (
-                          <button
-                            onClick={() => setSelectedCat(null)}
-                            className="w-full text-left px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:text-blue-600 rounded-lg mb-2 transition-all duration-200 flex items-center gap-2 bg-white/50"
+                        <button
+                          onClick={() => setSelectedCat(null)}
+                          className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg mb-2 transition-all duration-200 flex items-center gap-2 ${
+                            !selectedCat
+                              ? "bg-blue-100 text-blue-700 border border-blue-200"
+                              : "text-gray-700 hover:bg-white hover:text-blue-600 bg-white/50"
+                          }`}
+                        >
+                          <svg
+                            className="w-4 h-4 text-blue-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
                           >
-                            <svg
-                              className="w-4 h-4 text-blue-500"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 11H5m14-7l-7 7 7 7M5 4l7 7-7 7"
-                              />
-                            </svg>
-                            Бүгд
-                          </button>
-                        )}
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 11H5m14-7l-7 7 7 7M5 4l7 7-7 7"
+                            />
+                          </svg>
+                          Бүгд ({catalog.length})
+                        </button>
                         <CategoryTree
                           nodes={categories}
                           onSelect={(cat) => setSelectedCat(cat)}
@@ -787,6 +765,50 @@ export default function AddItemModal({
                       </div>
                     )}
                   </div>
+
+                  {/* Debug Info - Remove this in production */}
+                  {process.env.NODE_ENV === "development" && (
+                    <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200 text-xs">
+                      <div className="font-semibold text-green-800 mb-2">
+                        Debug Info (New Server-Side Filtering):
+                      </div>
+                      <div className="text-green-700">
+                        <div>Store ID: {storeId || "all"}</div>
+                        <div>
+                          Search Query: "{query}" {query ? "✓" : ""}
+                        </div>
+                        <div>
+                          Selected Category:{" "}
+                          {selectedCat
+                            ? `${selectedCat.name} (ID: ${selectedCat.id}) ✓`
+                            : "None"}
+                        </div>
+                        <div>
+                          Products Loaded: {catalog.length} (server-filtered)
+                        </div>
+                        <div>Categories Available: {categories.length}</div>
+                        <div className="mt-2 font-medium text-green-800">
+                          API Filters Active:
+                        </div>
+                        <div className="ml-2">
+                          • Store Filter:{" "}
+                          {storeId && storeId !== "all"
+                            ? `✓ ${storeId}`
+                            : "○ All stores"}
+                        </div>
+                        <div className="ml-2">
+                          • Category Filter:{" "}
+                          {selectedCat?.id
+                            ? `✓ ${selectedCat.name}`
+                            : "○ All categories"}
+                        </div>
+                        <div className="ml-2">
+                          • Search Filter:{" "}
+                          {query.trim() ? `✓ "${query}"` : "○ No search"}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

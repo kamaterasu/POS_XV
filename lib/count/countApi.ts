@@ -47,6 +47,13 @@ export type GetCountParams = {
   offset?: number;
 };
 
+export type GetCountResponse = {
+  items: CountItem[];
+  count: number;
+  limit: number;
+  offset: number;
+};
+
 export type CompareCountPayload = {
   store_id: string;
   items: Array<{
@@ -61,7 +68,9 @@ export type CompareCountPayload = {
  * Get system quantities for variants in a store
  * GET /functions/v1/count
  */
-export async function getSystemCount(params: GetCountParams) {
+export async function getSystemCount(
+  params: GetCountParams
+): Promise<GetCountResponse> {
   try {
     const token = await getAccessToken();
     const tenant_id = await getTenantId();
@@ -109,12 +118,7 @@ export async function getSystemCount(params: GetCountParams) {
       );
     }
 
-    return (await response.json()) as {
-      items: CountItem[];
-      count: number;
-      limit: number;
-      offset: number;
-    };
+    return (await response.json()) as GetCountResponse;
   } catch (error) {
     console.error("Error fetching system count:", error);
     throw error;

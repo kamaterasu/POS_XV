@@ -36,8 +36,10 @@ export async function applyCountAdjustments(
         variant_id: item.variant_id,
         store_id: store_id,
         delta: item.delta, // Can be positive or negative
-        reason: "COUNT",
+        reason: "ADJUSTMENT",
         note: `Count adjustment: ${item.status} (Delta: ${item.delta})`,
+        ref_table: "stock_count",
+        ref_id: `count_${Date.now()}`,
       });
 
       results.push({
@@ -100,8 +102,10 @@ export async function applyCountAdjustmentsWithProgress(
         variant_id: item.variant_id,
         store_id: store_id,
         delta: item.delta,
-        reason: "COUNT",
+        reason: "ADJUSTMENT",
         note: `Count adjustment: ${item.status} (Delta: ${item.delta})`,
+        ref_table: "stock_count",
+        ref_id: `count_${Date.now()}`,
       });
 
       results.push({

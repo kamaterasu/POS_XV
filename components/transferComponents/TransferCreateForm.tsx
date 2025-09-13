@@ -296,7 +296,7 @@ export default function TransferCreateForm({
 
         {/* Items */}
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          {/* <div className="flex justify-between items-center">
             <label className="block text-sm font-medium text-gray-700">
               Шилжүүлэх барааны жагсаалт
             </label>
@@ -322,7 +322,7 @@ export default function TransferCreateForm({
               <Plus className="h-4 w-4 mr-1" />
               Бараа нэмэх
             </button>
-          </div>
+          </div> */}
 
           {/* Search filter for products */}
           {formData.src_store_id && variants.length > 0 && (

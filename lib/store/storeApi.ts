@@ -26,10 +26,7 @@ function getTenantIdFromToken(token: string): string | undefined {
   }
 }
 
-async function fetchJson<T>(
-  url: string | URL,
-  init: RequestInit
-): Promise<T> {
+async function fetchJson<T>(url: string | URL, init: RequestInit): Promise<T> {
   const res = await fetch(typeof url === "string" ? url : url.toString(), {
     cache: "no-store",
     ...init,
@@ -63,10 +60,18 @@ async function getTenantWithStores(
   url.searchParams.set("id", tid);
   url.searchParams.set("withStores", "true");
 
-  return await fetchJson<TenantResp>(url, {
+  const response = await fetchJson<{ tenant: any; stores: StoreRow[] }>(url, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
+
+  // Backend returns { tenant: {...}, stores: [...] }, transform to expected format
+  return {
+    id: response.tenant.id,
+    name: response.tenant.name,
+    stores: response.stores || [],
+    ...response.tenant,
+  };
 }
 
 /** ==== Public API ==== */

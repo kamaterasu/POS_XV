@@ -85,39 +85,39 @@ export default function QuickActionsSheet({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center"
+      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg flex items-end justify-center animate-in fade-in duration-500"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-3xl bg-white rounded-t-2xl p-0"
+        className="w-full max-w-4xl bg-white/98 backdrop-blur-2xl rounded-t-[2rem] p-0 shadow-2xl border-t border-white/30 animate-in slide-in-from-bottom duration-600 ease-out"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Tabs */}
-        <div className="px-4 pt-4">
-          <div className="h-1.5 w-12 bg-black/10 rounded mx-auto mb-3" />
-          <div className="flex gap-2 text-sm">
+        {/* Enhanced Tabs */}
+        <div className="px-6 pt-6">
+          <div className="h-2 w-16 bg-gradient-to-r from-gray-300 to-gray-400 rounded-full mx-auto mb-6" />
+          <div className="flex gap-3 text-sm">
             <button
-              className={`px-3 h-9 rounded ${
+              className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-300 ${
                 tab === "settings"
-                  ? "bg-[#EAF2FF] text-[#1A274F] border border-[#CFE3FF]"
-                  : "border"
+                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30"
+                  : "border-2 border-gray-200 hover:border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
               }`}
               onClick={() => setTab("settings")}
             >
-              Гарын доорх тохиргоо
+              ⚙️ Гарын доорх тохиргоо
             </button>
             {Boolean(favorites?.length) && (
               <button
-                className={`px-3 h-9 rounded ${
+                className={`px-6 py-3 rounded-2xl font-semibold transition-all duration-300 ${
                   tab === "favorites"
-                    ? "bg-[#EAF2FF] text-[#1A274F] border border-[#CFE3FF]"
-                    : "border"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30"
+                    : "border-2 border-gray-200 hover:border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
                 onClick={() => setTab("favorites")}
               >
-                Дуртай бараа
+                ⭐ Дуртай бараа
               </button>
             )}
             <div className="ml-auto" />

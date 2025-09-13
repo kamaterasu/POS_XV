@@ -4,29 +4,60 @@ import {
   getCheckoutOrders,
   type CheckoutOrdersList,
   type CheckoutOrder,
+  type CheckoutOrderDetail,
 } from "@/lib/checkout/checkoutApi";
 import { fmt } from "@/lib/sales/salesUtils";
+
+interface CheckoutHistoryDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSelectOrder?: (order: CheckoutOrder) => void;
+  orderHistory?: CheckoutOrdersList | null;
+  loadingHistory?: boolean;
+  orderSearchTerm?: string;
+  onSearchChange?: (term: string) => void;
+  onLoadHistory?: () => void;
+  onViewOrderDetail?: (orderId: string) => void;
+  selectedOrderDetail?: CheckoutOrderDetail | null;
+  loadingOrderDetail?: boolean;
+  onCloseOrderDetail?: () => void;
+}
 
 export default function CheckoutHistoryDialog({
   open,
   onClose,
   onSelectOrder,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSelectOrder?: (order: CheckoutOrder) => void;
-}) {
+  orderHistory,
+  loadingHistory = false,
+  orderSearchTerm = "",
+  onSearchChange,
+  onLoadHistory,
+  onViewOrderDetail,
+  selectedOrderDetail,
+  loadingOrderDetail = false,
+  onCloseOrderDetail,
+}: CheckoutHistoryDialogProps) {
   const [orders, setOrders] = useState<CheckoutOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
-      loadOrders();
+    if (open && onLoadHistory && !orderHistory) {
+      onLoadHistory();
     }
-  }, [open]);
+  }, [open, onLoadHistory, orderHistory]);
+
+  // Use parent's order data or fallback to local state
+  const displayOrders = orderHistory?.items || orders;
+  const displayLoading = loadingHistory || loading;
 
   const loadOrders = async () => {
+    if (onLoadHistory) {
+      onLoadHistory();
+      return;
+    }
+
+    // Fallback to local loading if parent doesn't provide onLoadHistory
     setLoading(true);
     setError(null);
     try {
@@ -84,26 +115,121 @@ export default function CheckoutHistoryDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white text-black w-full max-w-2xl max-h-[80vh] rounded-xl shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Сүүлийн захиалгууд</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-lg"
-          >
-            ✕
-          </button>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg animate-in fade-in duration-500">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative bg-white/98 backdrop-blur-2xl text-black w-full max-w-4xl max-h-[90vh] rounded-[2rem] shadow-2xl border border-white/30 overflow-hidden animate-in slide-in-from-bottom duration-600 ease-out">
+        {/* Enhanced Modern Header */}
+        <div className="relative p-8 border-b border-gray-200/30 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
+                <svg
+                  className="w-7 h-7 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                  Захиалгын түүх
+                </h2>
+                <p className="text-sm text-gray-600 mt-1 font-medium">
+                  Хийсэн захиалгуудын түүх болон дэлгэрэнгүй мэдээлэл
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="group w-12 h-12 rounded-2xl bg-white/90 hover:bg-white border border-gray-200/50 hover:border-gray-300 flex items-center justify-center transition-all duration-300 hover:shadow-xl"
+            >
+              <svg
+                className="w-6 h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Enhanced Search Bar */}
+          {onSearchChange && (
+            <div className="relative group">
+              <input
+                type="text"
+                placeholder="🔍 Захиалгын дугаар эсвэл огноогоор хайх..."
+                value={orderSearchTerm}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="w-full h-14 border-2 border-gray-200/60 rounded-2xl px-6 pl-14 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 bg-white/90 backdrop-blur-sm font-medium placeholder:text-gray-500 shadow-sm"
+              />
+              <svg
+                className="absolute left-5 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400 group-focus-within:text-blue-500 transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              {orderSearchTerm && (
+                <button
+                  onClick={() => onSearchChange("")}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                  title="Цэвэрлэх"
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Elegant gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-t-[2rem] pointer-events-none"></div>
         </div>
 
-        {/* Content */}
-        <div className="overflow-y-auto max-h-[60vh]">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-2">Ачаалж байна...</span>
+        {/* Enhanced Content */}
+        <div className="overflow-y-auto max-h-[60vh] bg-gradient-to-br from-gray-50/50 to-white">
+          {displayLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+                <span className="text-lg font-medium text-gray-700">
+                  Ачаалж байна...
+                </span>
+                <p className="text-sm text-gray-500 mt-1">
+                  Захиалгын түүх ачаалж байна
+                </p>
+              </div>
             </div>
           ) : error ? (
             <div className="p-4 text-center text-red-600">
@@ -115,21 +241,25 @@ export default function CheckoutHistoryDialog({
                 Дахин оролдох
               </button>
             </div>
-          ) : orders.length === 0 ? (
+          ) : displayOrders.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              Захиалга олдсонгүй
+              {orderSearchTerm
+                ? "Хайлтын үр дүн олдсонгүй"
+                : "Захиалга олдсонгүй"}
             </div>
           ) : (
             <div className="p-4 space-y-3">
-              {orders.map((order) => (
+              {displayOrders.map((order) => (
                 <div
                   key={order.id}
                   className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={() => {
-                    if (onSelectOrder) {
+                    if (onViewOrderDetail) {
+                      onViewOrderDetail(order.id);
+                    } else if (onSelectOrder) {
                       onSelectOrder(order);
+                      onClose();
                     }
-                    onClose();
                   }}
                 >
                   <div className="flex items-start justify-between">
@@ -206,7 +336,7 @@ export default function CheckoutHistoryDialog({
           >
             Хаах
           </button>
-          {orders.length > 0 && (
+          {displayOrders.length > 0 && (
             <button
               onClick={loadOrders}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -215,6 +345,154 @@ export default function CheckoutHistoryDialog({
             </button>
           )}
         </div>
+
+        {/* Order Detail Modal */}
+        {selectedOrderDetail && onCloseOrderDetail && (
+          <div className="absolute inset-0 bg-white z-10">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                Захиалгын дэлгэрэнгүй #
+                {selectedOrderDetail.order.order_no ||
+                  selectedOrderDetail.order.id.slice(-8)}
+              </h3>
+              <button
+                onClick={onCloseOrderDetail}
+                className="text-gray-500 hover:text-gray-700 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto max-h-[60vh] p-4">
+              {loadingOrderDetail ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-2">Ачаалж байна...</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Order Info */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-medium mb-2">Захиалгын мэдээлэл</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        Дугаар:{" "}
+                        {selectedOrderDetail.order.order_no ||
+                          selectedOrderDetail.order.id}
+                      </div>
+                      <div>
+                        Статус:{" "}
+                        {getStatusText(selectedOrderDetail.order.status)}
+                      </div>
+                      <div>
+                        Огноо:{" "}
+                        {formatDate(selectedOrderDetail.order.created_at)}
+                      </div>
+                      <div>Дэлгүүр: {selectedOrderDetail.order.store_id}</div>
+                    </div>
+                  </div>
+
+                  {/* Items */}
+                  <div>
+                    <h4 className="font-medium mb-2">Бүтээгдэхүүн</h4>
+                    <div className="space-y-2">
+                      {selectedOrderDetail.items.map((item, index) => (
+                        <div
+                          key={item.id}
+                          className="flex justify-between items-center p-3 border rounded"
+                        >
+                          <div>
+                            <div className="font-medium">
+                              Variant: {item.variant_id}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {item.quantity} × {fmt(item.unit_price)}
+                            </div>
+                          </div>
+                          <div className="font-medium">
+                            {fmt(item.quantity * item.unit_price)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payments */}
+                  <div>
+                    <h4 className="font-medium mb-2">Төлбөр</h4>
+                    <div className="space-y-2">
+                      {selectedOrderDetail.payments.map((payment, index) => (
+                        <div
+                          key={payment.id}
+                          className="flex justify-between items-center p-3 border rounded"
+                        >
+                          <div>
+                            <div className="font-medium">{payment.method}</div>
+                            <div className="text-sm text-gray-600">
+                              {formatDate(payment.paid_at)}
+                            </div>
+                          </div>
+                          <div className="font-medium">
+                            {fmt(payment.amount)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Totals */}
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Дэд дүн:</span>
+                        <span>{fmt(selectedOrderDetail.order.subtotal)}</span>
+                      </div>
+                      {selectedOrderDetail.order.discount > 0 && (
+                        <div className="flex justify-between text-red-600">
+                          <span>Хөнгөлөлт:</span>
+                          <span>
+                            -{fmt(selectedOrderDetail.order.discount)}
+                          </span>
+                        </div>
+                      )}
+                      {selectedOrderDetail.order.tax > 0 && (
+                        <div className="flex justify-between text-amber-600">
+                          <span>Татвар:</span>
+                          <span>{fmt(selectedOrderDetail.order.tax)}</span>
+                        </div>
+                      )}
+                      <hr />
+                      <div className="flex justify-between font-semibold text-lg">
+                        <span>Нийт:</span>
+                        <span>{fmt(selectedOrderDetail.order.total)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t p-4 flex justify-end gap-2">
+              <button
+                onClick={onCloseOrderDetail}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+              >
+                Буцах
+              </button>
+              {onSelectOrder && (
+                <button
+                  onClick={() => {
+                    onSelectOrder(selectedOrderDetail.order);
+                    onClose();
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Баримт харах
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

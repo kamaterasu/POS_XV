@@ -76,22 +76,22 @@ export default function DraftManagerDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/60 via-blue-900/50 to-indigo-900/60 backdrop-blur-sm flex items-end md:items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg flex items-center justify-center p-4 animate-in fade-in duration-500"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-4xl bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 overflow-hidden max-h-[90vh] flex flex-col"
+        className="w-full max-w-5xl bg-white/98 backdrop-blur-2xl rounded-[2rem] shadow-2xl border border-white/30 overflow-hidden max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-600 ease-out"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-6 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200/50">
+        {/* Enhanced Modern Header */}
+        <div className="relative p-8 pb-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b border-gray-200/30">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
                 <svg
-                  className="w-6 h-6 text-white"
+                  className="w-7 h-7 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -104,30 +104,30 @@ export default function DraftManagerDialog({
                   />
                 </svg>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">
+              <div className="flex flex-col">
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
                   Түр хадгалсан өгөгдөл
                 </h2>
-                <p className="text-sm text-gray-600">
-                  {drafts.length} ширхэг түр хадгалагдсан
+                <p className="text-sm text-gray-600 mt-1 font-medium">
+                  {drafts.length} ширхэг түр хадгалагдсан захиалга
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {drafts.length > 0 && (
                 <button
                   onClick={clearAllDrafts}
-                  className="px-3 py-1.5 text-sm text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-sm font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded-xl transition-all duration-200 border border-red-200/50 hover:border-red-300"
                 >
                   Бүгдийг устгах
                 </button>
               )}
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                className="group w-12 h-12 rounded-2xl bg-white/90 hover:bg-white border border-gray-200/50 hover:border-gray-300 flex items-center justify-center transition-all duration-300 hover:shadow-xl"
               >
                 <svg
-                  className="w-5 h-5 text-gray-600"
+                  className="w-6 h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -135,13 +135,16 @@ export default function DraftManagerDialog({
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
               </button>
             </div>
           </div>
+
+          {/* Elegant gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-t-[2rem] pointer-events-none"></div>
         </div>
 
         {/* Content */}

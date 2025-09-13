@@ -9,7 +9,12 @@ import { Item, QuickActions, PaymentRow } from "@/lib/sales/salesTypes";
 import { fmt, calcTotals } from "@/lib/sales/salesUtils";
 import {
   createCheckoutOrder,
+  getCheckoutOrders,
+  getCheckoutOrder,
+  getCheckout,
   type PaymentInput,
+  type CheckoutOrdersList,
+  type CheckoutOrderDetail,
   normalizeMethod,
 } from "@/lib/checkout/checkoutApi";
 
@@ -88,6 +93,30 @@ export default function CheckoutPage() {
   // processing
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // order history
+  const [orderHistory, setOrderHistory] = useState<CheckoutOrdersList | null>(
+    null
+  );
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedOrderDetail, setSelectedOrderDetail] =
+    useState<CheckoutOrderDetail | null>(null);
+  const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
+  const [orderSearchTerm, setOrderSearchTerm] = useState("");
+
+  // Notification system
+  const [notification, setNotification] = useState<{
+    type: "success" | "error" | "info";
+    message: string;
+  } | null>(null);
+
+  const showNotification = (
+    type: "success" | "error" | "info",
+    message: string
+  ) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   // store + products
   const [storeId, setStoreId] = useState<string | null>(null);
   const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
@@ -110,6 +139,13 @@ export default function CheckoutPage() {
   const [selColor, setSelColor] = useState<string | null>(null);
   const [selSize, setSelSize] = useState<string | null>(null);
 
+  // Auto-load order history when history dialog opens
+  useEffect(() => {
+    if (openHistory && !orderHistory && !loadingHistory) {
+      loadOrderHistory(storeId || undefined);
+    }
+  }, [openHistory, orderHistory, loadingHistory, storeId]);
+
   const goToDashboard = () => router.push("/dashboard");
   const uniq = <T,>(arr: T[]) => Array.from(new Set(arr));
   const colorLabel = (c?: string) => {
@@ -121,6 +157,70 @@ export default function CheckoutPage() {
     return c ?? "—";
   };
   const colorKeyOf = (v: VariantOpt) => v.colorHex ?? v.color ?? "—";
+
+  // Load order history
+  const loadOrderHistory = async (storeIdFilter?: string) => {
+    setLoadingHistory(true);
+    try {
+      const orders = await getCheckoutOrders(storeIdFilter, 50, 0);
+      setOrderHistory(orders);
+    } catch (error) {
+      console.error("Failed to load order history:", error);
+      showNotification("error", "Захиалгын түүх ачаалахад алдаа гарлаа");
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Load specific order detail
+  const loadOrderDetail = async (orderId: string) => {
+    setLoadingOrderDetail(true);
+    try {
+      const detail = await getCheckoutOrder(orderId);
+      setSelectedOrderDetail(detail);
+    } catch (error) {
+      console.error("Failed to load order detail:", error);
+      showNotification("error", "Захиалгын дэлгэрэнгүй ачаалахад алдаа гарлаа");
+    } finally {
+      setLoadingOrderDetail(false);
+    }
+  };
+
+  // Search orders
+  const searchOrders = async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      loadOrderHistory(storeId || undefined);
+      return;
+    }
+
+    setLoadingHistory(true);
+    try {
+      // Load all orders first, then filter client-side
+      // In a production app, this should be server-side filtering
+      const orders = await getCheckoutOrders(storeId || undefined, 200, 0);
+      if (orders) {
+        const filtered = {
+          ...orders,
+          items: orders.items.filter(
+            (order) =>
+              order.order_no
+                ?.toLowerCase()
+                .includes(searchTerm.toLowerCase()) ||
+              order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              new Date(order.created_at)
+                .toLocaleDateString()
+                .includes(searchTerm)
+          ),
+        };
+        setOrderHistory(filtered);
+      }
+    } catch (error) {
+      console.error("Failed to search orders:", error);
+      showNotification("error", "Захиалга хайхад алдаа гарлаа");
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   const normalizeVariants = (det: any): VariantOpt[] => {
     const raw = (det?.variants ??
@@ -149,32 +249,113 @@ export default function CheckoutPage() {
     });
   };
 
-  const openVariantPicker = async (p: ProductRow) => {
-    // Since each item is now a specific variant, we can add it directly to cart
-    const variantId = p.variantId || p.id.split("-")[1] || p.id;
-    const productId = p.productId || p.id.split("-")[0] || p.id;
+  // Add product to cart with validation
+  const addToCart = (product: ProductRow, quantity: number = 1) => {
+    if (!product.variantId) {
+      showNotification("error", "Бүтээгдэхүүний мэдээлэл дутуу байна");
+      return;
+    }
 
-    // Add directly to cart since this is already a specific variant
+    if (product.qty <= 0) {
+      showNotification("error", `${product.name} дууссан байна`);
+      return;
+    }
+
+    const variantId = product.variantId;
+    const productId =
+      product.productId || product.id.split("-")[0] || product.id;
+
     setItems((prev) => {
-      const i = prev.findIndex((it) => it.variant_id === variantId);
-      if (i > -1) {
-        const copy = [...prev];
-        copy[i] = { ...copy[i], qty: copy[i].qty + 1 };
-        return copy;
+      const existingIndex = prev.findIndex(
+        (item) => item.variant_id === variantId
+      );
+
+      if (existingIndex > -1) {
+        const existing = prev[existingIndex];
+        const newQty = existing.qty + quantity;
+
+        // Check stock limit
+        if (newQty > product.qty) {
+          showNotification(
+            "error",
+            `${product.name} - Хангалттай нөөц байхгүй (үлдэгдэл: ${product.qty})`
+          );
+          return prev;
+        }
+
+        const updated = [...prev];
+        updated[existingIndex] = { ...existing, qty: newQty };
+        showNotification(
+          "success",
+          `${product.name} сагсанд нэмэгдлээ (${newQty})`
+        );
+        return updated;
       }
-      return [
-        {
-          id: productId,
-          variant_id: variantId,
-          name: p.name,
-          price: p.price,
-          qty: 1,
-          imgPath: p.imgPath || "/default.png",
-          size: "", // Will be filled from actual variant data if needed
-          color: "", // Will be filled from actual variant data if needed
-        },
-        ...prev,
-      ];
+
+      // Check if we can add initial quantity
+      if (quantity > product.qty) {
+        showNotification(
+          "error",
+          `${product.name} - Хангалттай нөөц байхгүй (үлдэгдэл: ${product.qty})`
+        );
+        return prev;
+      }
+
+      const newItem: CartItem = {
+        id: productId,
+        variant_id: variantId,
+        name: product.name,
+        price: product.price,
+        qty: quantity,
+        imgPath: product.imgPath || "/default.png",
+        size: "",
+        color: "",
+      };
+
+      showNotification("success", `${product.name} сагсанд нэмэгдлээ`);
+      return [newItem, ...prev];
+    });
+  };
+
+  const openVariantPicker = async (p: ProductRow) => {
+    addToCart(p, 1);
+  };
+
+  // Remove item from cart
+  const removeFromCart = (variantId: string) => {
+    setItems((prev) => {
+      const filtered = prev.filter((item) => item.variant_id !== variantId);
+      const removedItem = prev.find((item) => item.variant_id === variantId);
+      if (removedItem) {
+        showNotification("info", `${removedItem.name} сагснаас хасагдлаа`);
+      }
+      return filtered;
+    });
+  };
+
+  // Update item quantity with validation
+  const updateItemQuantity = (variantId: string, newQty: number) => {
+    if (newQty <= 0) {
+      removeFromCart(variantId);
+      return;
+    }
+
+    setItems((prev) => {
+      return prev.map((item) => {
+        if (item.variant_id !== variantId) return item;
+
+        // Find corresponding product for stock validation
+        const product = productList.find((p) => p.variantId === variantId);
+        if (product && newQty > product.qty) {
+          showNotification(
+            "error",
+            `${item.name} - Хангалттай нөөц байхгүй (үлдэгдэл: ${product.qty})`
+          );
+          return item; // Don't change quantity if exceeds stock
+        }
+
+        return { ...item, qty: newQty };
+      });
     });
   };
 
@@ -204,8 +385,18 @@ export default function CheckoutPage() {
           ]);
         }
       } catch (e) {
+        const errorMsg = handleApiError(
+          e,
+          "Дэлгүүрийн жагсаалт ачаалахад алдаа гарлаа"
+        );
         console.error("Load stores error:", e);
-        if (alive) setStores([{ id: "all", name: "Бүх дэлгүүр" }]);
+        if (alive) {
+          setStores([{ id: "all", name: "Бүх дэлгүүр" }]);
+          // Only show error for authentication issues
+          if (String(e).includes("NOT_AUTHENTICATED")) {
+            showNotification("error", errorMsg);
+          }
+        }
       } finally {
         if (alive) setLoadingStores(false);
       }
@@ -215,11 +406,12 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  // 1) storeId resolve
+  // 1) storeId resolve - Single useEffect for cleaner logic
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
+        // Check localStorage first for saved preference
         const fromLS =
           typeof window !== "undefined"
             ? localStorage.getItem("storeId")
@@ -228,13 +420,15 @@ export default function CheckoutPage() {
           if (alive) setStoreId(fromLS);
           return;
         }
+
+        // If no localStorage, get user's default store
         const token = await getAccessToken();
         if (!token) throw new Error("No token");
         const sid = await getStoredID(token);
         if (alive) setStoreId(sid ?? "all"); // Default to "all" if no specific store
       } catch (e) {
         console.error("Resolve storeId error:", e);
-        if (alive) setStoreId(null);
+        if (alive) setStoreId("all"); // Always fallback to "all" instead of null
       }
     })();
     return () => {
@@ -242,160 +436,197 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  // 1) storeId resolve
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const fromLS =
-          typeof window !== "undefined"
-            ? localStorage.getItem("storeId")
-            : null;
-        if (fromLS) {
-          if (alive) setStoreId(fromLS);
-          return;
+  // Load products based on store selection and search
+  const loadProducts = async (
+    selectedStoreId: string,
+    searchQuery: string = ""
+  ) => {
+    if (!selectedStoreId) return;
+
+    setLoadingProducts(true);
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error("Authentication required");
+
+      let invRes: any;
+      let currentDataSource = "store-specific";
+
+      if (selectedStoreId === "all") {
+        // Load global inventory for all stores
+        try {
+          const { jwtDecode } = await import("jwt-decode");
+          const decoded: any = jwtDecode(token);
+          const tenantId = decoded?.app_metadata?.tenants?.[0];
+
+          if (!tenantId) throw new Error("Tenant ID not found");
+
+          const globalResponse = await fetch(
+            `${
+              process.env.NEXT_PUBLIC_SUPABASE_URL
+            }/functions/v1/inventory?tenant_id=${encodeURIComponent(
+              tenantId
+            )}&scope=global&limit=500`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          if (globalResponse.ok) {
+            invRes = await globalResponse.json();
+            currentDataSource = "global";
+          } else {
+            throw new Error("Global inventory not available");
+          }
+        } catch (globalError) {
+          console.warn(
+            "Global inventory failed, using empty list:",
+            globalError
+          );
+          invRes = { items: [] };
         }
-        const token = await getAccessToken();
-        if (!token) throw new Error("No token");
-        const sid = await getStoredID(token);
-        if (alive) setStoreId(sid ?? "all"); // Use the specific store as default, fallback to "all"
-      } catch (e) {
-        console.error("Resolve storeId error:", e);
-        if (alive) setStoreId(null);
+      } else {
+        // Load store-specific inventory
+        invRes = await getProductByStore(token, selectedStoreId);
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
 
-  // 2) тухайн store-ийн inventory + product details
-  useEffect(() => {
-    if (!storeId) return;
-    let alive = true;
+      setDataSource(currentDataSource as "global" | "store-specific");
 
-    (async () => {
-      setLoadingProducts(true);
-      try {
-        const token = await getAccessToken();
-        if (!token) throw new Error("No token");
+      // Process inventory data
+      const rawItems = Array.isArray(invRes)
+        ? invRes
+        : invRes?.items ?? invRes?.data ?? invRes?.products ?? [];
 
-        // Try to get products based on selected store
-        let invRes: any;
-        let dataSource = "store-specific";
+      // Transform to ProductRow format
+      const productList: ProductRow[] = rawItems
+        .filter((item: any) => item?.product?.id && item?.variant_id)
+        .map((item: any) => {
+          const product = item.product;
+          const variant = item.variant;
+          const baseName = String(product?.name ?? "(нэргүй)");
+          const variantName = variant?.name;
 
-        if (storeId === "all") {
-          // Use global scope for "all stores"
-          try {
-            const { jwtDecode } = await import("jwt-decode");
-            const decoded: any = jwtDecode(token);
-            const tenantId = decoded?.app_metadata?.tenants?.[0];
-
-            const globalResponse = await fetch(
-              `${
-                process.env.NEXT_PUBLIC_SUPABASE_URL
-              }/functions/v1/inventory?tenant_id=${encodeURIComponent(
-                tenantId
-              )}&scope=global&limit=500`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-
-            if (globalResponse.ok) {
-              invRes = await globalResponse.json();
-              dataSource = "global";
-              setDataSource("global");
-              console.log("✅ Using global inventory (all stores)");
-            } else {
-              throw new Error("Global scope not available");
-            }
-          } catch (globalError) {
-            console.log("⚠️ Global scope not available, fallback failed");
-            invRes = { items: [] }; // Empty fallback
-            dataSource = "store-specific";
-            setDataSource("store-specific");
-          }
-        } else {
-          // Use store-specific inventory for selected store
-          try {
-            invRes = await getProductByStore(token, storeId);
-            dataSource = "store-specific";
-            setDataSource("store-specific");
-            console.log(
-              `✅ Using store-specific inventory for store: ${storeId}`
-            );
-          } catch (storeError) {
-            console.log("⚠️ Store-specific inventory failed:", storeError);
-            invRes = { items: [] };
-            dataSource = "store-specific";
-            setDataSource("store-specific");
-          }
-        }
-
-        // Use the same logic as inventory page
-        const arr: any[] = Array.isArray(invRes)
-          ? invRes
-          : invRes?.items ?? invRes?.data ?? invRes?.products ?? [];
-
-        // Show all variants as separate products instead of grouping
-        const list: ProductRow[] = arr
-          .filter((item) => {
-            const productId = item?.product?.id;
-            const variantId = item?.variant_id;
-            return productId && variantId;
-          })
-          .map((item) => {
-            const product = item.product;
-            const variant = item.variant;
-            const qty = Number(item?.qty ?? item?.stock ?? 0);
-            const price = Number(variant?.price ?? 0);
-
-            // Create unique display name for variants
-            const baseName = String(product?.name ?? "(нэргүй)");
-            const variantName = variant?.name;
-            const displayName =
+          return {
+            id: `${product.id}-${item.variant_id}`,
+            name:
               variantName && variantName !== baseName
                 ? `${baseName} - ${variantName}`
-                : baseName;
+                : baseName,
+            imgPath: product?.img,
+            price: Number(variant?.price ?? 0),
+            qty: Number(item?.qty ?? item?.stock ?? 0),
+            variantId: item.variant_id,
+            productId: product.id,
+          };
+        });
 
-            return {
-              id: `${product.id}-${item.variant_id}`, // Unique ID for each variant
-              name: displayName,
-              imgPath: product?.img,
-              price: price,
-              qty: qty,
-              // Store the actual variant ID for cart operations
-              variantId: item.variant_id,
-              productId: product.id,
-            };
-          });
+      // Resolve image URLs
+      const productsWithImages = await Promise.all(
+        productList.map(async (product) => ({
+          ...product,
+          imgPath: await resolveImageUrl(product.imgPath),
+        }))
+      );
 
-        const withUrls: ProductRow[] = await Promise.all(
-          list.map(async (row) => ({
-            ...row,
-            imgPath: await resolveImageUrl(row.imgPath),
-          }))
-        );
+      // Apply search filter
+      const searchTerm = searchQuery.trim().toLowerCase();
+      const filteredProducts = searchTerm
+        ? productsWithImages.filter((p) =>
+            p.name.toLowerCase().includes(searchTerm)
+          )
+        : productsWithImages;
 
-        const q = search.trim().toLowerCase();
-        const filtered = q
-          ? withUrls.filter((p) => p.name.toLowerCase().includes(q))
-          : withUrls;
+      setProductList(filteredProducts);
+    } catch (error) {
+      const errorMsg = handleApiError(
+        error,
+        "Бүтээгдэхүүн ачаалахад алдаа гарлаа"
+      );
+      console.error("Load products failed:", error);
+      setProductList([]);
 
-        if (alive) setProductList(filtered);
-      } catch (e) {
-        console.error("Load products for checkout failed:", e);
-        if (alive) setProductList([]);
-      } finally {
-        if (alive) setLoadingProducts(false);
+      // Show error for critical issues
+      if (
+        String(error).includes("NOT_AUTHENTICATED") ||
+        String(error).includes("tenant_id")
+      ) {
+        showNotification("error", errorMsg);
       }
-    })();
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
 
-    return () => {
-      alive = false;
-    };
+  // 2) Load products when store or search changes
+  useEffect(() => {
+    if (storeId) {
+      loadProducts(storeId, search);
+    }
   }, [storeId, search]);
+
+  // Enhanced error handling helper
+  const handleApiError = (
+    error: any,
+    defaultMessage: string = "Тодорхойгүй алдаа гарлаа"
+  ) => {
+    console.error("API Error:", error);
+    const errorMessage = String(error?.message ?? "");
+
+    // Network errors
+    if (
+      errorMessage.includes("Failed to fetch") ||
+      errorMessage.includes("NetworkError")
+    ) {
+      return "Интернэт холболт тасарсан байна. Дахин оролдоно уу.";
+    }
+
+    // Authentication errors
+    if (
+      errorMessage.includes("NOT_AUTHENTICATED") ||
+      errorMessage.includes("401")
+    ) {
+      return "Нэвтрэх эрх дууссан байна. Дахин нэвтэрнэ үү.";
+    }
+
+    // Authorization errors
+    if (errorMessage.includes("tenant_id") || errorMessage.includes("403")) {
+      return "Танд байгууллагын эрх байхгүй байна.";
+    }
+
+    if (errorMessage.includes("store_id")) {
+      return "Дэлгүүрийн эрх байхгүй байна.";
+    }
+
+    // Validation errors
+    if (
+      errorMessage.includes("variant_id") ||
+      errorMessage.includes("validation")
+    ) {
+      return "Бүтээгдэхүүний мэдээлэл буруу байна. Дахин сонгоно уу.";
+    }
+
+    // UUID validation error (like "invalid input syntax for type uuid")
+    if (errorMessage.includes("invalid input syntax for type uuid")) {
+      return "Дэлгүүрийн ID буруу байна. Тодорхой дэлгүүр сонгоно уу.";
+    }
+
+    if (
+      errorMessage.includes("insufficient") ||
+      errorMessage.includes("stock")
+    ) {
+      return "Хангалттай нөөц байхгүй байна.";
+    }
+
+    // Server errors
+    if (
+      errorMessage.includes("500") ||
+      errorMessage.includes("Internal Server Error")
+    ) {
+      return "Серверийн алдаа гарлаа. Дахин оролдоно уу.";
+    }
+
+    // Return the actual error message if it's user-friendly, otherwise use default
+    return errorMessage.length > 0 && errorMessage.length < 100
+      ? errorMessage
+      : defaultMessage;
+  };
 
   // 3) төлбөр
   const handleCheckout = async (
@@ -403,13 +634,38 @@ export default function CheckoutPage() {
     _totalReceived: number,
     _change: number
   ) => {
-    if (items.length === 0) return alert("Захиалгад бүтээгдэхүүн нэмнэ үү");
+    // Enhanced validation with better error messages
+    if (items.length === 0) {
+      showNotification("error", "Захиалгад бүтээгдэхүүн нэмнэ үү");
+      return;
+    }
+
     const missing = items.filter((i) => !i.variant_id);
     if (missing.length) {
       console.error("Items missing variant_id:", missing);
-      return alert("Зарим мөрт variant сонгогдоогүй байна. (size/color)");
+      showNotification(
+        "error",
+        "Зарим бүтээгдэхүүнд хэмжээ/өнгө сонгогдоогүй байна. Дахин сонгоно уу."
+      );
+      return;
     }
-    if (!storeId) return alert("Store сонгогдоогүй байна");
+
+    if (!storeId || storeId === "all") {
+      showNotification(
+        "error",
+        "Захиалга үүсгэхийн тулд тодорхой дэлгүүр сонгоно уу. 'Бүх дэлгүүр' сонголтоор захиалга үүсгэх боломжгүй."
+      );
+      return;
+    }
+
+    const totalPayments = paymentRows.reduce((sum, p) => sum + p.amount, 0);
+    if (Math.abs(totalPayments - totals.grand) > 1) {
+      showNotification(
+        "error",
+        "Төлбөрийн дүн таарахгүй байна. Дахин шалгаарай."
+      );
+      return;
+    }
 
     setIsProcessing(true);
     try {
@@ -417,7 +673,7 @@ export default function CheckoutPage() {
       const discount = Math.round(totals.discount);
 
       const payments: PaymentInput[] = paymentRows.map((r) => ({
-        method: normalizeMethod(r.method), // <-- жижиг/том үсгийг засна
+        method: normalizeMethod(r.method),
         amount: Math.round(r.amount),
         ref: (r as any).ref,
       }));
@@ -432,35 +688,35 @@ export default function CheckoutPage() {
         { tax, discount },
         storeId
       );
-      console.log(
-        "creata order",
-        items.map((it) => ({
-          variantId: it.variant_id!,
-          qty: it.qty,
-          price: it.price,
-        })),
-        payments,
-        { tax, discount },
-        storeId
-      );
+
+      // Clear cart and reset state on success
       setItems([]);
       setQa({ discountPercent: 0, deliveryFee: 0, includeVAT: false });
       setOpenPay(false);
-      alert(
-        `Захиалга амжилттай! Order: ${String(result?.order?.id || "").slice(
-          -8
-        )}`
+
+      // Refresh order history if it's loaded
+      if (orderHistory) {
+        loadOrderHistory(storeId);
+      }
+
+      const orderNumber =
+        result?.order?.order_no ||
+        result?.order?.id?.slice(-8) ||
+        "Тодорхойгүй";
+      showNotification(
+        "success",
+        `Захиалга амжилттай үүсгэгдлээ! Дугаар: ${orderNumber}`
       );
-      if (result?.order?.id) router.push(`/receipt?orderId=${result.order.id}`);
+
+      if (result?.order?.id) {
+        router.push(`/receipt?orderId=${result.order.id}`);
+      }
     } catch (error: any) {
-      console.error("Checkout error:", error);
-      const t = String(error?.message ?? "");
-      let msg = "Тодорхойгүй алдаа";
-      if (t.includes("tenant_id")) msg = "Танд байгууллагын эрх байхгүй байна.";
-      else if (t.includes("store_id")) msg = "Дэлгүүрийн эрх байхгүй.";
-      else if (t.includes("NOT_AUTHENTICATED")) msg = "Дахин нэвтэрнэ үү.";
-      else msg = t;
-      alert(`Захиалга үүсгэхэд алдаа: ${msg}`);
+      const userMessage = handleApiError(
+        error,
+        "Захиалга үүсгэхэд алдаа гарлаа"
+      );
+      showNotification("error", userMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -531,6 +787,28 @@ export default function CheckoutPage() {
               Бүх дэлгүүр
             </span>
           )}
+
+          {/* Quick Order Stats */}
+          {orderHistory && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <span>
+                Өнөөдөр:{" "}
+                {
+                  orderHistory.items.filter((o) => {
+                    const today = new Date().toDateString();
+                    const orderDate = new Date(o.created_at).toDateString();
+                    return today === orderDate;
+                  }).length
+                }{" "}
+                захиалга
+              </span>
+              {orderHistory.count > orderHistory.items.length && (
+                <span className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">
+                  +{orderHistory.count - orderHistory.items.length}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -538,162 +816,363 @@ export default function CheckoutPage() {
         {/* Search + grid */}
         <section className="mb-4">
           <div className="flex items-center gap-3 mb-3">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Бүтээгдэхүүн хайх..."
-              className="flex-1 px-4 py-2 rounded-xl bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              disabled={!storeId}
-            />
-            <span className="text-sm text-gray-600">
-              {!storeId
-                ? "Store сонгогдоогүй"
-                : loadingProducts
-                ? "Ачааллаж..."
-                : `${productList.length} олдлоо`}
-            </span>
+            <div className="flex-1 relative">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Бүтээгдэхүүн хайх..."
+                className="w-full px-4 py-2 pl-10 rounded-xl bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                disabled={!storeId}
+              />
+              <svg
+                className="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-2.5 w-4 h-4 text-gray-400 hover:text-gray-600"
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="text-sm text-gray-600 whitespace-nowrap">
+              {!storeId ? (
+                "Store сонгоогүй"
+              ) : loadingProducts ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  Ачааллаж...
+                </div>
+              ) : (
+                `${productList.length} олдлоо`
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {(!storeId
-              ? []
-              : loadingProducts
-              ? Array.from({ length: 8 })
-              : productList
-            ).map((p: any, idx: number) =>
-              loadingProducts ? (
-                <div
-                  key={`s-${idx}`}
-                  className="h-28 rounded-2xl bg-white/60 border border-white/40 animate-pulse"
+          {!storeId ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+              <svg
+                className="w-16 h-16 mb-4 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
                 />
-              ) : (
-                <button
-                  key={p.id}
-                  onClick={() => openVariantPicker(p)}
-                  className="group text-left p-3 rounded-2xl bg-white/70 hover:bg-white/90 border border-white/40 shadow-sm hover:shadow-md transition-all duration-200"
-                  disabled={(p.qty ?? 0) <= 0}
-                  title={(p.qty ?? 0) <= 0 ? "Нөөц дууссан" : "Сагслах"}
-                >
-                  <div className="flex items-center gap-3">
-                    <Image
-                      src={p.imgPath || "/default.png"}
-                      alt={p.name}
-                      width={56}
-                      height={56}
-                      className="w-14 h-14 rounded-xl object-cover bg-gray-100"
-                      unoptimized
+              </svg>
+              <p className="text-lg font-medium mb-2">Дэлгүүр сонгогдоогүй</p>
+              <p className="text-sm text-center">
+                Бүтээгдэхүүн харахын тулд дэлгүүр сонгоно уу
+              </p>
+            </div>
+          ) : productList.length === 0 && !loadingProducts ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+              <svg
+                className="w-16 h-16 mb-4 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                />
+              </svg>
+              <p className="text-lg font-medium mb-2">Бүтээгдэхүүн олдсонгүй</p>
+              <p className="text-sm text-center">
+                {search
+                  ? "Хайлтын үр дүн олдсонгүй. Өөр түлхүүр үг ашиглана уу."
+                  : "Энэ дэлгүүрт бүтээгдэхүүн байхгүй байна."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {(loadingProducts ? Array.from({ length: 8 }) : productList).map(
+                (p: any, idx: number) =>
+                  loadingProducts ? (
+                    <div
+                      key={`s-${idx}`}
+                      className="h-28 rounded-2xl bg-white/60 border border-white/40 animate-pulse"
                     />
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-gray-900 truncate">
-                        {p.name}
+                  ) : (
+                    <button
+                      key={p.id}
+                      onClick={() => openVariantPicker(p)}
+                      className={`group text-left p-3 rounded-2xl border shadow-sm transition-all duration-200 ${
+                        (p.qty ?? 0) <= 0
+                          ? "bg-gray-50 border-gray-200 cursor-not-allowed opacity-60"
+                          : "bg-white/70 hover:bg-white/90 border-white/40 hover:shadow-md"
+                      }`}
+                      disabled={(p.qty ?? 0) <= 0}
+                      title={(p.qty ?? 0) <= 0 ? "Нөөц дууссан" : "Сагслах"}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <Image
+                            src={p.imgPath || "/default.png"}
+                            alt={p.name}
+                            width={56}
+                            height={56}
+                            className="w-14 h-14 rounded-xl object-cover bg-gray-100"
+                            unoptimized
+                          />
+                          {(p.qty ?? 0) <= 0 && (
+                            <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
+                              <span className="text-xs text-white font-medium">
+                                Дууссан
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-gray-900 truncate">
+                            {p.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Үнэ: {fmt(p.price)}
+                          </div>
+                          <div
+                            className={`text-xs font-medium ${
+                              (p.qty ?? 0) <= 0
+                                ? "text-red-500"
+                                : "text-green-600"
+                            }`}
+                          >
+                            Үлд: {p.qty ?? 0}
+                          </div>
+                        </div>
+                        {(p.qty ?? 0) > 0 && (
+                          <div className="flex-shrink-0">
+                            <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                              +
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        Үнэ: {fmt(p.price)} • Үлд: {p.qty ?? 0}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              )
-            )}
-          </div>
+                    </button>
+                  )
+              )}
+            </div>
+          )}
         </section>
 
         {/* Cart header */}
-        <div className="grid grid-cols-[1fr_auto_auto] gap-2 px-6 py-3 mb-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm text-sm text-gray-900 font-medium">
-          <span>Бүтээгдэхүүн</span>
-          <span className="text-right">Ширхэг/Үнэ</span>
+        <div className="flex flex-col gap-2 px-6 py-3 mb-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm">
+          <div className="flex items-center justify-between text-sm text-gray-900 font-medium">
+            <div className="flex items-center gap-2">
+              <span>Сагс</span>
+              {items.length > 0 && (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  {items.length} зүйл
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {items.length > 0 && (
+                <>
+                  <span className="text-xs text-gray-600">
+                    Нийт:{" "}
+                    <span className="font-semibold text-blue-600">
+                      {fmt(totalRaw)}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setItems([]);
+                      showNotification("info", "Сагс цэвэрлэгдлээ");
+                    }}
+                    className="px-3 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                    title="Сагс цэвэрлэх"
+                  >
+                    Цэвэрлэх
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Store selection status indicator */}
+          {storeId === "all" && items.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
+              <svg
+                className="w-4 h-4 text-amber-600 flex-shrink-0"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span className="text-amber-800 font-medium">
+                Анхаар: "Бүх дэлгүүр" сонгосон тул төлбөр тооцох боломжгүй.
+                Тодорхой дэлгүүр сонгоно уу.
+              </span>
+            </div>
+          )}
+
+          {storeId !== "all" &&
+            items.length > 0 &&
+            stores.find((s) => s.id === storeId) && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs">
+                <svg
+                  className="w-4 h-4 text-green-600 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span className="text-green-800 font-medium">
+                  Дэлгүүр: {stores.find((s) => s.id === storeId)?.name} - Төлбөр
+                  тооцоход бэлэн
+                </span>
+              </div>
+            )}
         </div>
 
         {/* Cart list */}
         <div className="flex-1 bg-white/70 backdrop-blur-sm border border-white/40 rounded-2xl shadow-sm overflow-y-auto p-4">
-          <ul className="space-y-3">
-            {items.map((it, idx) => {
-              const line = it.qty * it.price;
-              return (
-                <li
-                  key={it.id + "-" + (it as any).variant_id + "-" + idx}
-                  className="p-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm hover:shadow-md hover:bg-white/80 transition-all duration-200"
-                >
-                  <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                    <div className="flex items-start gap-2 w-full">
-                      <Image
-                        src={it.imgPath || "/default.png"}
-                        alt={it.name}
-                        width={40}
-                        height={40}
-                        className="w-12 h-12 rounded-xl object-cover bg-gray-100 shadow-sm"
-                        unoptimized
-                      />
-                      <div className="leading-tight flex flex-col">
-                        <div className="text-sm font-semibold text-gray-900">
-                          {idx + 1}. {it.name}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          Хэмжээ: {(it as any).size || "—"} • Өнгө:{" "}
-                          {(it as any).color || "—"}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {fmt(it.price)} × {it.qty}
+          {items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+              <svg
+                className="w-16 h-16 mb-4 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                />
+              </svg>
+              <p className="text-lg font-medium mb-2">Сагс хоосон байна</p>
+              <p className="text-sm text-center">
+                Бүтээгдэхүүн сонгож сагсанд нэмнэ үү
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {items.map((it, idx) => {
+                const line = it.qty * it.price;
+                return (
+                  <li
+                    key={it.id + "-" + (it as any).variant_id + "-" + idx}
+                    className="p-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm hover:shadow-md hover:bg-white/80 transition-all duration-200"
+                  >
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
+                      <div className="flex items-start gap-2 w-full">
+                        <Image
+                          src={it.imgPath || "/default.png"}
+                          alt={it.name}
+                          width={40}
+                          height={40}
+                          className="w-12 h-12 rounded-xl object-cover bg-gray-100 shadow-sm"
+                          unoptimized
+                        />
+                        <div className="leading-tight flex flex-col min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-gray-900 truncate">
+                            {idx + 1}. {it.name}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            Хэмжээ: {(it as any).size || "—"} • Өнгө:{" "}
+                            {(it as any).color || "—"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {fmt(it.price)} × {it.qty}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex flex-col place-content-end gap-2 items-center max-w-full justify-center">
-                      <div className="flex justify-center w-20">
-                        <div className="inline-flex items-center gap-1 bg-gray-50 rounded-full p-1">
-                          <button
-                            onClick={() =>
-                              setItems((arr) =>
-                                arr.map((x) =>
-                                  x === it && it.qty > 1
-                                    ? { ...x, qty: x.qty - 1 }
-                                    : x
-                                )
-                              )
-                            }
-                            className="w-7 h-7 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 text-sm leading-none flex items-center justify-center transition-colors duration-200"
-                          >
-                            –
-                          </button>
-                          <span className="w-8 text-center text-sm font-medium text-gray-900 px-2">
-                            {it.qty}
-                          </span>
-                          <button
-                            onClick={() =>
-                              setItems((arr) =>
-                                arr.map((x) =>
-                                  x === it
-                                    ? {
-                                        ...x,
-                                        qty: Math.min(
-                                          x.qty + 1,
-                                          (() => {
-                                            const prod = productList.find(
-                                              (p) => p.id === x.id
-                                            );
-                                            return prod ? prod.qty : 9999;
-                                          })()
-                                        ),
-                                      }
-                                    : x
-                                )
-                              )
-                            }
-                            className="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-sm leading-none flex items-center justify-center transition-colors duration-200"
-                          >
-                            +
-                          </button>
+                      <div className="flex flex-col gap-2 items-center">
+                        <div className="flex justify-center w-20">
+                          <div className="inline-flex items-center gap-1 bg-gray-50 rounded-full p-1">
+                            <button
+                              onClick={() =>
+                                updateItemQuantity(it.variant_id!, it.qty - 1)
+                              }
+                              className="w-7 h-7 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 text-sm leading-none flex items-center justify-center transition-colors duration-200"
+                              title={
+                                it.qty === 1 ? "Сагснаас хасах" : "Тоог хасах"
+                              }
+                            >
+                              –
+                            </button>
+                            <span className="w-8 text-center text-sm font-medium text-gray-900 px-2">
+                              {it.qty}
+                            </span>
+                            <button
+                              onClick={() =>
+                                updateItemQuantity(it.variant_id!, it.qty + 1)
+                              }
+                              className="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-sm leading-none flex items-center justify-center transition-colors duration-200"
+                              title="Тоог нэмэх"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        <div className="w-20 text-right font-semibold text-gray-900">
+                          {fmt(line)}
                         </div>
                       </div>
-                      <div className="w-24 text-right font-semibold text-gray-900">
-                        {fmt(line)}
-                      </div>
+
+                      {/* Delete button */}
+                      <button
+                        onClick={() => removeFromCart(it.variant_id!)}
+                        className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 flex items-center justify-center transition-colors duration-200"
+                        title="Сагснаас хасах"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         {/* Totals */}
@@ -738,8 +1217,23 @@ export default function CheckoutPage() {
           onQuick={() => setOpenAdd(true)}
           onAdd={() => setOpenAdd(true)}
           onSave={() => setOpenSave(true)}
-          onPay={() => setOpenPay(true)}
-          onHistory={() => setOpenHistory(true)}
+          onPay={() => {
+            if (storeId === "all") {
+              showNotification(
+                "error",
+                "Захиалга үүсгэхийн тулд тодорхой дэлгүүр сонгоно уу"
+              );
+              return;
+            }
+            setOpenPay(true);
+          }}
+          onHistory={() => {
+            setOpenHistory(true);
+            // Auto-load history when opening
+            if (!orderHistory && !loadingHistory) {
+              loadOrderHistory(storeId || undefined);
+            }
+          }}
           onPrint={handlePrintClick}
           onDraftManager={() => setOpenDraftManager(true)}
         />
@@ -783,13 +1277,25 @@ export default function CheckoutPage() {
         onClose={() => !isProcessing && setOpenPay(false)}
         total={totals.grand}
         onPaidMulti={handleCheckout}
-        disabled={isProcessing}
+        disabled={isProcessing || storeId === "all"}
       />
 
       <CheckoutHistoryDialog
         open={openHistory}
         onClose={() => setOpenHistory(false)}
         onSelectOrder={(order) => router.push(`/receipt?orderId=${order.id}`)}
+        orderHistory={orderHistory}
+        loadingHistory={loadingHistory}
+        orderSearchTerm={orderSearchTerm}
+        onSearchChange={(term: string) => {
+          setOrderSearchTerm(term);
+          searchOrders(term);
+        }}
+        onLoadHistory={() => loadOrderHistory(storeId || undefined)}
+        onViewOrderDetail={loadOrderDetail}
+        selectedOrderDetail={selectedOrderDetail}
+        loadingOrderDetail={loadingOrderDetail}
+        onCloseOrderDetail={() => setSelectedOrderDetail(null)}
       />
 
       {picker && (
@@ -997,7 +1503,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {showPrintConfirm && printPayload && (
+      {/* {showPrintConfirm && printPayload && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
             <h2 className="text-lg font-bold mb-3">Баталгаажуулах</h2>
@@ -1039,13 +1545,105 @@ export default function CheckoutPage() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       <DraftManagerDialog
         open={openDraftManager}
         onClose={() => setOpenDraftManager(false)}
         onLoadDraft={(draftItems) => setItems(draftItems)}
       />
+
+      {/* Enhanced Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[200] animate-in slide-in-from-right-full duration-300">
+          <div
+            className={`px-6 py-4 rounded-lg shadow-xl backdrop-blur-sm border max-w-sm ${
+              notification.type === "success"
+                ? "bg-green-50 text-green-800 border-green-200"
+                : notification.type === "error"
+                ? "bg-red-50 text-red-800 border-red-200"
+                : "bg-blue-50 text-blue-800 border-blue-200"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                {notification.type === "success" && (
+                  <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-3 h-3 text-green-600"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                )}
+                {notification.type === "error" && (
+                  <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-3 h-3 text-red-600"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                )}
+                {notification.type === "info" && (
+                  <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-3 h-3 text-blue-600"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 text-sm font-medium leading-relaxed">
+                {notification.message}
+              </div>
+              <button
+                onClick={() => setNotification(null)}
+                className={`flex-shrink-0 p-1 rounded-full transition-colors ${
+                  notification.type === "success"
+                    ? "text-green-400 hover:text-green-600 hover:bg-green-100"
+                    : notification.type === "error"
+                    ? "text-red-400 hover:text-red-600 hover:bg-red-100"
+                    : "text-blue-400 hover:text-blue-600 hover:bg-blue-100"
+                }`}
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

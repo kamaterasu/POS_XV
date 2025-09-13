@@ -133,22 +133,22 @@ export default function SaveDraftDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/60 via-blue-900/50 to-indigo-900/60 backdrop-blur-sm flex items-end md:items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-gradient-to-br from-slate-900/50 via-blue-900/60 to-indigo-900/50 backdrop-blur-lg flex items-center justify-center p-4 animate-in fade-in duration-500"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-lg bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 overflow-hidden"
+        className="w-full max-w-xl bg-white/98 backdrop-blur-2xl rounded-[2rem] shadow-2xl border border-white/30 overflow-hidden animate-in slide-in-from-bottom duration-600 ease-out"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="p-6 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200/50">
+        {/* Enhanced Modern Header */}
+        <div className="relative p-8 pb-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b border-gray-200/30">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
                 <svg
-                  className="w-6 h-6 text-white"
+                  className="w-7 h-7 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -161,21 +161,21 @@ export default function SaveDraftDialog({
                   />
                 </svg>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">
+              <div className="flex flex-col">
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
                   Түр хадгалах
                 </h2>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 mt-1 font-medium">
                   Сагсны агуулгыг түр хадгална уу
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+              className="group w-12 h-12 rounded-2xl bg-white/90 hover:bg-white border border-gray-200/50 hover:border-gray-300 flex items-center justify-center transition-all duration-300 hover:shadow-xl"
             >
               <svg
-                className="w-5 h-5 text-gray-600"
+                className="w-6 h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -183,88 +183,118 @@ export default function SaveDraftDialog({
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
             </button>
           </div>
+
+          {/* Elegant gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-indigo-500/5 to-purple-500/5 rounded-t-[2rem] pointer-events-none"></div>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Form Fields */}
-          <div className="space-y-4">
+        {/* Enhanced Content */}
+        <div className="p-8 space-y-8">
+          {/* Enhanced Form Fields */}
+          <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Нэр <span className="text-red-500">*</span>
+              <label className="flex items-center gap-2 text-base font-semibold text-gray-800 mb-3">
+                <span>Нэр</span>
+                <span className="text-red-500 text-lg">*</span>
               </label>
               <input
-                className="w-full h-12 border-2 border-gray-200 rounded-xl px-4 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 placeholder-gray-400"
+                className="w-full h-14 border-2 border-gray-200/60 rounded-2xl px-6 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 placeholder-gray-500 bg-white/90 backdrop-blur-sm font-medium shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ж: Хэрэглэгч A — борлуулалт"
+                placeholder="📝 Ж: Хэрэглэгч A — борлуулалт"
                 disabled={saving}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Тайлбар
+              <label className="flex items-center gap-2 text-base font-semibold text-gray-800 mb-3">
+                <span>Тайлбар</span>
+                <span className="text-xs text-gray-500 font-normal">
+                  (заавал бус)
+                </span>
               </label>
               <textarea
-                className="w-full min-h-[100px] border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 placeholder-gray-400 resize-none"
+                className="w-full min-h-[120px] border-2 border-gray-200/60 rounded-2xl px-6 py-4 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-300 placeholder-gray-500 resize-none bg-white/90 backdrop-blur-sm font-medium shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Ж: Хүргэлтээр, 18:00-д авах..."
+                placeholder="💭 Ж: Хүргэлтээр, 18:00-д авах..."
                 disabled={saving}
               />
             </div>
           </div>
 
-          {/* Summary Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-200/50">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <svg
-                className="w-4 h-4 text-blue-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                />
-              </svg>
-              Хураангуй
+          {/* Enhanced Summary Card */}
+          <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-3xl p-6 border border-blue-200/40 shadow-lg shadow-blue-500/10 backdrop-blur-sm">
+            <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+              <span>Хураангуй</span>
             </h3>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
+            <div className="grid grid-cols-3 gap-6">
+              <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50">
+                <div className="text-3xl font-bold text-blue-600 mb-1">
                   {items.length}
                 </div>
-                <div className="text-xs text-gray-600">Барааны төрөл</div>
+                <div className="text-sm text-gray-700 font-medium">
+                  Барааны төрөл
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
+              <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50">
+                <div className="text-3xl font-bold text-green-600 mb-1">
                   {totalQty}
                 </div>
-                <div className="text-xs text-gray-600">Нийт ширхэг</div>
+                <div className="text-sm text-gray-700 font-medium">
+                  Нийт ширхэг
+                </div>
               </div>
-              <div className="text-center">
-                <div className="text-lg font-bold text-purple-600">
+              <div className="text-center p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/50">
+                <div className="text-xl font-bold text-purple-600 mb-1 leading-tight">
                   {formatMNT(totalAmount)}
                 </div>
-                <div className="text-xs text-gray-600">Нийт дүн</div>
+                <div className="text-sm text-gray-700 font-medium">
+                  Нийт дүн
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Items Preview */}
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-800">
+          {/* Enhanced Items Preview */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-white/50 overflow-hidden shadow-lg shadow-blue-500/10">
+            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-blue-50/50 border-b border-gray-200/40">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-3">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center">
+                  <svg
+                    className="w-3 h-3 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.5}
+                      d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                    />
+                  </svg>
+                </div>
                 Барааны жагсаалт
               </h3>
             </div>
@@ -362,11 +392,12 @@ export default function SaveDraftDialog({
               </div>
             </div>
           )}
-          <div className="flex justify-end gap-3">
+          {/* Enhanced Action Buttons */}
+          <div className="flex justify-end gap-4 pt-2">
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-6 py-2.5 rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 disabled:opacity-50"
+              className="px-8 py-4 rounded-2xl border-2 border-gray-300/60 bg-white/90 text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 disabled:opacity-50 shadow-sm hover:shadow-lg backdrop-blur-sm"
             >
               Болих
             </button>
@@ -374,23 +405,23 @@ export default function SaveDraftDialog({
               onClick={handleSave}
               disabled={disabled}
               className={
-                "px-6 py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 " +
+                "px-8 py-4 rounded-2xl font-bold transition-all duration-300 flex items-center gap-3 shadow-xl " +
                 (disabled
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : saveSuccess
-                  ? "bg-green-500 text-white"
-                  : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl active:scale-95")
+                  ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-green-500/30"
+                  : "bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 text-white hover:from-blue-600 hover:via-indigo-700 hover:to-purple-700 shadow-blue-500/30 hover:shadow-blue-600/40 active:scale-95 transform")
               }
             >
               {saving ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Хадгалж байна...
+                  <div className="animate-spin rounded-full h-6 w-6 border-3 border-white border-t-transparent"></div>
+                  <span>Хадгалж байна...</span>
                 </>
               ) : saveSuccess ? (
                 <>
                   <svg
-                    className="w-4 h-4"
+                    className="w-6 h-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -398,16 +429,16 @@ export default function SaveDraftDialog({
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  Хадгалагдлаа
+                  <span>Хадгалагдлаа</span>
                 </>
               ) : (
                 <>
                   <svg
-                    className="w-4 h-4"
+                    className="w-6 h-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -415,11 +446,11 @@ export default function SaveDraftDialog({
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"
                     />
                   </svg>
-                  Хадгалах
+                  <span>Хадгалах</span>
                 </>
               )}
             </button>

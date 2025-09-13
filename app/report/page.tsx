@@ -1568,10 +1568,6 @@ export default function ReportPage() {
                 <FaUndo className={loading ? "animate-spin" : ""} />
                 Сэргээх
               </button>
-              <button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 font-medium shadow-md hover:shadow-lg">
-                <FaDownload />
-                Татах
-              </button>
             </div>
           </div>
         </div>

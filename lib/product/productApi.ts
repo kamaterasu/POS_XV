@@ -6,18 +6,19 @@
 import { jwtDecode } from "jwt-decode";
 
 export type VariantInput = {
-  name: string;
-  sku: string;
-  price: number;
-  cost: number;
-  attrs?: Record<string, string>;
+  name?: string | null;
+  sku?: string | null;
+  price?: number;
+  cost?: number | null;
+  attrs?: Record<string, any>;
 };
 
 export type ProductInput = {
   name: string;
-  category_id: string;
-  variants: VariantInput[];
-  img?: string;
+  description?: string | null;
+  category_id?: string | null;
+  variants?: VariantInput[];
+  img?: string | null;
 };
 
 export type UpdateProductInput = {
@@ -28,11 +29,11 @@ export type UpdateProductInput = {
   img?: string | null;
   upsert_variants?: Array<{
     id?: string;
-    name: string;
-    sku: string;
-    price: number;
-    cost: number | null;
-    attrs?: Record<string, string>;
+    name?: string | null;
+    sku?: string | null;
+    price?: number;
+    cost?: number | null;
+    attrs?: Record<string, any>;
   }>;
   remove_variant_ids?: string[];
 };
@@ -121,15 +122,20 @@ export async function getProductById(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
   );
   url.searchParams.set("tenant_id", tenant_id);
-  url.searchParams.set("id", product_id); // IMPORTANT: id=
+  url.searchParams.set("id", product_id);
   url.searchParams.set("withVariants", String(opts?.withVariants ?? true));
-  if (opts?.withStock && opts.storeId) {
-    url.searchParams.set("withStock", "true");
+
+  // Backend includes qty in variants when store_id is provided
+  if (opts?.storeId) {
     url.searchParams.set("store_id", opts.storeId);
   }
+
   const res = await fetch(url.toString(), {
     method: "GET",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
   assertOk(res);
   return res.json();
@@ -151,10 +157,69 @@ export async function getProductByCategory(token: string, category_id: string) {
   return res.json();
 }
 
+// New function for AddItemModal - gets products with variants and inventory
+export async function getProductsForModal(
+  token: string,
+  params?: {
+    store_id?: string;
+    category_id?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+    subtree?: boolean;
+  }
+) {
+  const tenant_id = getTenantIdFromToken(token);
+  const url = new URL(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
+  );
+
+  // Required parameters
+  url.searchParams.set("tenant_id", tenant_id);
+  url.searchParams.set("withVariants", "true"); // Always get variants for modal
+
+  // Store ID for inventory quantities (backend will include qty in variant objects)
+  if (params?.store_id) {
+    url.searchParams.set("store_id", params.store_id);
+  }
+
+  // Category filtering
+  if (params?.category_id) {
+    url.searchParams.set("category_id", params.category_id);
+    url.searchParams.set("subtree", String(params.subtree ?? true)); // Include subcategories by default
+  }
+
+  // Search filtering
+  if (params?.search) {
+    url.searchParams.set("search", params.search);
+  }
+
+  // Pagination
+  url.searchParams.set("limit", String(params?.limit ?? 200));
+  url.searchParams.set("offset", String(params?.offset ?? 0));
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  assertOk(res);
+  return res.json();
+}
+
 export async function createProduct(token: string, product: ProductInput) {
   const tenant_id = getTenantIdFromToken(token);
   const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`;
-  const payload = { ...product, tenant_id };
+
+  // Transform the payload to match backend expectations
+  const payload = {
+    tenant_id,
+    name: product.name,
+    description: product.description || null,
+    category_id: product.category_id || null,
+    img: product.img || null,
+    variants: product.variants || [],
+  };
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -173,7 +238,27 @@ export async function updateProduct(
 ) {
   const tenant_id = getTenantIdFromToken(token);
   const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`;
-  const payload = { ...product, tenant_id };
+
+  // Ensure proper payload structure matching backend expectations
+  const payload = {
+    tenant_id,
+    id: product.id,
+    ...(product.name !== undefined && { name: product.name }),
+    ...(product.description !== undefined && {
+      description: product.description,
+    }),
+    ...(product.category_id !== undefined && {
+      category_id: product.category_id,
+    }),
+    ...(product.img !== undefined && { img: product.img }),
+    ...(product.upsert_variants && {
+      upsert_variants: product.upsert_variants,
+    }),
+    ...(product.remove_variant_ids && {
+      remove_variant_ids: product.remove_variant_ids,
+    }),
+  };
+
   const res = await fetch(url, {
     method: "PATCH",
     headers: {
@@ -206,41 +291,39 @@ export async function deleteProduct(token: string, productId: string) {
  * Get all product variants for transfer selection
  */
 /**
- * Get all product variants for transfer selection - OPTIMIZED VERSION
- * This version makes far fewer API calls by using parallel processing
+ * Get all product variants for transfer selection - FIXED VERSION
+ * This version works with your current edge function by making individual product calls
  */
 export async function getAllProductVariants(token: string) {
   const tenant_id = getTenantIdFromToken(token);
-  const url = new URL(
+
+  console.log("🚀 Loading variants for transfer system...");
+
+  // First, get all products (without variants)
+  const productsUrl = new URL(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
   );
+  productsUrl.searchParams.set("tenant_id", tenant_id);
+  productsUrl.searchParams.set("limit", "200");
 
-  // Set required parameters
-  url.searchParams.set("tenant_id", tenant_id);
-  url.searchParams.set("withVariants", "true");
-  url.searchParams.set("limit", "200");
-  url.searchParams.set("offset", "0");
-
-  console.log("🚀 Optimized fetch - fetching products from:", url.toString());
-
-  const res = await fetch(url.toString(), {
+  const productsRes = await fetch(productsUrl.toString(), {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.error("Product API error:", errorText);
-    throw new Error(
-      `Failed to fetch products: ${res.status} ${res.statusText}`
-    );
+  if (!productsRes.ok) {
+    const errorText = await productsRes.text();
+    console.error("Products API error:", errorText);
+    throw new Error(`Failed to fetch products: ${productsRes.status}`);
   }
 
-  const data = await res.json();
-  console.log("📦 Product API response data:", data);
+  const productsData = await productsRes.json();
+  console.log("📦 Products loaded:", productsData.items?.length || 0);
+
+  if (!productsData.items || !Array.isArray(productsData.items)) {
+    console.warn("No products found");
+    return [];
+  }
 
   const variants: Array<{
     id: string;
@@ -250,26 +333,37 @@ export async function getAllProductVariants(token: string) {
     product_name?: string;
   }> = [];
 
-  if (data.items && Array.isArray(data.items)) {
-    console.log(`📋 Processing ${data.items.length} products`);
+  // Now get variants for each product (in batches to avoid overwhelming the API)
+  const batchSize = 5;
+  const products = productsData.items;
 
-    // Check if the first product has variants included
-    const firstProduct = data.items[0];
-    if (
-      firstProduct &&
-      firstProduct.variants &&
-      Array.isArray(firstProduct.variants)
-    ) {
-      console.log("✅ FAST PATH: Variants are included in product response");
+  for (let i = 0; i < products.length; i += batchSize) {
+    const batch = products.slice(i, i + batchSize);
+    console.log(
+      `📋 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(
+        products.length / batchSize
+      )} (${batch.length} products)...`
+    );
 
-      // Fast path: variants are already included
-      for (const product of data.items) {
-        if (product.variants && Array.isArray(product.variants)) {
-          console.log(
-            `Product ${product.name}: ${product.variants.length} variants`
-          );
-          for (const variant of product.variants) {
-            variants.push({
+    // Process batch in parallel
+    const batchPromises = batch.map(async (product: any) => {
+      try {
+        const productUrl = new URL(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
+        );
+        productUrl.searchParams.set("tenant_id", tenant_id);
+        productUrl.searchParams.set("id", product.id);
+        productUrl.searchParams.set("withVariants", "true");
+
+        const productRes = await fetch(productUrl.toString(), {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (productRes.ok) {
+          const productData = await productRes.json();
+          if (productData.variants && Array.isArray(productData.variants)) {
+            return productData.variants.map((variant: any) => ({
               id: variant.id,
               name: `${product.name}${
                 variant.name ? ` - ${variant.name}` : ""
@@ -277,91 +371,32 @@ export async function getAllProductVariants(token: string) {
               sku: variant.sku || "",
               price: variant.price || 0,
               product_name: product.name,
-            });
+            }));
           }
+        } else {
+          console.warn(`Failed to load variants for product ${product.id}`);
         }
+      } catch (error) {
+        console.warn(
+          `Error loading variants for product ${product.id}:`,
+          error
+        );
       }
-    } else {
-      console.log("⚡ OPTIMIZED PATH: Fetching variants in parallel batches");
+      return [];
+    });
 
-      // Optimized path: fetch variants in parallel instead of sequentially
-      const productsNeedingVariants = data.items.filter(
-        (product: any) => !product.variants || !Array.isArray(product.variants)
-      );
+    const batchResults = await Promise.all(batchPromises);
+    batchResults.forEach((productVariants) => {
+      variants.push(...productVariants);
+    });
 
-      console.log(
-        `Need to fetch variants for ${productsNeedingVariants.length} products`
-      );
-
-      // Process in batches of 5 to avoid overwhelming the server
-      const batchSize = 5;
-      const batches = [];
-
-      for (let i = 0; i < productsNeedingVariants.length; i += batchSize) {
-        batches.push(productsNeedingVariants.slice(i, i + batchSize));
-      }
-
-      console.log(
-        `Processing ${batches.length} batches of ${batchSize} products each`
-      );
-
-      for (const batch of batches) {
-        const batchPromises = batch.map(async (product: any) => {
-          try {
-            const productUrl = new URL(url.toString());
-            productUrl.searchParams.set("id", product.id);
-            productUrl.searchParams.set("withVariants", "true");
-
-            const productRes = await fetch(productUrl.toString(), {
-              method: "GET",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-              },
-            });
-
-            if (productRes.ok) {
-              const productData = await productRes.json();
-              const productVariants = productData.variants || [];
-
-              return {
-                productName: product.name,
-                variants: productVariants.map((variant: any) => ({
-                  id: variant.id,
-                  name: `${product.name}${
-                    variant.name ? ` - ${variant.name}` : ""
-                  }`,
-                  sku: variant.sku || "",
-                  price: variant.price || 0,
-                  product_name: product.name,
-                })),
-              };
-            }
-            return { productName: product.name, variants: [] };
-          } catch (err) {
-            console.error(
-              `Failed to fetch variants for product ${product.id}:`,
-              err
-            );
-            return { productName: product.name, variants: [] };
-          }
-        });
-
-        // Wait for current batch to complete
-        const batchResults = await Promise.all(batchPromises);
-
-        // Add all variants from this batch
-        for (const result of batchResults) {
-          console.log(
-            `✅ ${result.productName}: ${result.variants.length} variants`
-          );
-          variants.push(...result.variants);
-        }
-      }
+    // Small delay to be nice to the API
+    if (i + batchSize < products.length) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 
-  console.log(`🎉 Total variants extracted: ${variants.length}`);
+  console.log(`🎉 Total variants loaded: ${variants.length}`);
   return variants;
 }
 

@@ -1,21 +1,17 @@
 // lib/inventoryApi.ts
 import { jwtDecode } from "jwt-decode";
 
-type Reason =
-  | "INITIAL"
-  | "ADJUST"
-  | "SALE"
-  | "RETURN"
-  | "TRANSFER"
-  | "COUNT";
+type Reason = "INITIAL" | "PURCHASE" | "ADJUSTMENT";
 
 type AddToInventoryArgs = {
   store_id: string;
   variant_id: string;
-  delta?: number;           // default: 1
-  reason?: Reason;          // default: 'INITIAL'
-  note?: string;            // default: 'SEEDING'
-  tenant_id?: string;       // заавал биш — токеноос уншиж чадна
+  delta?: number; // default: 1
+  reason?: Reason; // default: 'INITIAL'
+  note?: string; // default: 'SEEDING'
+  tenant_id?: string; // заавал биш — токеноос уншиж чадна
+  ref_table?: string; // optional reference table
+  ref_id?: string; // optional reference id
 };
 
 export async function productAddToInventory(
@@ -28,6 +24,8 @@ export async function productAddToInventory(
     delta = 1,
     reason = "INITIAL",
     note = "SEEDING",
+    ref_table,
+    ref_id,
   } = args;
 
   // tenant_id-г параметрээр ирээгүй бол JWT-с унших
@@ -62,6 +60,8 @@ export async function productAddToInventory(
       delta,
       reason,
       note,
+      ref_table: ref_table ?? null,
+      ref_id: ref_id ?? null,
     }),
   });
 

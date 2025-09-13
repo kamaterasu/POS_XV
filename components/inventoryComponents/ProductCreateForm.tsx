@@ -618,7 +618,7 @@ export default function ProductCreateForm({
       }
     }
 
-    // Create variant inputs for API
+    // Create variant inputs for backend API matching your expected structure
     const variantInputs = (
       cleanVariants.length
         ? cleanVariants
@@ -634,11 +634,12 @@ export default function ProductCreateForm({
       const variantSku =
         sku || `${newProd.name.substring(0, 3).toUpperCase()}-${index + 1}`;
 
+      // Match backend expectations: optional fields, proper typing
       return {
-        name: variantName,
-        sku: variantSku,
-        price: Number(v.price || basePrice),
-        cost: Number(newProd.cost || 0),
+        name: variantName || null,
+        sku: variantSku || null,
+        price: Number(v.price || basePrice) || 0,
+        cost: Number(newProd.cost || 0) || null,
         attrs: {
           ...(color ? { color } : {}),
           ...(size ? { size } : {}),
@@ -668,14 +669,13 @@ export default function ProductCreateForm({
       const token = await getAccessToken();
       if (!token) throw new Error("No token");
 
-      // Edge function-д нийцтэй байлгахын тулд images болон img хоёуланг дамжуулъя
+      // Match backend API expectations - POST endpoint structure
       const payload: any = {
         name: newProd.name,
-        category_id: selectedCatId!,
-        variants: variantInputs,
-        images: uploadedPaths, // storage path-ууд
-        img: uploadedPaths[0] ?? "test", // нийцтэй fallback
-        description: newProd.description,
+        description: newProd.description || null,
+        category_id: selectedCatId || null,
+        img: uploadedPaths[0] || null, // Single image path for backend
+        variants: variantInputs || [], // Variants array matching backend structure
       };
 
       // 1) Барааг үүсгэнэ

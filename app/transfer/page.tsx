@@ -203,40 +203,72 @@ export default function TransferPage() {
 
   const handleTestProductAPI = async () => {
     try {
-      console.log("Testing product API...");
+      setError("Системийг шалгаж байна...");
+      console.log("Testing transfer system APIs...");
+
       const token = await getAccessToken();
       console.log("Got token for test:", token ? "✓" : "✗");
 
-      // Test basic product list first
+      // Test 1: Product API
       const { jwtDecode } = await import("jwt-decode");
       const decoded: any = jwtDecode(token);
       const tenant_id = decoded?.app_metadata?.tenants?.[0];
       console.log("Tenant ID:", tenant_id);
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&limit=10`;
-      console.log("Testing URL:", url);
+      const productUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&limit=5`;
+      console.log("Testing Product API:", productUrl);
 
-      const response = await fetch(url, {
+      const productResponse = await fetch(productUrl, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log("Test response status:", response.status);
-      const testData = await response.json();
-      console.log("Test response data:", testData);
-
-      if (response.ok) {
+      if (!productResponse.ok) {
+        const errorData = await productResponse.json();
         setError(
-          `API тест амжилттай: ${testData.items?.length || 0} бараа олдлоо`
+          `Бүтээгдэхүүний API алдаа: ${errorData.error || "Тодорхойгүй алдаа"}`
         );
-        // Try to reload variants after successful test
-        await loadVariants();
-      } else {
-        setError(`API тест алдаа: ${testData.error || "Тодорхойгүй алдаа"}`);
+        return;
       }
-    } catch (err) {
-      console.error("API test error:", err);
+
+      const productData = await productResponse.json();
+      console.log("Product API response:", productData);
+
+      // Test 2: Transfer API
+      const transferUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/transfer?tenant_id=${tenant_id}&limit=5`;
+      console.log("Testing Transfer API:", transferUrl);
+
+      const transferResponse = await fetch(transferUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!transferResponse.ok) {
+        const errorData = await transferResponse.json();
+        setError(
+          `Шилжүүлгийн API алдаа: ${errorData.error || "Тодорхойгүй алдаа"}`
+        );
+        return;
+      }
+
+      const transferData = await transferResponse.json();
+      console.log("Transfer API response:", transferData);
+
+      // Test 3: Try to load variants
+      console.log("Testing variant loading...");
+      await loadVariants();
+
       setError(
-        `API тест алдаа: ${err instanceof Error ? err.message : String(err)}`
+        `✅ Систем шалгалт амжилттай: ${
+          productData.items?.length || 0
+        } бараа, ${transferData.items?.length || 0} шилжүүлэг, ${
+          variants.length
+        } вариант олдлоо`
+      );
+    } catch (err) {
+      console.error("System test error:", err);
+      setError(
+        `❌ Системийн алдаа: ${
+          err instanceof Error ? err.message : String(err)
+        }`
       );
     }
   };
