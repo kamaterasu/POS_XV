@@ -334,11 +334,6 @@ export default function ProductReturnPage() {
         note: mapReturnReason(selectedReason, customReason),
       };
 
-      console.log("🚀 About to create return with data:", returnData);
-      console.log("🔐 Token available:", !!token);
-      console.log("🏢 Tenant ID:", tenantId);
-      console.log("📋 Order ID:", currentOrder.id);
-
       const result = await createReturn(returnData, token);
 
       // Store the return ID for receipt generation
@@ -365,7 +360,6 @@ export default function ProductReturnPage() {
       let errorMessage = "Буцаалт үүсгэхэд алдаа гарлаа";
 
       if (error.message) {
-        console.log("🔍 Error message:", error.message);
 
         // Check for specific error types
         if (error.message.includes("qty exceeds remaining to return")) {

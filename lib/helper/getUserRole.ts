@@ -44,7 +44,6 @@ export function canAccessFeature(
   userRole: Role | null,
   feature: string
 ): boolean {
-  console.log("Checking access for role:", userRole, "to feature:", feature);
   if (!userRole) return false;
 
   switch (feature) {

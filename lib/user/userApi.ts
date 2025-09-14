@@ -140,8 +140,6 @@ export async function getUser(user_id: string, token: string) {
           });
           const userData = await userRes.json();
 
-          console.log(`User details for ${membership.user_id}:`, userData);
-
           if (userData.user && userData.membership) {
             // Map backend role to frontend role
             let frontendRole = userData.membership.role;
@@ -192,7 +190,6 @@ export async function getUser(user_id: string, token: string) {
       });
 
       const users = await Promise.all(userPromises);
-      console.log("Final processed users:", users);
       return users;
     }
     return [];
@@ -216,14 +213,6 @@ export async function createUser(
   if (role === "Manager") backendRole = "OWNER";
   if (role === "Cashier") backendRole = "CASHIER";
 
-  console.log("Creating user with:", {
-    email,
-    tenant_id,
-    role: `${role} -> ${backendRole}`,
-    store_ids,
-    display_name: name,
-  });
-
   const url = new URL(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/user`
   );
@@ -245,7 +234,6 @@ export async function createUser(
   });
 
   const result = await res.json();
-  console.log("Create user response:", result);
 
   if (!res.ok) {
     throw new Error(result.error || `HTTP ${res.status}: ${res.statusText}`);

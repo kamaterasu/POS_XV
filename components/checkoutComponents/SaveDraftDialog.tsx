@@ -88,7 +88,6 @@ export default function SaveDraftDialog({
           await saveDraftToBackend(draftData);
           savedToBackend = true;
           setSaveSuccess("backend");
-          console.log("✅ Draft saved to backend successfully");
         }
       } catch (backendError) {
         console.warn(
@@ -107,7 +106,6 @@ export default function SaveDraftDialog({
           arr.unshift(localDraft);
           localStorage.setItem(DRAFTS_KEY, JSON.stringify(arr.slice(0, 100))); // Keep only last 100
           setSaveSuccess("local");
-          console.log("✅ Draft saved to localStorage successfully");
         } catch (localError) {
           throw new Error("Локал хадгалалт болон бэкэнд хоёулаа алдаа гарлаа");
         }

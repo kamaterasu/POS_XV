@@ -14,6 +14,7 @@ import {
   FaArrowUp,
   FaArrowDown,
   FaArrowLeft,
+  FaCog,
 } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import {
@@ -30,6 +31,9 @@ import {
 } from "@/lib/count/inventoryAdjustment";
 import { getStoredID } from "@/lib/store/storeApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
+import { useProducts, useProductsByStore } from "@/lib/hooks/useProducts";
+import { useCurrentStore } from "@/lib/hooks/useStore";
+import { useInventoryAdjustment } from "@/lib/hooks/useInventoryAdjustment";
 
 interface Product {
   id: string;
@@ -50,7 +54,7 @@ interface CountItem {
 
 export default function CountPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"count" | "compare">("count");
+  const [activeTab, setActiveTab] = useState<"count" | "compare" | "adjust">("count");
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,6 +72,9 @@ export default function CountPage() {
     current: number;
     total: number;
   } | null>(null);
+
+  // Remove the separate modal state since we're integrating it into the tabs
+  // const [inventoryAdjustmentModalOpen, setInventoryAdjustmentModalOpen] = useState(false);
 
   // Pagination and search state
   const [totalCount, setTotalCount] = useState(0);
@@ -322,6 +329,8 @@ export default function CountPage() {
               </div>
             </div>
 
+
+
             {/* Enhanced Summary Stats */}
             <div className="flex gap-4">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 min-w-[120px]">
@@ -417,6 +426,20 @@ export default function CountPage() {
                   )}
                 </div>
               </button>
+
+              <button
+                onClick={() => setActiveTab("adjust")}
+                className={`flex-1 px-6 py-4 font-medium text-sm rounded-xl transition-all duration-200 ${
+                  activeTab === "adjust"
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "text-gray-600 hover:text-gray-800 hover:bg-white hover:shadow-sm"
+                }`}
+              >
+                <div className="flex items-center justify-center gap-3">
+                  <FaCog size={18} />
+                  <span className="text-base">Бараа нэмэх</span>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -444,6 +467,10 @@ export default function CountPage() {
               adjustmentResults={adjustmentResults}
             />
           )}
+
+          {activeTab === "adjust" && (
+            <AdjustTab />
+          )}
         </div>
       </div>
 
@@ -457,6 +484,7 @@ export default function CountPage() {
           progress={adjustmentProgress}
         />
       )}
+
     </div>
   );
 }
@@ -559,7 +587,7 @@ function CountTab({
             <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
               {products.map((product, index) => (
                 <div
-                  key={product.id}
+                  key={product.id || `product-index-${index}`}
                   className="p-6 hover:bg-gray-50 transition-colors duration-200"
                 >
                   <div className="flex items-center justify-between gap-6">
@@ -826,7 +854,7 @@ function CompareTab({
           <div className="divide-y divide-gray-100">
             {filteredResults.map((item, index) => (
               <div
-                key={item.variant_id}
+                key={item.variant_id || `comparison-item-${index}`}
                 className="p-6 hover:bg-gray-50 transition-all duration-200"
               >
                 <div className="flex items-center justify-between gap-6">
@@ -970,9 +998,9 @@ function AdjustmentDialog({
 
             <div className="bg-white rounded-xl p-4 max-h-60 overflow-y-auto">
               <div className="space-y-3">
-                {filteredResults.slice(0, 8).map((item) => (
+                {filteredResults.slice(0, 8).map((item, index) => (
                   <div
-                    key={item.variant_id}
+                    key={item.variant_id || `dialog-item-${index}`}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
                   >
                     <div className="flex-1 min-w-0">
@@ -1066,6 +1094,278 @@ function AdjustmentDialog({
               )}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Adjust Tab Component - Embedded inventory adjustment (Updated)
+function AdjustTab() {
+  const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [selectedVariant, setSelectedVariant] = useState<string>("");
+  const [adjustmentQuantity, setAdjustmentQuantity] = useState<number>(0);
+  const [note, setNote] = useState<string>("");
+  const [reason, setReason] = useState<"ADJUSTMENT" | "PURCHASE" | "INITIAL">("ADJUSTMENT");
+  
+  const { selectedStore } = useCurrentStore();
+  const inventoryAdjustment = useInventoryAdjustment();
+
+  // Use different hooks based on whether we have a store ID
+  const { data: globalProducts, isLoading: globalLoading } = useProducts({ limit: 500 });
+  const { data: storeProducts, isLoading: storeLoading } = useProductsByStore(
+    selectedStore?.id || '', 
+    500
+  );
+
+  // Use store-specific products if available, otherwise fall back to global
+  const products = selectedStore?.id ? storeProducts : globalProducts;
+  const productsLoading = selectedStore?.id ? storeLoading : globalLoading;
+
+
+
+  // Ensure products is an array - handle different API response structures
+  let productsList: any[] = [];
+  if (Array.isArray(products)) {
+    productsList = products;
+  } else if (products && typeof products === 'object') {
+    // Check if products has an array property (common API pattern)
+    if (Array.isArray(products.data)) {
+      productsList = products.data;
+    } else if (Array.isArray(products.items)) {
+      productsList = products.items;
+    } else if (Array.isArray(products.products)) {
+      productsList = products.products;
+    }
+  }
+
+  // Get variants for the selected product
+  const selectedProductData = productsList.find((p: any) => p.id === selectedProduct);
+  const variants: any[] = selectedProductData?.variants?.map((v: any) => ({
+    id: v.id,
+    name: v.name || v.value || 'Default',
+    current_stock: v.current_stock || 0,
+    product_name: selectedProductData.name
+  })) || [];
+
+  const selectedVariantData = variants.find(v => v.id === selectedVariant);
+
+  const handleSubmit = async () => {
+    if (!selectedStore?.id) {
+      alert("❌ Дэлгүүр сонгоогүй байна");
+      return;
+    }
+
+    if (!selectedVariant) {
+      alert("❌ Барааны хувилбар сонгоогүй байна");
+      return;
+    }
+
+    if (adjustmentQuantity === 0) {
+      alert("❌ Тоо ширхэг оруулна уу");
+      return;
+    }
+
+    try {
+      await inventoryAdjustment.mutateAsync({
+        store_id: selectedStore.id,
+        variant_id: selectedVariant,
+        delta: adjustmentQuantity,
+        reason,
+        note: note || `${adjustmentQuantity > 0 ? 'Нэмэгдүүлэх' : 'Хасах'}: ${Math.abs(adjustmentQuantity)} ширхэг`,
+      });
+
+      alert(
+        `✅ ${selectedVariantData?.product_name} (${selectedVariantData?.name}) - ${adjustmentQuantity > 0 ? 'нэмэгдлээ' : 'хасагдлаа'}: ${Math.abs(adjustmentQuantity)} ширхэг`
+      );
+      
+      // Reset form
+      setSelectedProduct("");
+      setSelectedVariant("");
+      setAdjustmentQuantity(0);
+      setNote("");
+      setReason("ADJUSTMENT");
+    } catch (error) {
+      alert("❌ Алдаа гарлаа: " + (error instanceof Error ? error.message : 'Тодорхойгүй алдаа'));
+    }
+  };
+
+  const handleQuickAdjust = (amount: number) => {
+    setAdjustmentQuantity(prev => prev + amount);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Барааны тоо ширхэг тохируулах</h2>
+        <p className="text-gray-600">Барааны хувилбар сонгоод тоо ширхэгийг нэмэгдүүлэх эсвэл хасах</p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Product Selection */}
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="product" className="block text-sm font-medium text-gray-700 mb-2">
+                Бараа
+              </label>
+              <select
+                id="product"
+                value={selectedProduct}
+                onChange={(e) => setSelectedProduct(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option key="empty-product" value="">Бараа сонгох...</option>
+                {productsLoading ? (
+                  <option key="loading-product" disabled>Ачааллаж байна...</option>
+                ) : (
+                  <>
+                    {productsList.map((product: any, index: number) => (
+                      <option key={`product-${product.id || `undefined-${index}`}`} value={product.id || ''}>
+                        {product.name || 'Unnamed Product'}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+
+            {/* Variant Selection */}
+            {selectedProduct && (
+              <div>
+                <label htmlFor="variant" className="block text-sm font-medium text-gray-700 mb-2">
+                  Хувилбар
+                </label>
+                <select
+                  id="variant"
+                  value={selectedVariant}
+                  onChange={(e) => setSelectedVariant(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option key="empty-variant" value="">Хувилбар сонгох...</option>
+                  <>
+                    {variants.map((variant, index: number) => (
+                      <option key={`variant-${variant.id || `undefined-${index}`}`} value={variant.id || ''}>
+                        {variant.name || 'Unnamed Variant'} (Одоогийн: {variant.current_stock || 0})
+                      </option>
+                    ))}
+                  </>
+                </select>
+              </div>
+            )}
+
+            {/* Current Stock Display */}
+            {selectedVariantData && (
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="text-sm font-medium text-blue-900">
+                  Одоогийн үлдэгдэл: {selectedVariantData.current_stock} ширхэг
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Adjustment Controls */}
+          <div className="space-y-4">
+            {/* Adjustment Quantity */}
+            <div>
+              <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
+                Тоо ширхэг (+/-)
+              </label>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => handleQuickAdjust(-1)}
+                  className="px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                >
+                  -
+                </button>
+                <input
+                  id="quantity"
+                  type="number"
+                  value={adjustmentQuantity}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAdjustmentQuantity(parseInt(e.target.value) || 0)}
+                  className="flex-1 p-3 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleQuickAdjust(1)}
+                  className="px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+                >
+                  +
+                </button>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Эерэг тоо - нэмэгдүүлэх, сөрөг тоо - хасах
+              </div>
+            </div>
+
+            {/* Quick Adjustment Buttons */}
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={() => setAdjustmentQuantity(1)} className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">+1</button>
+              <button type="button" onClick={() => setAdjustmentQuantity(5)} className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">+5</button>
+              <button type="button" onClick={() => setAdjustmentQuantity(10)} className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">+10</button>
+              <button type="button" onClick={() => setAdjustmentQuantity(-1)} className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">-1</button>
+              <button type="button" onClick={() => setAdjustmentQuantity(-5)} className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">-5</button>
+              <button type="button" onClick={() => setAdjustmentQuantity(-10)} className="px-3 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50">-10</button>
+            </div>
+
+            {/* Reason Selection */}
+            <div>
+              <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
+                Шалтгаан
+              </label>
+              <select
+                id="reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value as "ADJUSTMENT" | "PURCHASE" | "INITIAL")}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option key="reason-ADJUSTMENT" value="ADJUSTMENT">Тохируулга</option>
+                <option key="reason-PURCHASE" value="PURCHASE">Худалдан авалт</option>
+                <option key="reason-INITIAL" value="INITIAL">Анхны үлдэгдэл</option>
+              </select>
+            </div>
+
+            {/* Note */}
+            <div>
+              <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-2">
+                Тэмдэглэл (сонголт)
+              </label>
+              <textarea
+                id="note"
+                value={note}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNote(e.target.value)}
+                placeholder="Нэмэлт тэмдэглэл..."
+                rows={2}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Preview */}
+        {selectedVariantData && adjustmentQuantity !== 0 && (
+          <div className="mt-6 p-4 border rounded-lg bg-green-50 border-green-200">
+            <div className="text-sm font-medium mb-1 text-green-900">Урьдчилсан харагдац:</div>
+            <div className="text-sm text-green-800">
+              {selectedVariantData.current_stock} → {selectedVariantData.current_stock + adjustmentQuantity}
+              <span className={`ml-2 font-semibold ${adjustmentQuantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ({adjustmentQuantity > 0 ? '+' : ''}{adjustmentQuantity})
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="mt-6">
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedVariant || adjustmentQuantity === 0 || inventoryAdjustment.isPending}
+            className="w-full px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {inventoryAdjustment.isPending ? 'Хадгалж байна...' : 'Хадгалах'}
+          </button>
         </div>
       </div>
     </div>

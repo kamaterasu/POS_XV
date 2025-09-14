@@ -1135,15 +1135,33 @@ export default function CheckoutPage() {
                             <span className="w-8 text-center text-sm font-medium text-gray-900 px-2">
                               {it.qty}
                             </span>
-                            <button
-                              onClick={() =>
-                                updateItemQuantity(it.variant_id!, it.qty + 1)
-                              }
-                              className="w-7 h-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-sm leading-none flex items-center justify-center transition-colors duration-200"
-                              title="Тоог нэмэх"
-                            >
-                              +
-                            </button>
+                            {(() => {
+                              const product = productList.find(
+                                (p) => p.variantId === it.variant_id
+                              );
+                              const isAtStockLimit = product && it.qty >= product.qty;
+                              
+                              return (
+                                <button
+                                  onClick={() =>
+                                    updateItemQuantity(it.variant_id!, it.qty + 1)
+                                  }
+                                  disabled={isAtStockLimit}
+                                  className={`w-7 h-7 rounded-full text-white text-sm leading-none flex items-center justify-center transition-colors duration-200 ${
+                                    isAtStockLimit
+                                      ? "bg-gray-300 cursor-not-allowed"
+                                      : "bg-blue-500 hover:bg-blue-600"
+                                  }`}
+                                  title={
+                                    isAtStockLimit
+                                      ? `Хангалттай нөөц байхгүй (үлдэгдэл: ${product?.qty || 0})`
+                                      : "Тоог нэмэх"
+                                  }
+                                >
+                                  +
+                                </button>
+                              );
+                            })()}
                           </div>
                         </div>
                         <div className="w-20 text-right font-semibold text-gray-900">

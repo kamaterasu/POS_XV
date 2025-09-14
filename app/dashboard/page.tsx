@@ -33,8 +33,6 @@ export default function DashboardPage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      console.log("Session:", session);
-
       if (!session) {
         router.replace("/login");
         return;
@@ -43,7 +41,6 @@ export default function DashboardPage() {
       // Get user role
       const role = await getUserRole();
       setUserRole(role);
-      console.log("User role:", role);
 
       // Get user name from user_metadata
       const displayName =
@@ -51,10 +48,6 @@ export default function DashboardPage() {
         session.user.email ||
         "Нэргүй хэрэглэгч";
       setUserName(displayName);
-
-      // Debug: Print the token and user data as requested
-      console.log("Token:", session.access_token);
-      console.log("User data:", session.user);
     }
     checkAuth();
   }, [router]);
@@ -87,13 +80,7 @@ export default function DashboardPage() {
     return () => clearTimeout(t);
   }, []);
   // useEffect(() => {
-  //   // console.log("Tenant API:");
-  //   // console.log(token);
-  //   // console.log(tenant);
-  //   // console.log(tenantStore);
-  //   // updateTenant(tenant.items?.[0]?.id, "New Name").then(res => console.log(res));
-  //   // deleteTenant(tenant.items?.[0]?.id).then(res => console.log(res));
-  // })
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header with glassmorphism effect */}
