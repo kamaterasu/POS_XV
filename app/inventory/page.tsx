@@ -170,7 +170,7 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
     imgUrlCache.set(path, signed);
     return signed;
   } catch (e) {
-    console.error("Failed to sign image url for", path, e);
+    // Зургийн URL үүсгэхэд алдаа гарсан ч алдаа гаргахгүй
     return undefined;
   }
 }
@@ -455,10 +455,7 @@ export default function InventoryPage() {
               .filter(Boolean) as Product[];
             arr = globalItems;
           } catch (globalError) {
-            console.log(
-              "Global scope not available, fetching per store:",
-              globalError
-            );
+
             // Fallback: fetch from each store individually
             const merged: Product[] = [];
             for (const s of stores) {
@@ -587,9 +584,7 @@ export default function InventoryPage() {
   };
 
   const handleOpenAddSub = () => {
-    console.log("🔍 Opening subcategory form...");
-    console.log("selectedCat:", selectedCat);
-    console.log("Will set parentId to:", selectedCat?.id ?? null);
+
 
     setCatsOpen(true);
     setShowAddSub(true);
@@ -628,12 +623,7 @@ export default function InventoryPage() {
     const name = subName.trim();
     const pid = parentId;
 
-    console.log("🔍 Creating subcategory...");
-    console.log("subName:", subName);
-    console.log("name (trimmed):", name);
-    console.log("parentId:", parentId);
-    console.log("pid:", pid);
-    console.log("flatCatOptions:", flatCatOptions);
+
 
     if (!name) {
       addToast("warning", "Анхааруулга", "Дэд ангиллын нэр шаардлагатай.");
@@ -648,19 +638,11 @@ export default function InventoryPage() {
       const token = await getAccessToken();
       if (!token) throw new Error("no token");
 
-      console.log("🚀 Calling createSubcategory API...");
-      console.log("API params:", { parent_id: pid, name, token: "***" });
-
       const result = await createSubcategory(pid, name, token);
-      console.log("✅ API call successful, result:", result);
-
-      console.log("🔄 Refreshing categories...");
       await refreshCategories(token);
-      console.log("✅ Categories refreshed");
 
       setSubName("");
       setShowAddSub(false);
-      console.log("✅ Subcategory creation completed successfully!");
 
       // Add success feedback
       addToast("success", "Амжилттай", "Дэд ангилал амжилттай нэмэгдлээ!");
@@ -1309,7 +1291,6 @@ export default function InventoryPage() {
               <CategoryTree
                 nodes={cats}
                 onSelect={(n: any) => {
-                  console.log("CategoryTree onSelect called with:", n);
                   // Show toast for debugging
                   addToast(
                     "info",

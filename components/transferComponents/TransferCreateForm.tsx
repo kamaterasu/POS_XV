@@ -25,7 +25,7 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
     imgUrlCache.set(path, signed);
     return signed;
   } catch (e) {
-    console.error("Failed to sign image url for", path, e);
+    // Зургийн URL үүсгэхэд алдаа гарсан ч алдаа гаргахгүй
     return undefined;
   }
 }
@@ -119,7 +119,6 @@ export default function TransferCreateForm({
     setLoadingProducts(true);
     setError("");
     try {
-      console.log(`🔄 Loading products for store: ${storeId}`);
       const token = await getAccessToken();
 
       // Use the same approach as inventory page for better compatibility
@@ -164,18 +163,9 @@ export default function TransferCreateForm({
       
       // Resolve image URLs for all products
       const productsArray = Array.from(uniqueProducts.values());
-      console.log("🖼️ Resolving image URLs for products...", {
-        productCount: productsArray.length,
-        samplesRawImg: productsArray.slice(0, 3).map(p => ({ name: p.name, rawImg: p.rawImg }))
-      });
-      
       const productsWithUrls = await Promise.all(
         productsArray.map(async (product) => {
           const resolvedImg = (await resolveImageUrl(product.rawImg)) || "/default.png";
-          console.log(`🖼️ Resolved image for ${product.name}:`, {
-            rawImg: product.rawImg,
-            resolvedImg: resolvedImg
-          });
           return {
             ...product,
             img: resolvedImg,
@@ -184,9 +174,6 @@ export default function TransferCreateForm({
       );
       
       setProducts(productsWithUrls);
-      console.log(
-        `✅ Loaded ${storeVariants.length} variants and ${uniqueProducts.size} products for store ${storeId}`
-      );
 
       // Clear selected items since available products changed
       setItems([{ variant_id: "", qty: 1 }]);
@@ -219,15 +206,7 @@ export default function TransferCreateForm({
       
       // Resolve product image URL
       if (productDetail?.product?.img) {
-        console.log("🖼️ Resolving modal image for product:", {
-          productName: productDetail.product.name,
-          rawImg: productDetail.product.img
-        });
         const resolvedImageUrl = await resolveImageUrl(productDetail.product.img);
-        console.log("🖼️ Modal image resolved:", {
-          rawImg: productDetail.product.img,
-          resolvedImg: resolvedImageUrl
-        });
         productDetail.product.img = resolvedImageUrl || "/default.png";
       }
       

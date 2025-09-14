@@ -49,7 +49,7 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
     imgUrlCache.set(path, signed);
     return signed;
   } catch (e) {
-    console.error("Failed to sign image url for", path, e);
+    // Зургийн URL үүсгэхэд алдаа гарсан ч алдаа гаргахгүй
     return undefined;
   }
 }
@@ -278,14 +278,6 @@ export default function AddItemModal({
 
         // Process product API response - now includes variants from updated API function
         if (response?.items && response.items.length > 0) {
-          console.log(
-            "🛒 AddItemModal - Processing products with variants from API..."
-          );
-          console.log("🛒 AddItemModal - Store filter applied in API:", {
-            storeId: storeId,
-            productsAfterStoreFilter: response.items.length,
-          });
-
           const products: Product[] = response.items
             .map((productItem: any) => {
               const totalStock = (productItem.variants || []).reduce(
@@ -335,18 +327,6 @@ export default function AddItemModal({
             })
             .filter(Boolean) as Product[]; // Remove null entries
 
-          console.log(
-            "🛒 AddItemModal - Raw products from API:",
-            response.items.length
-          );
-          console.log(
-            "🛒 AddItemModal - Products with variants:",
-            products.length
-          );
-          console.log(
-            "🛒 AddItemModal - Products without variants (filtered out):",
-            response.items.length - products.length
-          );
           // Resolve image URLs for all products
           const productsWithUrls: Product[] = await Promise.all(
             products.map(async (product) => ({
@@ -384,29 +364,18 @@ export default function AddItemModal({
           const storeList = await getStore(token);
           if (storeList && Array.isArray(storeList)) {
             setStores(storeList);
-            console.log("🛒 AddItemModal - Loaded stores:", storeList);
 
             // Try to get saved store from localStorage or user default
             const fromLS =
               typeof window !== "undefined"
                 ? localStorage.getItem("storeId")
                 : null;
-            console.log("🛒 AddItemModal - Store from localStorage:", fromLS);
 
             if (fromLS && storeList.some((s) => s.id === fromLS)) {
-              console.log(
-                "🛒 AddItemModal - Using store from localStorage:",
-                fromLS
-              );
               setStoreId(fromLS);
             } else {
               const defaultStore = await getStoredID(token);
-              console.log(
-                "🛒 AddItemModal - Default store from API:",
-                defaultStore
-              );
               const finalStoreId = defaultStore || "all";
-              console.log("🛒 AddItemModal - Final store ID:", finalStoreId);
               setStoreId(finalStoreId);
             }
           } else {
@@ -519,13 +488,6 @@ export default function AddItemModal({
     // - Selected store (if not "all")
     // - Selected category (if any)
     // - Search query (if any)
-    console.log("🛒 AddItemModal - Server-side filtered catalog:", {
-      totalProducts: catalog.length,
-      selectedCategory: selectedCat?.name,
-      selectedStore: storeId,
-      searchQuery: debouncedQuery,
-      note: "All filtering handled server-side - no client-side filtering needed",
-    });
 
     return catalog;
   }, [catalog, selectedCat?.name, storeId, debouncedQuery]);
@@ -582,14 +544,7 @@ export default function AddItemModal({
       return;
     }
 
-    console.log("🛒 Adding item to cart:", {
-      product: active.name,
-      variant: selectedVariant.variant_id,
-      color: selectedVariant.color,
-      size: selectedVariant.size,
-      qty,
-      price: selectedVariant.price,
-    });
+
 
     onAdd({
       id:

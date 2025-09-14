@@ -222,6 +222,9 @@ export default function QuickActionsSheet({
                             p.img?.startsWith("blob:") ||
                             p.img?.startsWith("data:")
                           }
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = "/default.png";
+                          }}
                         />
                       </div>
 

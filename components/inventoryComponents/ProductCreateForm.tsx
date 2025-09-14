@@ -680,7 +680,6 @@ export default function ProductCreateForm({
 
       // 1) Барааг үүсгэнэ
       const res = await createProduct(token, payload);
-      console.log("createProduct response:", res); // ← энэ мөрийг нэм
       const newId =
         res?.id ?? res?.data?.id ?? res?.product?.id ?? res?.result?.id;
       if (!newId) {
