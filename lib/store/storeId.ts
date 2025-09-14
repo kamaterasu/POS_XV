@@ -8,7 +8,6 @@ export async function getStoreId(token: string) {
 
     // Fallback to JWT parsing if getTenantId fails
     if (!tenant_id) {
-      console.log("Fallback: extracting tenant_id from JWT token");
       const decoded: any = jwtDecode(token);
       tenant_id = decoded?.app_metadata?.tenants?.[0];
     }
@@ -16,8 +15,6 @@ export async function getStoreId(token: string) {
     if (!tenant_id) {
       throw new Error("No tenant_id found in token or from getTenantId()");
     }
-
-    console.log("Using tenant_id for store lookup:", tenant_id);
 
     const url = new URL(
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/helper?tenant_id=${tenant_id}&expand=false&include_names=false`
@@ -37,20 +34,14 @@ export async function getStoreId(token: string) {
     }
 
     const response = await res.json();
-    console.log("Store API response:", response);
 
     // Check if this is a membership response with store_ids
     if (response?.store_ids && Array.isArray(response.store_ids)) {
       if (response.store_ids.length > 0) {
         const store_id = response.store_ids[0];
-        console.log("Found store_id from store_ids array:", store_id);
         return store_id;
       } else if (response.role === "OWNER" && response.scope === "all") {
         // Owner with empty store_ids but scope "all" - try to get stores from a different endpoint
-        console.log(
-          "Owner with scope 'all' but empty store_ids, trying to fetch actual stores..."
-        );
-
         // Try to get stores with expanded data
         const expandedUrl = new URL(
           `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/helper?tenant_id=${tenant_id}&expand=true&include_names=true`
@@ -63,7 +54,6 @@ export async function getStoreId(token: string) {
 
         if (expandedRes.ok) {
           const expandedResponse = await expandedRes.json();
-          console.log("Expanded store response:", expandedResponse);
 
           // Check for stores in expanded response
           if (
@@ -72,7 +62,6 @@ export async function getStoreId(token: string) {
             expandedResponse.stores.length > 0
           ) {
             const store_id = expandedResponse.stores[0].id;
-            console.log("Found store_id from expanded response:", store_id);
             return store_id;
           }
         }
@@ -86,7 +75,6 @@ export async function getStoreId(token: string) {
       response.stores.length > 0
     ) {
       const store_id = response.stores[0].id;
-      console.log("Found store_id from stores array:", store_id);
       return store_id;
     }
 

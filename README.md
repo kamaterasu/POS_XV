@@ -104,3 +104,46 @@ Please file feedback and issues over on the [Supabase GitHub org](https://github
 - [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
 - [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
 # POS_XV
+
+## Шинэ функцууд (Inventory Management)
+
+### Барааны тоо ширхэг тохируулах функц
+
+Энэ функц нь POS системд барааны тоо ширхэгийг нэмэгдүүлэх, хасах боломжийг олгодог.
+
+#### Онцлогууд:
+- **Бараа сонгох**: Системийн бүх барааны жагсаалтаас сонгох
+- **Хувилбар сонгох**: Сонгосон барааны хувилбаруудаас тодорхой хувилбар сонгох
+- **Тоо ширхэг тохируулах**: Эерэг болон сөрөг тоогоор тоо ширхэг нэмэх/хасах
+- **Шалтгаан тэмдэглэх**: Тохируулга, Худалдан авалт, Анхны үлдэгдэл
+- **Урьдчилсан харагдац**: Өөрчлөлтийг хийхээс өмнө үр дүнг харах
+
+#### Техникийн мэдээлэл:
+- React Query ашиглан cache удирдлага
+- productAddToInventory API функц ашиглана
+- Автомат cache invalidation inventory өөрчлөлтийн дараа
+- TypeScript-тэй бүрэн тохицолтой
+
+#### Хэрэглэх:
+1. `/test-inventory` хуудас дээр тестлэх
+2. `/inventory-management` хуудас дээр бүрэн функц ашиглах
+3. `InventoryAdjustmentModal` компонентыг бусад хуудсанд импорт хийх
+
+#### Файлууд:
+- `lib/hooks/useInventoryAdjustment.ts` - React Query hooks
+- `components/inventoryComponents/InventoryAdjustmentModal.tsx` - Modal компонент
+- `app/test-inventory/page.tsx` - Тест хуудас
+- `app/inventory-management/page.tsx` - Бүрэн удирдлагын хуудас
+
+### Ашиглалт:
+```tsx
+import { InventoryAdjustmentModal } from "@/components/inventoryComponents/InventoryAdjustmentModal";
+
+// Modal-ыг нээх
+<InventoryAdjustmentModal
+  open={modalOpen}
+  onOpenChange={setModalOpen}
+  preselectedProductId="product-id" // Сонголт
+  preselectedVariantId="variant-id" // Сонголт
+/>
+```

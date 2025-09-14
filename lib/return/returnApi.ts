@@ -66,26 +66,14 @@ export async function createReturn(
   request: CreateReturnRequest,
   token: string
 ): Promise<ReturnResponse> {
-  console.log(
-    "🔄 Creating return with request:",
-    JSON.stringify(request, null, 2)
-  );
-  console.log("🔑 Using token:", token ? "✅ Present" : "❌ Missing");
-  console.log(
-    "🌐 API URL:",
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/return`
-  );
-
   const url = new URL(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/return`
   );
 
   const requestBody = JSON.stringify(request);
-  console.log("📦 Request body:", requestBody);
 
   let response: Response;
   try {
-    console.log("🌐 Making fetch request...");
     response = await fetch(url.toString(), {
       method: "POST",
       headers: {
@@ -95,8 +83,6 @@ export async function createReturn(
       },
       body: requestBody,
     });
-
-    console.log("📡 Fetch completed with status:", response.status);
   } catch (fetchError: any) {
     console.error("❌ Fetch error:", fetchError);
     throw new Error(
@@ -104,20 +90,12 @@ export async function createReturn(
     );
   }
 
-  console.log("📡 Response status:", response.status, response.statusText);
-  console.log(
-    "📡 Response headers:",
-    Object.fromEntries(response.headers.entries())
-  );
-
   let result;
   try {
     result = await response.json();
-    console.log("📥 Response body:", JSON.stringify(result, null, 2));
   } catch (parseError) {
     console.error("❌ Failed to parse response JSON:", parseError);
     const textResponse = await response.text();
-    console.log("📄 Raw response text:", textResponse);
     throw new Error(`Failed to parse response: ${textResponse}`);
   }
 
@@ -128,7 +106,6 @@ export async function createReturn(
     );
   }
 
-  console.log("✅ Return created successfully:", result.return?.id);
   return result;
 }
 

@@ -218,38 +218,25 @@ export default function AddItemModal({
 
     // Wait for store to be loaded before making API calls
     if (loadingStores) {
-      console.log("🛒 AddItemModal - Waiting for stores to load...", {
-        loadingStores,
-      });
       return;
     }
 
     // If no storeId is set after stores loaded, default to "all"
     if (!storeId) {
-      console.log("🛒 AddItemModal - No store selected, defaulting to 'all'");
       setStoreId("all");
       return;
     }
-
-    console.log("🛒 AddItemModal - Starting to load products...");
     setLoading(true);
     setCatalog([]); // Clear previous catalog
 
     (async () => {
       try {
-        console.log("🛒 AddItemModal - Getting access token...");
         const token = await getAccessToken();
         if (!token) {
           console.error("🛒 AddItemModal - No access token available");
           setCatalog([]);
           return;
         }
-        console.log(
-          "🛒 AddItemModal - Token obtained:",
-          token.substring(0, 20) + "..."
-        );
-
-        console.log("🛒 AddItemModal - Using store ID:", storeId);
 
         // Set store info for UI display
         if (storeId && storeId !== "all") {
@@ -269,11 +256,6 @@ export default function AddItemModal({
         // Add store filtering (skip if "all")
         if (storeId && storeId !== "all") {
           apiParams.store_id = storeId;
-          console.log("🛒 AddItemModal - Store filtering ACTIVE:", storeId);
-        } else {
-          console.log(
-            "🛒 AddItemModal - Store filtering DISABLED (showing all stores)"
-          );
         }
 
         // Add category filtering if selected
@@ -287,27 +269,8 @@ export default function AddItemModal({
           apiParams.search = debouncedQuery.trim();
         }
 
-        console.log("🛒 AddItemModal - API parameters:", apiParams);
-        console.log("🛒 AddItemModal - Store filtering:", {
-          storeId: storeId,
-          isFiltering: storeId && storeId !== "all",
-          filterType:
-            storeId === "all" ? "show all stores" : "filter by inventory",
-        });
-
         // Fetch products using the new product API (includes variants and inventory in bulk)
         const response = await getProductsForModal(token, apiParams);
-
-        console.log("🛒 AddItemModal - Raw API response:", response);
-        console.log("🛒 AddItemModal - Response type:", typeof response);
-        console.log(
-          "🛒 AddItemModal - Response keys:",
-          Object.keys(response || {})
-        );
-        console.log(
-          "🛒 AddItemModal - Response items count:",
-          response?.items?.length || 0
-        );
 
         if (response?.error) {
           console.error("🛒 AddItemModal - API Error:", response.error);
@@ -329,19 +292,6 @@ export default function AddItemModal({
                 (sum: number, v: any) => sum + (v.qty || 0),
                 0
               );
-
-              console.log("🛒 Processing product:", {
-                id: productItem.id,
-                name: productItem.name,
-                category_id: productItem.category_id,
-                variants_count: productItem.variants?.length || 0,
-                totalStock: totalStock,
-                hasVariants: !!productItem.variants,
-                storeFiltered:
-                  storeId !== "all"
-                    ? `Stock in ${storeId}: ${totalStock}`
-                    : "All stores",
-              });
 
               // Skip products without variants (but be more lenient for debugging)
               if (!productItem.variants || productItem.variants.length === 0) {
@@ -397,8 +347,6 @@ export default function AddItemModal({
             "🛒 AddItemModal - Products without variants (filtered out):",
             response.items.length - products.length
           );
-          console.log("🛒 AddItemModal - Resolving image URLs...");
-
           // Resolve image URLs for all products
           const productsWithUrls: Product[] = await Promise.all(
             products.map(async (product) => ({
@@ -407,61 +355,18 @@ export default function AddItemModal({
             }))
           );
 
-          console.log(
-            "🛒 AddItemModal - Processed products with resolved images:",
-            productsWithUrls
-          );
-          console.log(
-            "🛒 AddItemModal - Total products:",
-            productsWithUrls.length
-          );
-
-          productsWithUrls.forEach((p, i) => {
-            console.log(
-              `🛒 Product ${i + 1}: ${p.name} (${
-                p.variants.length
-              } variants) - Image: ${p.img}`
-            );
-            p.variants.forEach((v, j) => {
-              console.log(
-                `  🛒 Variant ${j + 1}: ${v.color}/${v.size} - Stock: ${
-                  v.stock
-                }, Price: ${v.price}`
-              );
-            });
-          });
-
           setCatalog(productsWithUrls);
           if (productsWithUrls.length > 0) {
             setActiveId(productsWithUrls[0].id);
-            console.log(
-              "🛒 AddItemModal - Set active product:",
-              productsWithUrls[0].name
-            );
           }
         } else {
           console.warn("🛒 AddItemModal - No items in response or empty array");
-          console.log(
-            "🛒 AddItemModal - Full response:",
-            JSON.stringify(response, null, 2)
-          );
-          console.log(
-            "🛒 AddItemModal - API URL that was called:",
-            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
-          );
-          console.log(
-            "🛒 AddItemModal - API params sent:",
-            JSON.stringify(apiParams, null, 2)
-          );
           setCatalog([]);
         }
       } catch (error) {
         console.error("🛒 AddItemModal - Error fetching products:", error);
         setCatalog([]);
       } finally {
-        console.log(
-          "🛒 AddItemModal - Finished loading, setting loading to false"
-        );
         setLoading(false);
       }
     })();

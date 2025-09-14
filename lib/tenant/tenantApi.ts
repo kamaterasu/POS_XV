@@ -14,7 +14,6 @@ export async function getTenantById(tenant_id: string, token?: string) {
     });
 
     const data = await res.json();
-    console.log("Tenant details API response:", data);
 
     if (!res.ok) {
       throw new Error(data.error || `HTTP ${res.status}: ${res.statusText}`);

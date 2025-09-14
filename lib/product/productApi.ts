@@ -377,8 +377,6 @@ export async function deleteProduct(token: string, productId: string) {
 export async function getAllProductVariants(token: string) {
   const tenant_id = getTenantIdFromToken(token);
 
-  console.log("🚀 Loading variants for transfer system...");
-
   // First, get all products (without variants)
   const productsUrl = new URL(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
@@ -398,10 +396,8 @@ export async function getAllProductVariants(token: string) {
   }
 
   const productsData = await productsRes.json();
-  console.log("📦 Products loaded:", productsData.items?.length || 0);
 
   if (!productsData.items || !Array.isArray(productsData.items)) {
-    console.warn("No products found");
     return [];
   }
 
@@ -419,11 +415,6 @@ export async function getAllProductVariants(token: string) {
 
   for (let i = 0; i < products.length; i += batchSize) {
     const batch = products.slice(i, i + batchSize);
-    console.log(
-      `📋 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(
-        products.length / batchSize
-      )} (${batch.length} products)...`
-    );
 
     // Process batch in parallel
     const batchPromises = batch.map(async (product: any) => {
@@ -476,7 +467,6 @@ export async function getAllProductVariants(token: string) {
     }
   }
 
-  console.log(`🎉 Total variants loaded: ${variants.length}`);
   return variants;
 }
 
@@ -487,8 +477,6 @@ export async function getProductVariantsByStore(
   token: string,
   storeId: string
 ) {
-  console.log(`🏪 Fetching products for store: ${storeId}`);
-
   const tenant_id = getTenantIdFromToken(token);
   const url = new URL(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product`
@@ -500,8 +488,6 @@ export async function getProductVariantsByStore(
   url.searchParams.set("withVariants", "true");
   url.searchParams.set("limit", "200");
   url.searchParams.set("offset", "0");
-
-  console.log("🎯 Store-filtered fetch:", url.toString());
 
   const res = await fetch(url.toString(), {
     method: "GET",
@@ -520,7 +506,6 @@ export async function getProductVariantsByStore(
   }
 
   const data = await res.json();
-  console.log(`📦 Store ${storeId} products:`, data);
 
   const variants: Array<{
     id: string;
@@ -532,10 +517,6 @@ export async function getProductVariantsByStore(
   }> = [];
 
   if (data.items && Array.isArray(data.items)) {
-    console.log(
-      `📋 Processing ${data.items.length} products for store ${storeId}`
-    );
-
     // Same logic as getAllProductVariants but store-filtered
     const firstProduct = data.items[0];
     if (
@@ -543,7 +524,6 @@ export async function getProductVariantsByStore(
       firstProduct.variants &&
       Array.isArray(firstProduct.variants)
     ) {
-      console.log("✅ FAST PATH: Store variants are included");
 
       for (const product of data.items) {
         if (product.variants && Array.isArray(product.variants)) {
@@ -562,8 +542,6 @@ export async function getProductVariantsByStore(
         }
       }
     } else {
-      console.log("⚡ STORE PATH: Fetching store variants individually");
-
       for (const product of data.items) {
         try {
           const productUrl = new URL(url.toString());
@@ -605,6 +583,5 @@ export async function getProductVariantsByStore(
     }
   }
 
-  console.log(`🎯 Store ${storeId} variants: ${variants.length}`);
   return variants;
 }

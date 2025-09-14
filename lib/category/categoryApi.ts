@@ -42,22 +42,11 @@ export async function createSubcategory(
   name: string,
   token: string
 ) {
-  console.log("🔧 createSubcategory API called with:", {
-    parent_id,
-    name,
-    token: token ? "present" : "missing",
-  });
-
   const decoded: any = jwtDecode(token);
   const tenant_id = decoded?.app_metadata?.tenants?.[0];
 
-  console.log("🔧 Decoded tenant_id:", tenant_id);
-
   const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/category`;
   const requestBody = { tenant_id, name, parent_id };
-
-  console.log("🔧 Request URL:", url);
-  console.log("🔧 Request body:", requestBody);
 
   const res = await fetch(url, {
     method: "POST",
@@ -69,9 +58,6 @@ export async function createSubcategory(
     body: JSON.stringify(requestBody),
   });
 
-  console.log("🔧 Response status:", res.status, res.statusText);
-  console.log("🔧 Response ok:", res.ok);
-
   if (!res.ok) {
     const err = await res.text();
     console.error("🔧 Response error text:", err);
@@ -79,6 +65,5 @@ export async function createSubcategory(
   }
 
   const result = await res.json();
-  console.log("🔧 Response JSON:", result);
   return result;
 }

@@ -160,19 +160,8 @@ export default function TransferPage() {
 
   const loadVariants = async () => {
     try {
-      console.log("Starting to load variants...");
       const token = await getAccessToken();
-      console.log("Got access token for variants:", token ? "✓" : "✗");
-
       const variantsData = await getAllProductVariants(token);
-      console.log("Raw variants response:", variantsData);
-      console.log("Loaded variants:", variantsData.length, "variants");
-
-      // Log first few variants for debugging
-      if (variantsData.length > 0) {
-        console.log("First variant:", variantsData[0]);
-      }
-
       setVariants(variantsData);
     } catch (err) {
       console.error("Error loading variants:", err);
@@ -204,19 +193,15 @@ export default function TransferPage() {
   const handleTestProductAPI = async () => {
     try {
       setError("Системийг шалгаж байна...");
-      console.log("Testing transfer system APIs...");
 
       const token = await getAccessToken();
-      console.log("Got token for test:", token ? "✓" : "✗");
 
       // Test 1: Product API
       const { jwtDecode } = await import("jwt-decode");
       const decoded: any = jwtDecode(token);
       const tenant_id = decoded?.app_metadata?.tenants?.[0];
-      console.log("Tenant ID:", tenant_id);
 
       const productUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/product?tenant_id=${tenant_id}&limit=5`;
-      console.log("Testing Product API:", productUrl);
 
       const productResponse = await fetch(productUrl, {
         headers: { Authorization: `Bearer ${token}` },
@@ -231,11 +216,9 @@ export default function TransferPage() {
       }
 
       const productData = await productResponse.json();
-      console.log("Product API response:", productData);
 
       // Test 2: Transfer API
       const transferUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/transfer?tenant_id=${tenant_id}&limit=5`;
-      console.log("Testing Transfer API:", transferUrl);
 
       const transferResponse = await fetch(transferUrl, {
         headers: { Authorization: `Bearer ${token}` },
@@ -250,7 +233,6 @@ export default function TransferPage() {
       }
 
       const transferData = await transferResponse.json();
-      console.log("Transfer API response:", transferData);
 
       // Test 3: Try to load variants
       console.log("Testing variant loading...");
