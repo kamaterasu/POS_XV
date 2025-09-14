@@ -204,8 +204,8 @@ export default function ManagementPage() {
         }
 
         // Try both store API and tenant API approaches
-        let storesResponse;
-        let remoteUsers;
+        let storesResponse: any;
+        let remoteUsers: any;
 
         try {
           [storesResponse, remoteUsers] = await Promise.all([

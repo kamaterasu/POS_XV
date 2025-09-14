@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
 
 import { getAccessToken } from "@/lib/helper/getAccessToken";
+import { getUserRole, canAccessFeature } from "@/lib/helper/getUserRole";
 import { getCategories } from "@/lib/category/categoryApi";
 import { createCategory } from "@/lib/category/categoryApi";
 import { createProduct } from "@/lib/product/productApi";
@@ -159,6 +160,14 @@ function CategoryPicker({
   async function addSubcategory() {
     const name = newName.trim();
     if (!name || !tenantId) return;
+
+    // Check user permission to create categories
+    const role = await getUserRole();
+    if (!canAccessFeature(role, "createCategory")) {
+      alert("Таны эрх ангилал нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай.");
+      return;
+    }
+
     try {
       const created = await apiCategoryCreate({
         tenantId,
@@ -344,6 +353,10 @@ export default function ProductCreateForm({
   const imgInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Role-based access control
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [checkingPermission, setCheckingPermission] = useState(true);
+
   const [catsState, setCatsState] = useState<Category[]>(cats ?? []);
   const [loadingCats, setLoadingCats] = useState<boolean>(false);
   const [resolvedTenantId, setResolvedTenantId] = useState<string | undefined>(
@@ -360,6 +373,13 @@ export default function ProductCreateForm({
 
     const initializeData = async () => {
       try {
+        // Check user role and permissions first
+        const role = await getUserRole();
+        if (alive) {
+          setUserRole(role);
+          setCheckingPermission(false);
+        }
+
         const token = await getAccessToken();
         if (!token || !alive) return;
 
@@ -766,6 +786,39 @@ export default function ProductCreateForm({
   const [quantity, setQuantity] = useState(1);
 
   if (loading) return <Loading open label="Уншиж байна…" />;
+
+  // Check if user has permission to create products
+  if (checkingPermission) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loading open={true} />
+        <span className="ml-2">Эрх шалгаж байна...</span>
+      </div>
+    );
+  }
+
+  if (!canAccessFeature(userRole as any, "createProduct")) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <div className="text-red-500 text-6xl mb-4">🚫</div>
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          Хандалт хориглогдсон
+        </h2>
+        <p className="text-gray-600 mb-4">
+          Таны эрх ({userRole}) бараа нэмэх боломжийг олгохгүй байна.
+        </p>
+        <p className="text-sm text-gray-500">
+          Бараа нэмэхийн тулд Admin эсвэл Manager эрх шаардлагатай.
+        </p>
+        <button
+          onClick={() => router.back()}
+          className="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+        >
+          Буцах
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

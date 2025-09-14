@@ -62,6 +62,12 @@ export function canAccessFeature(
     case "transfer":
       // Only Admin and OWNER can access reports and transfers
       return userRole === "Admin" || userRole === "OWNER";
+    case "createProduct":
+      // Only Admin, Manager and OWNER can create products - Cashier cannot
+      return userRole === "Admin" || userRole === "Manager" || userRole === "OWNER";
+    case "createCategory":
+      // Only Admin, Manager and OWNER can create categories - Cashier cannot
+      return userRole === "Admin" || userRole === "Manager" || userRole === "OWNER";
     default:
       return true;
   }

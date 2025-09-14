@@ -11,6 +11,7 @@ import ProductCreateForm, {
 } from "@/components/inventoryComponents/ProductCreateForm";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getTenantId } from "@/lib/helper/getTenantId";
+import { getUserRole, canAccessFeature, type Role } from "@/lib/helper/getUserRole";
 import {
   getProductByStore,
   getProductByCategory,
@@ -303,6 +304,9 @@ function CategoryTree({
 export default function InventoryPage() {
   const router = useRouter();
 
+  // Role-based access control
+  const [userRole, setUserRole] = useState<Role | null>(null);
+
   // UI state
   const [loadingStores, setLoadingStores] = useState(true);
   const [stores, setStores] = useState<StoreRow[]>([
@@ -372,6 +376,10 @@ export default function InventoryPage() {
     setLoadingStores(true);
     (async () => {
       try {
+        // Check user role first
+        const role = await getUserRole();
+        setUserRole(role);
+
         const token = await getAccessToken();
         if (!token) throw new Error("no token");
 
@@ -573,6 +581,13 @@ export default function InventoryPage() {
       addToast("warning", "Анхааруулга", "Эхлээд тодорхой салбар сонгоно уу.");
       return;
     }
+
+    // Check user permission
+    if (!canAccessFeature(userRole, "createProduct")) {
+      addToast("error", "Хандалт хориглогдсон", "Таны эрх бараа нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай.");
+      return;
+    }
+
     setShowCreate(true);
   };
 
@@ -599,6 +614,13 @@ export default function InventoryPage() {
       addToast("warning", "Анхааруулга", "Ангиллын нэр шаардлагатай.");
       return;
     }
+
+    // Check user permission
+    if (!canAccessFeature(userRole, "createCategory")) {
+      addToast("error", "Хандалт хориглогдсон", "Таны эрх ангилал нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай.");
+      return;
+    }
+
     try {
       setCreatingCat(true);
       const token = await getAccessToken();
@@ -623,14 +645,18 @@ export default function InventoryPage() {
     const name = subName.trim();
     const pid = parentId;
 
-
-
     if (!name) {
       addToast("warning", "Анхааруулга", "Дэд ангиллын нэр шаардлагатай.");
       return;
     }
     if (!pid) {
       addToast("warning", "Анхааруулга", "Эцэг ангиллыг сонгоно уу.");
+      return;
+    }
+
+    // Check user permission
+    if (!canAccessFeature(userRole, "createCategory")) {
+      addToast("error", "Хандалт хориглогдсон", "Таны эрх дэд ангилал нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай.");
       return;
     }
     try {
@@ -792,26 +818,28 @@ export default function InventoryPage() {
 
             {/* Primary Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                onClick={handleAddProduct}
-                className="h-11 px-4 sm:px-6 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium flex-1 sm:flex-none justify-center"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {canAccessFeature(userRole, "createProduct") && (
+                <button
+                  onClick={handleAddProduct}
+                  className="h-11 px-4 sm:px-6 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium flex-1 sm:flex-none justify-center"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-                <span className="hidden xs:inline">Бараа нэмэх</span>
-                <span className="xs:hidden">Нэмэх</span>
-              </button>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                  <span className="hidden xs:inline">Бараа нэмэх</span>
+                  <span className="xs:hidden">Нэмэх</span>
+                </button>
+              )}
 
               {/* Categories Toggle */}
               <button
@@ -947,7 +975,7 @@ export default function InventoryPage() {
             </div>
 
             {/* Category Management Actions */}
-            {catsOpen && (
+            {catsOpen && canAccessFeature(userRole, "createCategory") && (
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   onClick={handleOpenAddCat}
@@ -1120,7 +1148,7 @@ export default function InventoryPage() {
             </div>
 
             {/* Create category form */}
-            {showAddCat && (
+            {showAddCat && canAccessFeature(userRole, "createCategory") && (
               <div className="mb-6 rounded-xl border border-slate-200 p-4 bg-gradient-to-r from-slate-50 to-white">
                 <div className="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-700">
                   <svg
@@ -1188,7 +1216,7 @@ export default function InventoryPage() {
             )}
 
             {/* Create subcategory form */}
-            {showAddSub && (
+            {showAddSub && canAccessFeature(userRole, "createCategory") && (
               <div className="mb-6 rounded-xl border border-slate-200 p-4 bg-gradient-to-r from-slate-50 to-white">
                 <div className="text-sm font-semibold mb-3 flex items-center gap-2 text-slate-700">
                   <svg
