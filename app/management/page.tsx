@@ -198,8 +198,6 @@ export default function ManagementPage() {
           const roles = payload.app_metadata?.role || [];
           const currentRole = roles.length > 0 ? roles[0] : "";
           setUserRole(currentRole);
-
-          console.log("User role:", currentRole);
         } catch (e) {
           // Token decode error
           setUserRole("");

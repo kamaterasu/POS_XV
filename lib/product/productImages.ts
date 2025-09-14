@@ -144,6 +144,6 @@ export async function getImageShowUrl(
     if (pub?.publicUrl) return pub.publicUrl;
   }
 
-  console.warn('getImageShowUrl: object not found or signing failed, using fallback', { path, error });
+  // Зураг олдохгүй эсвэл URL үүсгэх алдаа гарсан ч алдаа гаргахгүй - default зураг буцаана
   return fallback;
 }

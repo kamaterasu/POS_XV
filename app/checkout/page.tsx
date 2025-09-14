@@ -66,7 +66,7 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
     imgUrlCache.set(path, signed);
     return signed;
   } catch (e) {
-    console.error("Failed to sign image url for", path, e);
+    // Зургийн URL үүсгэхэд алдаа гарсан ч алдаа гаргахгүй
     return undefined;
   }
 }
@@ -943,6 +943,9 @@ export default function CheckoutPage() {
                             height={56}
                             className="w-14 h-14 rounded-xl object-cover bg-gray-100"
                             unoptimized
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = "/default.png";
+                            }}
                           />
                           {(p.qty ?? 0) <= 0 && (
                             <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
@@ -1103,6 +1106,9 @@ export default function CheckoutPage() {
                           height={40}
                           className="w-12 h-12 rounded-xl object-cover bg-gray-100 shadow-sm"
                           unoptimized
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = "/default.png";
+                          }}
                         />
                         <div className="leading-tight flex flex-col min-w-0 flex-1">
                           <div className="text-sm font-semibold text-gray-900 truncate">
@@ -1335,6 +1341,9 @@ export default function CheckoutPage() {
                     height={64}
                     className="w-16 h-16 rounded-lg object-cover bg-gray-100"
                     unoptimized
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "/default.png";
+                    }}
                   />
                   <div className="flex-1">
                     <div className="flex items-start justify-between">

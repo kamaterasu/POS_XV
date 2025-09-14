@@ -159,8 +159,6 @@ export default function ProductDetailPage() {
         // Get token first and validate
         const token = await getAccessToken();
 
-        console.log("Token retrieved successfully, length:", token.length); // Debug log
-
         // Fetch product data and categories in parallel
         const [productResult, categoriesResult] = await Promise.all([
           getProductById(token, String(id), { withVariants: true }), // Enable variants fetching
@@ -171,7 +169,6 @@ export default function ProductDetailPage() {
           if (productResult.error) {
             setError(productResult.error);
           } else {
-            console.log("Product result:", productResult); // Debug log
             setData(productResult);
             setFormData({
               name: productResult.product.name || "",
@@ -199,7 +196,7 @@ export default function ProductDetailPage() {
                     setImagePreviews(["/default.png"]);
                   }
                 } catch (error) {
-                  console.error("Error loading image:", error);
+                  // Зураг ачаалахад алдаа гарсан ч алдаа гаргахгүй
                   setImageError("Зураг ачаалахад алдаа гарлаа");
                   setImagePreviews(["/default.png"]);
                 }
@@ -210,7 +207,6 @@ export default function ProductDetailPage() {
 
           // Handle categories result
           try {
-            console.log("Categories result:", categoriesResult); // Debug log
 
             // Handle different possible response structures
             let categoryData = [];
@@ -279,7 +275,7 @@ export default function ProductDetailPage() {
           uploadedImagePath = uploadResult.path; // Store path in database
           uploadedImageUrl = uploadResult.signedUrl; // Use signed URL for display
         } catch (e) {
-          console.error("Image upload failed:", e);
+          // Зураг upload алдаа гарсан ч алдаа гаргахгүй
           alert("Зураг upload хийхэд алдаа гарлаа.");
           setUploadingImages(false);
           return;
@@ -322,7 +318,6 @@ export default function ProductDetailPage() {
           // Convert the storage path to signed URL for display
           try {
             const imageUrl = await getImageUrl(result.product.img);
-            console.log("Updated image URL:", imageUrl); // Debug log
             if (imageUrl && imageUrl !== "/default.png") {
               setImagePreviews([imageUrl]);
             } else {
@@ -330,7 +325,7 @@ export default function ProductDetailPage() {
               setImagePreviews(["/default.png"]);
             }
           } catch (error) {
-            console.error("Error loading updated image:", error);
+            // Зураг ачаалахад алдаа гарсан ч алдаа гаргахгүй
             setImageError("Зураг ачаалахад алдаа гарлаа");
             setImagePreviews(["/default.png"]);
           }
@@ -609,7 +604,6 @@ export default function ProductDetailPage() {
                               const imageUrl = await getImageUrl(
                                 data.product.img
                               );
-                              console.log("Reset image URL:", imageUrl); // Debug log
                               if (imageUrl && imageUrl !== "/default.png") {
                                 setImagePreviews([imageUrl]);
                               } else {
@@ -747,10 +741,7 @@ export default function ProductDetailPage() {
                             imagePreviews[0].startsWith("data:")
                           }
                           onError={(e) => {
-                            console.error(
-                              "Image failed to load:",
-                              imagePreviews[0]
-                            );
+                            // Зураг ачаалахад алдаа гарсан ч алдаа гаргахгүй - default.png fallback ашиглана
                             (e.target as HTMLImageElement).src = "/default.png";
                           }}
                           onLoad={() => setImageError(null)}

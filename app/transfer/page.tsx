@@ -235,7 +235,6 @@ export default function TransferPage() {
       const transferData = await transferResponse.json();
 
       // Test 3: Try to load variants
-      console.log("Testing variant loading...");
       await loadVariants();
 
       setError(
