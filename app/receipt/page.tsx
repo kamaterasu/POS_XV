@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { jwtDecode } from 'jwt-decode';
 import { supabase } from '@/lib/supabaseClient';
@@ -255,6 +255,13 @@ function canvasToEscPosRaster(canvas: HTMLCanvasElement) {
   return out;
 }
 
+// --------------- Binary helpers ---------------
+const toArrayBuffer = (u8: Uint8Array): ArrayBuffer => {
+  const buf = new ArrayBuffer(u8.byteLength);
+  new Uint8Array(buf).set(u8);
+  return buf;
+};
+
 // --------------- Print paths: Web Serial → WebUSB → Download/Share ---------------
 async function printViaWebSerial(bytes: Uint8Array) {
   // @ts-ignore
@@ -262,7 +269,7 @@ async function printViaWebSerial(bytes: Uint8Array) {
   if (!port) throw new Error('Web Serial not available');
   await port.open({ baudRate: 9600 });
   const w = port.writable!.getWriter();
-  await w.write(bytes);
+  await w.write(bytes); // ✅ ArrayBuffer
   w.releaseLock();
   await port.close();
 }
@@ -270,17 +277,13 @@ async function printViaWebSerial(bytes: Uint8Array) {
 async function printViaWebUSB(bytes: Uint8Array) {
   // @ts-ignore
   const usb: USB = navigator.usb;
-  console.log(usb);
   if (!usb?.requestDevice) throw new Error('WebUSB not available');
 
-  // Олон төрлийн USB-тэй нийцүүлэхийн тулд filter хоосон.
-  // Хэрэглэгч төхөөрөмжөө сонгоно.
   // @ts-ignore
   const device: USBDevice = await usb.requestDevice({ filters: [] });
   await device.open();
   if (!device.configuration) await device.selectConfiguration(1);
 
-  // OUT endpoint-той interface/alternate-ыг олно
   // @ts-ignore
   const iface = device.configuration.interfaces.find((i: any) =>
     i.alternates.some((a: any) => a.endpoints.some((e: any) => e.direction === 'out'))
@@ -295,12 +298,13 @@ async function printViaWebUSB(bytes: Uint8Array) {
   await device.claimInterface(ifaceNum);
   // @ts-ignore
   if (device.selectAlternateInterface) await device.selectAlternateInterface(ifaceNum, alt.alternateSetting);
-  await device.transferOut(outEp, bytes);
-  try { await device.close(); } catch { }
+  await device.transferOut(outEp, toArrayBuffer(bytes)); // ✅ ArrayBuffer
+  try { await device.close(); } catch { /* no-op */ }
 }
 
 function downloadOrShare(bytes: Uint8Array, filename = 'receipt.escpos') {
-  const blob = new Blob([bytes], { type: 'application/octet-stream' });
+  const buf = toArrayBuffer(bytes);
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
   const file = new File([blob], filename, { type: 'application/octet-stream' });
   // @ts-ignore
   if (navigator.canShare?.({ files: [file] })) {
@@ -312,7 +316,7 @@ function downloadOrShare(bytes: Uint8Array, filename = 'receipt.escpos') {
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 0);
     a.remove();
   }
 }
@@ -341,9 +345,9 @@ async function fetchReceipt(orderId: string): Promise<ReceiptPayload> {
   return res.json();
 }
 
-// --------------- Page Component ---------------
-export default function Page() {
-  const sp = useSearchParams();
+// --------------- Inner Page (must be inside Suspense) ---------------
+function ReceiptPageInner() {
+  const sp = useSearchParams(); // ✅ inside Suspense
   const orderId = sp.get('orderId') || '';
 
   const [payload, setPayload] = useState<ReceiptPayload | null>(null);
@@ -373,13 +377,9 @@ export default function Page() {
       const canvas = await renderReceiptCanvas(payload);
       const bytes = canvasToEscPosRaster(canvas);
 
-      // 1) Web Serial
       try { await printViaWebSerial(bytes); alert('Хэвлэгдлээ (Web Serial).'); return; } catch { }
-
-      // 2) WebUSB
       try { await printViaWebUSB(bytes); alert('Хэвлэгдлээ (WebUSB).'); return; } catch { }
 
-      // 3) Fallback: download/share .escpos
       await downloadOrShare(bytes);
       alert('Төхөөрөмжтэй шууд холбогдож чадсангүй. .escpos файлыг татаж/шэйрлэж хэвлэнэ үү.');
     } catch (e) {
@@ -438,3 +438,11 @@ export default function Page() {
   );
 }
 
+// --------------- Outer Page (Suspense wrapper, no hooks) ---------------
+export default function Page() {
+  return (
+    <Suspense fallback={<main className="p-6 max-w-lg">Уншиж байна…</main>}>
+      <ReceiptPageInner />
+    </Suspense>
+  );
+}
