@@ -12,11 +12,13 @@ import ProductCreateForm, {
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getTenantId } from "@/lib/helper/getTenantId";
 import { getUserRole, canAccessFeature, type Role } from "@/lib/helper/getUserRole";
+import { productAddToInventory } from "@/lib/inventory/inventoryApi";
 import {
   getProductByStore,
   getProductByCategory,
   getInventoryGlobal,
   updateProduct,
+  getProductsForModal,
 } from "@/lib/product/productApi";
 import { getStore } from "@/lib/store/storeApi";
 import { getImageShowUrl } from "@/lib/product/productImages";
@@ -167,12 +169,17 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
   if (imgUrlCache.has(path)) return imgUrlCache.get(path)!;
 
   try {
-    const signed = await getImageShowUrl(path); // 7 хоног хүчинтэй
+    const signed = await getImageShowUrl(path, { 
+      fallback: "/default.png", // Default зураг
+      preferPublic: true 
+    });
     imgUrlCache.set(path, signed);
     return signed;
   } catch (e) {
-    // Зургийн URL үүсгэхэд алдаа гарсан ч алдаа гаргахгүй
-    return undefined;
+    // Storage алдааг log хийхгүй - зөвхөн default зураг буцаах
+    const defaultUrl = "/default.png";
+    imgUrlCache.set(path, defaultUrl);
+    return defaultUrl;
   }
 }
 
@@ -351,8 +358,14 @@ export default function InventoryPage() {
     cost: 0,
     code: "",
     description: "",
+    quantity: 0, // Current stock quantity
+    selectedVariantId: "", // Selected variant for quantity adjustment
   });
   const [updating, setUpdating] = useState(false);
+
+  // Product variants for editing
+  const [productVariants, setProductVariants] = useState<any[]>([]);
+  const [loadingVariants, setLoadingVariants] = useState(false);
 
   // Toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -700,6 +713,36 @@ export default function InventoryPage() {
   );
 
   // --------- Edit and Delete handlers ----------
+  // Load product variants when editing
+  const loadProductVariants = async (productId: string) => {
+    try {
+      setLoadingVariants(true);
+      const token = await getAccessToken();
+      if (!token) return;
+
+      // Use the modal API to get product with variants
+      const response = await getProductsForModal(token, {
+        store_id: storeId !== "all" ? storeId : undefined,
+        limit: 1,
+      });
+
+      const products = Array.isArray(response?.items) ? response.items : [];
+      const product = products.find((p: any) => p.id === productId);
+      
+      if (product?.variants) {
+        setProductVariants(product.variants);
+      } else {
+        setProductVariants([]);
+      }
+    } catch (error) {
+      console.error("Failed to load product variants:", error);
+      setProductVariants([]);
+      addToast("error", "Алдаа", "Барааны хувилбарууд ачаалж чадсангүй");
+    } finally {
+      setLoadingVariants(false);
+    }
+  };
+
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
     setEditForm({
@@ -708,7 +751,85 @@ export default function InventoryPage() {
       cost: 0, // We don't have cost in the Product type, so default to 0
       code: product.code || "",
       description: "", // We don't have description in the Product type
+      quantity: product.qty || 0, // Current stock quantity
+      selectedVariantId: product.variantId || "", // Current variant ID
     });
+
+    // Load variants for this product
+    if (product.id) {
+      loadProductVariants(product.id);
+    }
+  };
+
+  // Add inventory to selected variant
+  const handleAddToVariant = async (addQuantity: number) => {
+    if (!editingProduct || addQuantity <= 0) return;
+
+    try {
+      setUpdating(true);
+      const token = await getAccessToken();
+
+      // Get the target variant
+      const targetVariantId = editForm.selectedVariantId || editingProduct.variantId;
+      if (!targetVariantId) {
+        addToast("error", "Алдаа", "Хувилбар сонгоно уу!");
+        return;
+      }
+
+      // Get current quantity for the selected variant
+      const currentQty = productVariants.length > 1 && editForm.selectedVariantId
+        ? productVariants.find(v => v.id === editForm.selectedVariantId)?.qty || 0
+        : editingProduct.qty || 0;
+
+      // Add inventory
+      const response = await productAddToInventory(token, {
+        store_id: storeId !== "all" ? storeId : editingProduct.storeId || "",
+        variant_id: targetVariantId,
+        delta: addQuantity,
+        reason: "ADJUSTMENT",
+        note: `Бараа нэмэх: ${addQuantity} ширхэг`
+      });
+
+      if (response.movement) {
+        // Update local state
+        const newQty = currentQty + addQuantity;
+        
+        if (productVariants.length > 1 && editForm.selectedVariantId) {
+          // Update the specific variant in productVariants
+          setProductVariants(prev => 
+            prev.map(v => 
+              v.id === editForm.selectedVariantId 
+                ? { ...v, qty: newQty }
+                : v
+            )
+          );
+        }
+
+        // Update the edit form
+        setEditForm(prev => ({
+          ...prev,
+          quantity: newQty
+        }));
+
+        // Show success message
+        const selectedVariant = productVariants.find(v => v.id === editForm.selectedVariantId);
+        const variantInfo = selectedVariant 
+          ? `(${selectedVariant.attrs?.color || ''} ${selectedVariant.attrs?.size || ''})`.trim()
+          : '';
+        
+        addToast("success", "Амжилттай", `${addQuantity} ширхэг бараа нэмэгдлээ ${variantInfo}`);
+        
+        // Refresh products list
+        window.location.reload();
+      } else {
+        throw new Error("Бараа нэмэхэд алдаа гарлаа");
+      }
+    } catch (error: any) {
+      console.error("Error adding inventory:", error);
+      addToast("error", "Алдаа", `Алдаа гарлаа: ${error?.message || error}`);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleUpdateProduct = async () => {
@@ -717,6 +838,27 @@ export default function InventoryPage() {
     try {
       setUpdating(true);
       const token = await getAccessToken();
+
+      // Determine which variant to use for inventory adjustment
+      const targetVariantId = editForm.selectedVariantId || editingProduct.variantId;
+      const currentQty = productVariants.length > 1 && editForm.selectedVariantId
+        ? productVariants.find(v => v.id === editForm.selectedVariantId)?.qty || 0
+        : editingProduct.qty || 0;
+
+      // Check if quantity has changed and user has permission
+      const quantityChanged = editForm.quantity !== currentQty;
+      const canEditQuantity = canAccessFeature(userRole, "inventory");
+      
+      if (quantityChanged && !canEditQuantity) {
+        addToast("error", "Хандалт хориглогдсон", "Таны эрх үлдэгдэл өөрчлөх боломжийг олгохгүй байна.");
+        return;
+      }
+
+      // Validate variant selection for multi-variant products
+      if (productVariants.length > 1 && quantityChanged && !editForm.selectedVariantId) {
+        addToast("error", "Алдаа", "Олон хувилбартай бараанд хувилбар сонгоно уу");
+        return;
+      }
 
       const updateData = {
         id: editingProduct.id,
@@ -734,19 +876,59 @@ export default function InventoryPage() {
         ],
       };
 
+      // Update product first
       const result = await updateProduct(token, updateData);
 
       if (result.error) {
         addToast("error", "Алдаа", `Шинэчлэхэд алдаа гарлаа: ${result.error}`);
+        return;
+      }
+
+      // Handle inventory adjustment if quantity changed
+      if (quantityChanged && canEditQuantity && targetVariantId) {
+        const newQty = editForm.quantity;
+        const delta = newQty - currentQty;
+
+        if (delta !== 0) {
+          try {
+            // Use current selected store or default to the product's store
+            const adjustmentStoreId = storeId !== "all" ? storeId : editingProduct.storeId;
+            
+            if (!adjustmentStoreId) {
+              addToast("warning", "Анхaaруулга", "Бараа шинэчлэгдсэн боловч үлдэгдэл өөрчлөгдөөгүй. Салбар тодорхойгүй.");
+            } else {
+              const selectedVariant = productVariants.find(v => v.id === editForm.selectedVariantId);
+              const variantInfo = selectedVariant 
+                ? `(${selectedVariant.attrs?.color || ''} ${selectedVariant.attrs?.size || ''})`.trim()
+                : '';
+
+              await productAddToInventory(token, {
+                variant_id: targetVariantId,
+                store_id: adjustmentStoreId,
+                delta: delta,
+                reason: "ADJUSTMENT",
+                note: `Manual inventory adjustment via product edit ${variantInfo}. Changed from ${currentQty} to ${newQty}`,
+              });
+              
+              addToast("success", "Амжилттай", `Бараа болон үлдэгдэл амжилттай шинэчлэгдлээ! ${variantInfo} (${delta > 0 ? '+' : ''}${delta})`);
+            }
+          } catch (inventoryError: any) {
+            addToast("warning", "Анхааруулга", `Бараа шинэчлэгдсэн боловч үлдэгдэл өөрчлөгдөөгүй: ${inventoryError?.message || inventoryError}`);
+          }
+        } else {
+          addToast("success", "Амжилттай", "Амжилттай шинэчлэгдлээ!");
+        }
       } else {
         addToast("success", "Амжилттай", "Амжилттай шинэчлэгдлээ!");
-        setEditingProduct(null);
-        // Refresh products
-        const token = await getAccessToken();
-        if (token) {
-          window.location.reload();
-        }
       }
+
+      setEditingProduct(null);
+      setProductVariants([]);
+      setLoadingVariants(false);
+      
+      // Refresh products
+      window.location.reload();
+      
     } catch (e: any) {
       addToast("error", "Алдаа", `Алдаа гарлаа: ${e?.message ?? e}`);
     } finally {
@@ -1940,7 +2122,10 @@ export default function InventoryPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setEditingProduct(null)}
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setProductVariants([]);
+                    }}
                     className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"
                   >
                     <svg
@@ -2123,6 +2308,140 @@ export default function InventoryPage() {
                       placeholder="SKU код оруулна уу"
                     />
                   </div>
+
+                  {/* Variant Selection - Only for Admin/Owner */}
+                  {canAccessFeature(userRole, "inventory") && productVariants.length > 1 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <span className="flex items-center gap-2">
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM7 21a4 4 0 004-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4"
+                            />
+                          </svg>
+                          Хувилбар сонгох
+                          <span className="text-yellow-600 text-xs">Admin/Owner</span>
+                        </span>
+                      </label>
+                      {loadingVariants ? (
+                        <div className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg">
+                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-sm text-gray-500">Хувилбарууд ачаалж байна...</span>
+                        </div>
+                      ) : (
+                        <select
+                          value={editForm.selectedVariantId}
+                          onChange={(e) => {
+                            const selectedVariant = productVariants.find(v => v.id === e.target.value);
+                            setEditForm((prev) => ({
+                              ...prev,
+                              selectedVariantId: e.target.value,
+                              quantity: selectedVariant?.qty || 0,
+                              price: selectedVariant?.price || prev.price,
+                              code: selectedVariant?.sku || prev.code,
+                            }));
+                          }}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        >
+                          <option value="">Хувилбар сонгоно уу</option>
+                          {productVariants.map((variant) => {
+                            const variantLabel = [
+                              variant.attrs?.color && `Өнгө: ${variant.attrs.color}`,
+                              variant.attrs?.size && `Хэмжээ: ${variant.attrs.size}`,
+                              variant.sku && `SKU: ${variant.sku}`,
+                            ].filter(Boolean).join(", ") || `Хувилбар ${variant.id}`;
+                            
+                            return (
+                              <option key={variant.id} value={variant.id}>
+                                {variantLabel} (Үлдэгдэл: {variant.qty || 0})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Олон хувилбартай бараанд тодорхой хувилбарын үлдэгдэл өөрчилнө
+                      </p>
+
+                      {/* Quick Add Buttons */}
+                      {editForm.selectedVariantId && (
+                        <div className="mt-3 flex gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-700">Хурдан нэмэх:</span>
+                          {[1, 5, 10, 20, 50].map(qty => (
+                            <button
+                              key={qty}
+                              type="button"
+                              onClick={() => handleAddToVariant(qty)}
+                              disabled={updating}
+                              className="px-3 py-1 text-sm bg-green-100 text-green-700 border border-green-300 rounded-md hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              +{qty}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Inventory Quantity - Only for Admin/Owner */}
+                  {canAccessFeature(userRole, "inventory") && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <span className="flex items-center gap-2">
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                            />
+                          </svg>
+                          Үлдэгдэл ({storeId !== "all" ? stores.find(s => s.id === storeId)?.name : "Бүх салбар"})
+                          <span className="text-yellow-600 text-xs">Admin/Owner</span>
+                        </span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={editForm.quantity}
+                          onChange={(e) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              quantity: Math.max(0, Number(e.target.value)),
+                            }))
+                          }
+                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                          placeholder="0"
+                          min="0"
+                          step="1"
+                          disabled={productVariants.length > 1 && !editForm.selectedVariantId}
+                        />
+                        <div className="text-sm text-gray-500">
+                          Одоо: {productVariants.length > 1 && editForm.selectedVariantId 
+                            ? productVariants.find(v => v.id === editForm.selectedVariantId)?.qty || 0
+                            : editingProduct?.qty || 0}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {productVariants.length > 1 && !editForm.selectedVariantId 
+                          ? "Эхлээд хувилбар сонгоно уу"
+                          : "Зөвхөн Admin болон Owner эрхтэй хүмүүс үлдэгдэл өөрчилж болно"}
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

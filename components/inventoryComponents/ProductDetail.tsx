@@ -204,7 +204,7 @@ export default function ProductDetail({
         <div className="flex items-center justify-between">
           <div className="text-sm font-medium">Сонгосон хувилбар:</div>
           <div className="text-xs text-[#5AA6FF]">
-            Боломжит: {selected?.qty ?? 0}
+            Боломжит: {selected?.stock ?? 0}
           </div>
         </div>
         <div className="mt-2 text-sm">
@@ -246,11 +246,11 @@ export default function ProductDetail({
       </section>
 
       {/* Per-store breakdown (optional) */}
-      {selected && variantStoreQty?.[selected.variantId] && (
+      {selected && variantStoreQty?.[selected.id] && (
         <section className="mt-2 rounded-xl bg-white border border-[#E6E6E6] p-3">
           <div className="text-sm font-medium mb-1">Салбарууд:</div>
           <ul className="text-sm">
-            {variantStoreQty[selected.variantId]!.map((r) => (
+            {variantStoreQty[selected.id]!.map((r) => (
               <li key={r.store} className="flex justify-between py-0.5">
                 <span className="text-black/70">{r.store}:</span>
                 <span>{r.qty}</span>

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getOrderById } from "@/lib/order/orderApi";
 
 type Item = { name: string; qty: number; price: number };
 
-export default function WebSerialPrinter() {
+function WebSerialPrinterContent() {
   const portRef = useRef<SerialPort | null>(null);
   const [connected, setConnected] = useState(false);
   const [baud, setBaud] = useState(9600); // 9600 эсвэл 115200
@@ -295,5 +295,13 @@ export default function WebSerialPrinter() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function WebSerialPrinter() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <WebSerialPrinterContent />
+    </Suspense>
   );
 }
