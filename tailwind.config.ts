@@ -10,6 +10,35 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          '"Helvetica Neue"',
+          'Arial',
+          '"Noto Sans"',
+          'sans-serif',
+          '"Apple Color Emoji"',
+          '"Segoe UI Emoji"',
+          '"Segoe UI Symbol"',
+          '"Noto Color Emoji"',
+        ],
+        mono: [
+          '"SF Mono"',
+          'Monaco',
+          '"Inconsolata"',
+          '"Roboto Mono"',
+          '"Source Code Pro"',
+          'Consolas',
+          '"Liberation Mono"',
+          'Menlo',
+          'Courier',
+          'monospace',
+        ],
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",

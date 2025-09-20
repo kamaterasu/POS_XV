@@ -374,6 +374,7 @@ export default function CheckoutPage() {
         const token = await getAccessToken();
         if (!token) throw new Error("No token");
         const storeList = await getStore(token);
+        console.log("🏪 Available stores:", storeList);
         if (alive) {
           // Add "All stores" option at the beginning
           setStores([
@@ -425,6 +426,7 @@ export default function CheckoutPage() {
         const token = await getAccessToken();
         if (!token) throw new Error("No token");
         const sid = await getStoredID(token);
+        console.log("🎯 Default store ID:", sid);
         if (alive) setStoreId(sid ?? "all"); // Default to "all" if no specific store
       } catch (e) {
         console.error("Resolve storeId error:", e);
@@ -602,6 +604,14 @@ export default function CheckoutPage() {
       return "Бүтээгдэхүүний мэдээлэл буруу байна. Дахин сонгоно уу.";
     }
 
+    // Database constraint errors
+    if (errorMessage.includes("foreign key constraint")) {
+      if (errorMessage.includes("tenant_id_store_id")) {
+        return "Сонгосон дэлгүүр системд бүртгэгдээгүй байна. Админтай холбогдоно уу.";
+      }
+      return "Өгөгдлийн сангийн холболтын алдаа. Админтай холбогдоно уу.";
+    }
+
     // UUID validation error (like "invalid input syntax for type uuid")
     if (errorMessage.includes("invalid input syntax for type uuid")) {
       return "Дэлгүүрийн ID буруу байна. Тодорхой дэлгүүр сонгоно уу.";
@@ -678,6 +688,8 @@ export default function CheckoutPage() {
         ref: (r as any).ref,
       }));
 
+      console.log("🛒 Creating checkout order with store_id:", storeId);
+      
       const result = await createCheckoutOrder(
         items.map((it) => ({
           variantId: it.variant_id!,

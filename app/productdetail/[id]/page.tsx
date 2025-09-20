@@ -8,7 +8,9 @@ import { getProductById, updateProduct } from "@/lib/product/productApi";
 import { getCategories } from "@/lib/category/categoryApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { uploadProductImageOnly } from "@/lib/product/productImages";
+import { getStore, StoreRow } from "@/lib/store/storeApi";
 import { supabase } from "@/lib/supabaseClient";
+import { getInventoryForProduct, InventoryItem, productAddToInventory } from "@/lib/inventory/inventoryApi";
 
 type Product = {
   id: string;
@@ -119,27 +121,12 @@ export default function ProductDetailPage() {
     number | null
   >(null);
 
-  // New states for size/color/branch management
-  const [availableColors, setAvailableColors] = useState<string[]>([
-    "хар",
-    "цагаан",
-    "улаан",
-    "цэнхэр",
-    "ногоон",
-  ]);
-  const [availableSizes, setAvailableSizes] = useState<string[]>([
-    "XS",
-    "S",
-    "M",
-    "L",
-    "XL",
-    "XXL",
-  ]);
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([
-    { id: "main", name: "Төв салбар" },
-    { id: "branch1", name: "Салбар-1" },
-    { id: "branch2", name: "Салбар-2" },
-  ]);
+  // Store management
+  const [stores, setStores] = useState<StoreRow[]>([]);
+  const [storeInventory, setStoreInventory] = useState<Record<string, Record<string, number>>>({});
+  const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [adjustingInventory, setAdjustingInventory] = useState<Record<string, boolean>>({});
 
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -159,10 +146,11 @@ export default function ProductDetailPage() {
         // Get token first and validate
         const token = await getAccessToken();
 
-        // Fetch product data and categories in parallel
-        const [productResult, categoriesResult] = await Promise.all([
-          getProductById(token, String(id), { withVariants: true }), // Enable variants fetching
+        // Fetch product data, categories, stores, and inventory in parallel
+        const [productResult, categoriesResult, storesResult] = await Promise.all([
+          getProductById(token, String(id), { withVariants: true }),
           getCategories(token),
+          getStore(token),
         ]);
 
         if (alive) {
@@ -180,6 +168,36 @@ export default function ProductDetailPage() {
             // Initialize variants
             if (productResult.variants) {
               setVariants(productResult.variants);
+              
+              // Fetch inventory data for this product
+              setInventoryLoading(true);
+              try {
+                const inventoryItems = await getInventoryForProduct(token, productResult.product.tenant_id, String(id));
+                setInventoryData(inventoryItems);
+                
+                // Process inventory data into the format we need
+                const inventoryMap: Record<string, Record<string, number>> = {};
+                inventoryItems.forEach(item => {
+                  if (!inventoryMap[item.variant_id]) {
+                    inventoryMap[item.variant_id] = {};
+                  }
+                  inventoryMap[item.variant_id][item.store_id] = item.qty;
+                });
+                setStoreInventory(inventoryMap);
+                
+                // Update variants with total qty
+                const updatedVariants = productResult.variants.map(variant => ({
+                  ...variant,
+                  qty: inventoryItems
+                    .filter(item => item.variant_id === variant.id)
+                    .reduce((total, item) => total + item.qty, 0)
+                }));
+                setVariants(updatedVariants);
+              } catch (inventoryError) {
+                console.warn('Failed to load inventory:', inventoryError);
+              } finally {
+                setInventoryLoading(false);
+              }
             }
 
             // Initialize image previews with current product images
@@ -221,6 +239,15 @@ export default function ProductDetailPage() {
             setCategories(categoryData);
           } catch (e) {
             console.warn("Failed to process categories:", e);
+          }
+
+          // Handle stores result
+          try {
+            if (Array.isArray(storesResult)) {
+              setStores(storesResult);
+            }
+          } catch (e) {
+            console.warn("Failed to process stores:", e);
           }
         }
       } catch (e: any) {
@@ -377,11 +404,11 @@ export default function ProductDetailPage() {
       product_id: String(id),
       name: "",
       sku: "",
-      price: 0,
-      cost: null,
+      price: variants.length > 0 ? variants[0].price : 0,
+      cost: variants.length > 0 ? variants[0].cost : null,
       attrs: {
-        color: availableColors[0],
-        size: availableSizes[0],
+        color: "",
+        size: "",
       },
       created_at: new Date().toISOString(),
       qty: 0,
@@ -423,50 +450,114 @@ export default function ProductDetailPage() {
     setVariants(variants.filter((_, i) => i !== index));
   };
 
-  // Color and size management
-  const addColor = (color: string) => {
-    if (color.trim() && !availableColors.includes(color.trim())) {
-      setAvailableColors([...availableColors, color.trim()]);
+  // Store inventory management functions
+  const updateStoreInventory = (variantId: string, storeId: string, quantity: number) => {
+    setStoreInventory(prev => ({
+      ...prev,
+      [variantId]: {
+        ...prev[variantId],
+        [storeId]: quantity,
+      },
+    }));
+  };
+
+  const getStoreInventory = (variantId: string, storeId: string): number => {
+    return storeInventory[variantId]?.[storeId] ?? 0;
+  };
+
+  // New function to handle inventory adjustments
+  const adjustInventory = async (variantId: string, storeId: string, newQuantity: number, reason: "PURCHASE" | "ADJUSTMENT" = "ADJUSTMENT") => {
+    const currentQuantity = getStoreInventory(variantId, storeId);
+    const delta = newQuantity - currentQuantity;
+    
+    if (delta === 0) return;
+
+    const adjustKey = `${variantId}-${storeId}`;
+    setAdjustingInventory(prev => ({ ...prev, [adjustKey]: true }));
+
+    try {
+      const token = await getAccessToken();
+      
+      await productAddToInventory(token, {
+        store_id: storeId,
+        variant_id: variantId,
+        delta: delta,
+        reason: reason,
+        note: `Manual adjustment: ${delta > 0 ? '+' : ''}${delta}`,
+      });
+
+      // Update local state
+      updateStoreInventory(variantId, storeId, newQuantity);
+      
+      // Update variant total quantity
+      const updatedVariants = variants.map(variant => {
+        if (variant.id === variantId) {
+          const newTotal = stores.reduce((total, store) => {
+            const storeQty = store.id === storeId ? newQuantity : getStoreInventory(variantId, store.id);
+            return total + storeQty;
+          }, 0);
+          return { ...variant, qty: newTotal };
+        }
+        return variant;
+      });
+      setVariants(updatedVariants);
+
+      // Show success message
+      alert(`Үлдэгдэл амжилттай шинэчлэгдлээ! (${delta > 0 ? '+' : ''}${delta})`);
+      
+    } catch (error) {
+      console.error('Error adjusting inventory:', error);
+      alert('Үлдэгдэл өөрчлөхөд алдаа гарлаа: ' + (error as Error).message);
+    } finally {
+      setAdjustingInventory(prev => ({ ...prev, [adjustKey]: false }));
     }
   };
 
-  const addSize = (size: string) => {
-    if (size.trim() && !availableSizes.includes(size.trim())) {
-      setAvailableSizes([...availableSizes, size.trim()]);
-    }
-  };
-
-  // Generate variant combinations
-  const generateVariantCombinations = () => {
-    const combinations: ProductVariant[] = [];
-
-    availableColors.forEach((color) => {
-      availableSizes.forEach((size) => {
-        // Check if this combination already exists
-        const exists = variants.some(
-          (v) => v.attrs?.color === color && v.attrs?.size === size
-        );
-
-        if (!exists) {
-          combinations.push({
-            id: `temp-${Date.now()}-${color}-${size}`,
-            product_id: String(id),
-            name: `${color} / ${size}`,
-            sku: `${
-              data?.product.name?.substring(0, 3).toUpperCase() || "PRD"
-            }-${color.substring(0, 2).toUpperCase()}-${size}`,
-            price: variants.length > 0 ? variants[0].price : 0,
-            cost: variants.length > 0 ? variants[0].cost : null,
-            attrs: { color, size },
-            created_at: new Date().toISOString(),
-            qty: 0,
+  // Bulk inventory adjustment
+  const bulkAdjustInventory = async (variantId: string, adjustments: Record<string, number>) => {
+    setInventoryLoading(true);
+    try {
+      const token = await getAccessToken();
+      
+      // Execute all adjustments in parallel
+      const promises = Object.entries(adjustments).map(async ([storeId, newQuantity]) => {
+        const currentQuantity = getStoreInventory(variantId, storeId);
+        const delta = newQuantity - currentQuantity;
+        
+        if (delta !== 0) {
+          await productAddToInventory(token, {
+            store_id: storeId,
+            variant_id: variantId,
+            delta: delta,
+            reason: "ADJUSTMENT",
+            note: `Bulk adjustment: ${delta > 0 ? '+' : ''}${delta}`,
           });
         }
+        
+        return { storeId, newQuantity };
       });
-    });
 
-    if (combinations.length > 0) {
-      setVariants([...variants, ...combinations]);
+      const results = await Promise.all(promises);
+      
+      // Update local state with all changes
+      results.forEach(({ storeId, newQuantity }) => {
+        updateStoreInventory(variantId, storeId, newQuantity);
+      });
+      
+      // Update variant total quantity
+      const newTotal = Object.values(adjustments).reduce((sum, qty) => sum + qty, 0);
+      const updatedVariants = variants.map(variant => 
+        variant.id === variantId ? { ...variant, qty: newTotal } : variant
+      );
+      setVariants(updatedVariants);
+
+      alert('Бүх салбарын үлдэгдэл амжилттай шинэчлэгдлээ!');
+      
+    } catch (error) {
+      console.error('Error in bulk adjustment:', error);
+      alert('Үлдэгдэл өөрчлөхөд алдаа гарлаа: ' + (error as Error).message);
+    } finally {
+      setInventoryLoading(false);
     }
   };
 
@@ -930,13 +1021,6 @@ export default function ProductDetailPage() {
                         </h2>
                         <div className="flex gap-3">
                           <button
-                            onClick={generateVariantCombinations}
-                            className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg border border-green-600 hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-medium shadow-sm"
-                            title="Өнгө болон хэмжээний бүх хослолыг үүсгэх"
-                          >
-                            🎨 Автомат үүсгэх
-                          </button>
-                          <button
                             onClick={addVariant}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium shadow-sm"
                           >
@@ -946,91 +1030,12 @@ export default function ProductDetailPage() {
                       </div>
                     )}
 
-                    {/* Color and Size Management */}
-                    {isEditing && (
-                      <div className="mb-6 p-5 bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl">
-                        {/* Colors */}
-                        <div className="mb-5">
-                          <div className="text-base font-semibold mb-3 text-gray-800">
-                            Боломжит өнгөнүүд
-                          </div>
-                          <div className="flex items-center gap-3 flex-wrap">
-                            {availableColors.map((color, index) => (
-                              <div
-                                key={color}
-                                className="flex items-center gap-2 bg-white rounded-lg p-2 border border-gray-200 shadow-sm"
-                              >
-                                <span className="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium border border-blue-200">
-                                  {color}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    setAvailableColors(
-                                      availableColors.filter(
-                                        (_, i) => i !== index
-                                      )
-                                    )
-                                  }
-                                  className="w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                            <input
-                              type="text"
-                              placeholder="Өнгө нэмэх"
-                              className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  addColor(e.currentTarget.value);
-                                  e.currentTarget.value = "";
-                                }
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Sizes */}
-                        <div>
-                          <div className="text-base font-semibold mb-3 text-gray-800">
-                            Боломжит хэмжээнүүд
-                          </div>
-                          <div className="flex items-center gap-3 flex-wrap">
-                            {availableSizes.map((size, index) => (
-                              <div
-                                key={size}
-                                className="flex items-center gap-2 bg-white rounded-lg p-2 border border-gray-200 shadow-sm"
-                              >
-                                <span className="px-3 py-1.5 bg-green-100 text-green-800 rounded-lg text-sm font-medium border border-green-200">
-                                  {size}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    setAvailableSizes(
-                                      availableSizes.filter(
-                                        (_, i) => i !== index
-                                      )
-                                    )
-                                  }
-                                  className="w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                            <input
-                              type="text"
-                              placeholder="Хэмжээ нэмэх"
-                              className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  addSize(e.currentTarget.value);
-                                  e.currentTarget.value = "";
-                                }
-                              }}
-                            />
-                          </div>
+                    {/* Inventory Loading Indicator */}
+                    {inventoryLoading && (
+                      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-blue-700">Үлдэгдлийн мэдээлэл ачаалж байна...</span>
                         </div>
                       </div>
                     )}
@@ -1058,24 +1063,32 @@ export default function ProductDetailPage() {
                               </div>
                             </div>
                             <div className="text-sm text-[#6b6b6b]">
-                              Боломжит:{" "}
-                              <span className="font-semibold">
+                              Нийт үлдэгдэл:{" "}
+                              <span className={`font-semibold ${
+                                (variants[selectedVariantIndex].qty || 0) > 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}>
                                 {variants[selectedVariantIndex].qty || 0}
                               </span>
                             </div>
                           </div>
 
-                          {/* Branch Inventory */}
+                          {/* Store Inventory */}
                           <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#444]">
-                            {branches.map((branch) => (
-                              <div key={branch.id}>
-                                {branch.name}:{" "}
-                                <span className="font-semibold">
-                                  {Math.floor(Math.random() * 10)}{" "}
-                                  {/* Mock branch inventory */}
-                                </span>
-                              </div>
-                            ))}
+                            {stores.map((store) => {
+                              const qty = getStoreInventory(variants[selectedVariantIndex].id, store.id);
+                              return (
+                                <div key={store.id} className="flex justify-between">
+                                  <span>{store.name}:</span>
+                                  <span className={`font-semibold ${
+                                    qty > 0 ? "text-green-600" : "text-gray-400"
+                                  }`}>
+                                    {qty}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1115,30 +1128,16 @@ export default function ProductDetailPage() {
                                       variantIndex >= 0 ? variantIndex : 0
                                     );
                                   }}
-                                  className={`w-10 h-10 rounded-full border-4 transition-all duration-200 hover:scale-110 ${
+                                  className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 ${
                                     selectedVariantIndex !== null &&
                                     variants[selectedVariantIndex]?.attrs
                                       ?.color === color
-                                      ? "border-blue-600 shadow-lg ring-2 ring-blue-200"
-                                      : "border-gray-300 hover:border-gray-400"
+                                      ? "border-blue-600 bg-blue-50 text-blue-800 font-semibold"
+                                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
                                   }`}
-                                  style={{
-                                    backgroundColor:
-                                      color === "хар"
-                                        ? "#000"
-                                        : color === "цагаан"
-                                        ? "#fff"
-                                        : color === "улаан"
-                                        ? "#dc2626"
-                                        : color === "цэнхэр"
-                                        ? "#2563eb"
-                                        : color === "ногоон"
-                                        ? "#16a34a"
-                                        : "#6b7280",
-                                  }}
-                                  aria-label={color}
-                                  title={color}
-                                />
+                                >
+                                  {color}
+                                </button>
                               ))}
                             </div>
                           </div>
@@ -1174,8 +1173,8 @@ export default function ProductDetailPage() {
                                     selectedVariantIndex !== null &&
                                     variants[selectedVariantIndex]?.attrs
                                       ?.size === size
-                                      ? "bg-blue-600 border-blue-600 text-white shadow-lg"
-                                      : "bg-white border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+                                      ? "border-green-600 bg-green-50 text-green-800 font-semibold"
+                                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
                                   }`}
                                 >
                                   {size}
@@ -1240,23 +1239,22 @@ export default function ProductDetailPage() {
                                 </div>
                               </div>
 
-                              {/* Branch Inventory */}
+                              {/* Store Inventory */}
                               <div className="mt-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                                 <div className="text-sm font-medium text-gray-600 mb-3">
                                   Салбарын үлдэгдэл
                                 </div>
                                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {branches.map((branch) => (
+                                  {stores.map((store) => (
                                     <div
-                                      key={branch.id}
+                                      key={store.id}
                                       className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
                                     >
                                       <span className="text-gray-700 font-medium">
-                                        {branch.name}
+                                        {store.name}
                                       </span>
                                       <span className="font-bold text-gray-900 bg-white px-2 py-1 rounded">
-                                        {Math.floor(Math.random() * 10)}{" "}
-                                        {/* Mock branch inventory */}
+                                        {getStoreInventory(variants[selectedVariantIndex].id, store.id)}
                                       </span>
                                     </div>
                                   ))}
@@ -1276,12 +1274,13 @@ export default function ProductDetailPage() {
                             className="bg-white border border-[#efefef] p-3 rounded-md"
                           >
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                              {/* Color Selection */}
+                              {/* Color Input */}
                               <div>
                                 <div className="text-xs text-[#6b6b6b] mb-1">
                                   Өнгө:
                                 </div>
-                                <select
+                                <input
+                                  type="text"
                                   value={variant.attrs?.color || ""}
                                   onChange={(e) =>
                                     updateVariantAttr(
@@ -1291,22 +1290,17 @@ export default function ProductDetailPage() {
                                     )
                                   }
                                   className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                >
-                                  <option value="">Өнгө сонгох</option>
-                                  {availableColors.map((color) => (
-                                    <option key={color} value={color}>
-                                      {color}
-                                    </option>
-                                  ))}
-                                </select>
+                                  placeholder="Өнгө оруулах"
+                                />
                               </div>
 
-                              {/* Size Selection */}
+                              {/* Size Input */}
                               <div>
                                 <div className="text-xs text-[#6b6b6b] mb-1">
                                   Хэмжээ:
                                 </div>
-                                <select
+                                <input
+                                  type="text"
                                   value={variant.attrs?.size || ""}
                                   onChange={(e) =>
                                     updateVariantAttr(
@@ -1316,14 +1310,8 @@ export default function ProductDetailPage() {
                                     )
                                   }
                                   className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                >
-                                  <option value="">Хэмжээ сонгох</option>
-                                  {availableSizes.map((size) => (
-                                    <option key={size} value={size}>
-                                      {size}
-                                    </option>
-                                  ))}
-                                </select>
+                                  placeholder="Хэмжээ оруулах"
+                                />
                               </div>
 
                               {/* SKU */}
@@ -1396,14 +1384,19 @@ export default function ProductDetailPage() {
                                 <div className="text-xs text-[#6b6b6b] mb-1">
                                   Нийт үлдэгдэл:
                                 </div>
-                                <div
-                                  className={`inline-block px-2 py-1 rounded text-sm font-semibold ${
-                                    (variant.qty || 0) > 0
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-red-100 text-red-800"
-                                  }`}
-                                >
-                                  {variant.qty || 0}
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`inline-block px-2 py-1 rounded text-sm font-semibold ${
+                                      (variant.qty || 0) > 0
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    {variant.qty || 0}
+                                  </div>
+                                  {inventoryLoading && (
+                                    <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                                  )}
                                 </div>
                               </div>
 
@@ -1448,34 +1441,183 @@ export default function ProductDetailPage() {
                               </div>
                             </div>
 
-                            {/* Branch Inventory Management */}
+                            {/* Store Inventory Management */}
                             <div className="mt-3 pt-2 border-t border-[#f0f0f0]">
-                              <div className="text-xs text-[#6b6b6b] mb-2">
-                                Салбар тус бүрийн үлдэгдэл:
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-xs text-[#6b6b6b]">
+                                  Салбар тус бүрийн үлдэгдэл:
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const adjustments: Record<string, number> = {};
+                                    stores.forEach(store => {
+                                      const currentQty = getStoreInventory(variant.id, store.id);
+                                      const newQty = prompt(`${store.name}-ийн үлдэгдэл:`, currentQty.toString());
+                                      if (newQty !== null && !isNaN(parseInt(newQty))) {
+                                        adjustments[store.id] = parseInt(newQty);
+                                      }
+                                    });
+                                    if (Object.keys(adjustments).length > 0) {
+                                      bulkAdjustInventory(variant.id, adjustments);
+                                    }
+                                  }}
+                                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 transition-colors"
+                                  disabled={inventoryLoading}
+                                >
+                                  Бүгдийг засах
+                                </button>
                               </div>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                {branches.map((branch) => (
-                                  <div
-                                    key={branch.id}
-                                    className="flex items-center gap-2"
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {stores.map((store) => {
+                                  const qty = getStoreInventory(variant.id, store.id);
+                                  const adjustKey = `${variant.id}-${store.id}`;
+                                  const isAdjusting = adjustingInventory[adjustKey];
+                                  
+                                  return (
+                                    <div
+                                      key={store.id}
+                                      className="flex items-center gap-2 p-2 bg-gray-50 rounded border"
+                                    >
+                                      <span className="text-xs text-[#6b6b6b] flex-1 font-medium">
+                                        {store.name}:
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="number"
+                                          value={qty}
+                                          onChange={(e) => {
+                                            const newQty = parseInt(e.target.value) || 0;
+                                            updateStoreInventory(variant.id, store.id, newQty);
+                                          }}
+                                          onBlur={(e) => {
+                                            const newQty = parseInt(e.target.value) || 0;
+                                            const currentQty = getStoreInventory(variant.id, store.id);
+                                            if (newQty !== currentQty) {
+                                              adjustInventory(variant.id, store.id, newQty);
+                                            }
+                                          }}
+                                          onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                              const newQty = parseInt((e.target as HTMLInputElement).value) || 0;
+                                              const currentQty = getStoreInventory(variant.id, store.id);
+                                              if (newQty !== currentQty) {
+                                                adjustInventory(variant.id, store.id, newQty);
+                                              }
+                                              (e.target as HTMLInputElement).blur();
+                                            }
+                                          }}
+                                          className="w-16 px-2 py-1 border border-[#e6e6e6] rounded text-xs text-center focus:outline-none focus:border-[#bcd0ff] bg-white"
+                                          min="0"
+                                          placeholder="0"
+                                          disabled={isAdjusting || inventoryLoading}
+                                        />
+                                        {isAdjusting && (
+                                          <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                        )}
+                                        {!isAdjusting && qty > 0 && (
+                                          <span className="text-xs text-green-600">✓</span>
+                                        )}
+                                        <div className="flex flex-col gap-1">
+                                          <button
+                                            onClick={() => adjustInventory(variant.id, store.id, qty + 1)}
+                                            className="w-5 h-5 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 transition-colors flex items-center justify-center font-bold"
+                                            disabled={isAdjusting || inventoryLoading}
+                                            title="Нэмэх"
+                                          >
+                                            +
+                                          </button>
+                                          <button
+                                            onClick={() => adjustInventory(variant.id, store.id, Math.max(0, qty - 1))}
+                                            className="w-5 h-5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 transition-colors flex items-center justify-center font-bold"
+                                            disabled={isAdjusting || inventoryLoading || qty <= 0}
+                                            title="Хасах"
+                                          >
+                                            -
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {(inventoryLoading || Object.values(adjustingInventory).some(Boolean)) && (
+                                <div className="mt-2 text-xs text-blue-600 flex items-center gap-2">
+                                  <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                  Үлдэгдлийн мэдээлэл шинэчлэж байна...
+                                </div>
+                              )}
+                              
+                              {/* Quick Actions */}
+                              <div className="mt-3 pt-2 border-t border-[#f5f5f5]">
+                                <div className="text-xs text-[#6b6b6b] mb-2">Хурдан үйлдэл:</div>
+                                <div className="flex gap-2 flex-wrap">
+                                  <button
+                                    onClick={() => {
+                                      const amount = prompt('Бүх салбарт нэмэх тоо:', '10');
+                                      if (amount && !isNaN(parseInt(amount))) {
+                                        const adjustments: Record<string, number> = {};
+                                        stores.forEach(store => {
+                                          adjustments[store.id] = getStoreInventory(variant.id, store.id) + parseInt(amount);
+                                        });
+                                        bulkAdjustInventory(variant.id, adjustments);
+                                      }
+                                    }}
+                                    className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded border border-green-200 hover:bg-green-200 transition-colors font-medium"
+                                    disabled={inventoryLoading}
                                   >
-                                    <span className="text-xs text-[#6b6b6b] flex-1">
-                                      {branch.name}:
-                                    </span>
-                                    <input
-                                      type="number"
-                                      defaultValue={Math.floor(
-                                        Math.random() * 10
-                                      )} // Mock data
-                                      className="w-16 px-1 py-1 border border-[#e6e6e6] rounded text-xs text-center focus:outline-none focus:border-[#bcd0ff]"
-                                      min="0"
-                                      placeholder="0"
-                                    />
-                                  </div>
-                                ))}
+                                    + Бүгдэд нэмэх
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const amount = prompt('Бүх салбараас хасах тоо:', '1');
+                                      if (amount && !isNaN(parseInt(amount))) {
+                                        const adjustments: Record<string, number> = {};
+                                        stores.forEach(store => {
+                                          const current = getStoreInventory(variant.id, store.id);
+                                          adjustments[store.id] = Math.max(0, current - parseInt(amount));
+                                        });
+                                        bulkAdjustInventory(variant.id, adjustments);
+                                      }
+                                    }}
+                                    className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded border border-orange-200 hover:bg-orange-200 transition-colors font-medium"
+                                    disabled={inventoryLoading}
+                                  >
+                                    - Бүгдээс хасах
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('Бүх салбарын үлдэгдлийг 0 болгох уу?')) {
+                                        const adjustments: Record<string, number> = {};
+                                        stores.forEach(store => {
+                                          adjustments[store.id] = 0;
+                                        });
+                                        bulkAdjustInventory(variant.id, adjustments);
+                                      }
+                                    }}
+                                    className="text-xs px-3 py-1 bg-red-100 text-red-700 rounded border border-red-200 hover:bg-red-200 transition-colors font-medium"
+                                    disabled={inventoryLoading}
+                                  >
+                                    Бүгдийг 0 болгох
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const amount = prompt('Бүх салбарт тохируулах тоо:', '50');
+                                      if (amount && !isNaN(parseInt(amount))) {
+                                        const adjustments: Record<string, number> = {};
+                                        stores.forEach(store => {
+                                          adjustments[store.id] = parseInt(amount);
+                                        });
+                                        bulkAdjustInventory(variant.id, adjustments);
+                                      }
+                                    }}
+                                    className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 transition-colors font-medium"
+                                    disabled={inventoryLoading}
+                                  >
+                                    = Бүгдийг тохируулах
+                                  </button>
+                                </div>
                               </div>
                             </div>
-
                             {/* Variant Name (auto-generated or manual) */}
                             <div className="mt-3 pt-2 border-t border-[#f0f0f0]">
                               <div className="text-xs text-[#6b6b6b] mb-1">
@@ -1552,12 +1694,22 @@ export default function ProductDetailPage() {
                         </pre>
                       </div>
                       {categories.length > 0 && (
-                        <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                        <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-4">
                           <div className="font-semibold mb-3 text-gray-800">
                             Categories:
                           </div>
                           <pre className="text-gray-600 overflow-auto max-h-32 text-sm font-mono bg-white p-3 rounded border">
                             {JSON.stringify(categories, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                      {inventoryData.length > 0 && (
+                        <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                          <div className="font-semibold mb-3 text-gray-800">
+                            Inventory Data:
+                          </div>
+                          <pre className="text-gray-600 overflow-auto max-h-32 text-sm font-mono bg-white p-3 rounded border">
+                            {JSON.stringify(inventoryData, null, 2)}
                           </pre>
                         </div>
                       )}

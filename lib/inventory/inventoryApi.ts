@@ -86,3 +86,81 @@ export async function productAddToInventory(
     };
   };
 }
+
+import { getAccessToken } from "@/lib/helper/getAccessToken";
+
+export type InventoryItem = {
+  store_id: string;
+  variant_id: string;
+  qty: number;
+  variant: {
+    id: string;
+    name: string;
+    sku: string;
+    attrs: Record<string, any>;
+    price: number;
+    cost: number | null;
+  };
+  product: {
+    id: string;
+    name: string;
+    description: string | null;
+    img: string | null;
+  };
+};
+
+export async function getInventory(
+  token: string,
+  tenantId: string,
+  storeId?: string
+) {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+
+    // Build URL with query parameters
+    const params = new URLSearchParams({
+      tenant_id: tenantId,
+      scope: "store&store_id",
+    });
+
+    if (storeId) {
+      params.append("store_id", storeId);
+    }
+
+    const url = `${baseUrl}/inventory?${params.toString()}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error("Error fetching inventory:", error);
+    throw error;
+  }
+}
+
+export async function getInventoryForProduct(
+  token: string,
+  tenantId: string,
+  productId: string
+): Promise<InventoryItem[]> {
+  try {
+    const allInventory = await getInventory(token, tenantId);
+    return allInventory.filter(
+      (item: InventoryItem) => item.product.id === productId
+    );
+  } catch (error) {
+    console.error("Error fetching product inventory:", error);
+    return [];
+  }
+}
