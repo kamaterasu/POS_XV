@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Loading } from "@/components/Loading";
 import { getProductById, updateProduct } from "@/lib/product/productApi";
+import { getProductByStore } from "@/lib/product/productApi";
 import { getCategories } from "@/lib/category/categoryApi";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { uploadProductImageOnly } from "@/lib/product/productImages";
@@ -120,6 +121,10 @@ export default function ProductDetailPage() {
   const [selectedVariantIndex, setSelectedVariantIndex] = useState<
     number | null
   >(null);
+  
+  // Variant selection for view mode
+  const [selectedColor, setSelectedColor] = useState<string>("");
+  const [selectedSize, setSelectedSize] = useState<string>("");
 
   // Store management
   const [stores, setStores] = useState<StoreRow[]>([]);
@@ -127,6 +132,8 @@ export default function ProductDetailPage() {
   const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [adjustingInventory, setAdjustingInventory] = useState<Record<string, boolean>>({});
+  const [deltaInputs, setDeltaInputs] = useState<Record<string, number>>({});
+  const [storeProductData, setStoreProductData] = useState<Array<{storeId: string, storeName: string, data: any}> | null>(null);
 
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -152,6 +159,53 @@ export default function ProductDetailPage() {
           getCategories(token),
           getStore(token),
         ]);
+
+        // Also fetch store-specific product data for better inventory tracking
+        if (storesResult && Array.isArray(storesResult) && storesResult.length > 0) {
+          try {
+            // Fetch inventory data for each store for this product
+            const storeProductResults = await Promise.all(
+              storesResult.map(async (store) => {
+                try {
+                  const result = await getProductByStore(token, store.id);
+                  // Filter items to only include variants from our current product
+                  const filteredItems = result.items?.filter((item: any) => 
+                    item.product?.id === String(id)
+                  ) || [];
+                  
+                  return { 
+                    storeId: store.id, 
+                    storeName: store.name, 
+                    data: { ...result, items: filteredItems }
+                  };
+                } catch (error) {
+                  console.warn(`Failed to fetch data for store ${store.name}:`, error);
+                  return { storeId: store.id, storeName: store.name, data: null };
+                }
+              })
+            );
+            setStoreProductData(storeProductResults);
+            console.log('Store-specific product data (filtered):', storeProductResults);
+            
+            // Initialize store inventory from the fetched data
+            const storeInventoryMap: Record<string, Record<string, number>> = {};
+            storeProductResults.forEach(({ storeId, data }) => {
+              if (data?.items) {
+                data.items.forEach((item: any) => {
+                  if (!storeInventoryMap[item.variant_id]) {
+                    storeInventoryMap[item.variant_id] = {};
+                  }
+                  storeInventoryMap[item.variant_id][storeId] = item.qty || 0;
+                });
+              }
+            });
+            
+            // Merge with existing storeInventory state
+            setStoreInventory(prev => ({ ...prev, ...storeInventoryMap }));
+          } catch (error) {
+            console.warn('Failed to fetch store-specific product data:', error);
+          }
+        }
 
         if (alive) {
           if (productResult.error) {
@@ -186,7 +240,7 @@ export default function ProductDetailPage() {
                 setStoreInventory(inventoryMap);
                 
                 // Update variants with total qty
-                const updatedVariants = productResult.variants.map(variant => ({
+                const updatedVariants = productResult.variants.map((variant: any) => ({
                   ...variant,
                   qty: inventoryItems
                     .filter(item => item.variant_id === variant.id)
@@ -462,14 +516,69 @@ export default function ProductDetailPage() {
   };
 
   const getStoreInventory = (variantId: string, storeId: string): number => {
-    return storeInventory[variantId]?.[storeId] ?? 0;
+    // First check the existing storeInventory state
+    const existingQty = storeInventory[variantId]?.[storeId];
+    if (existingQty !== undefined) {
+      return existingQty;
+    }
+    
+    // If not found, check storeProductData from getProductByStore API
+    if (storeProductData) {
+      const storeData = storeProductData.find(store => store.storeId === storeId);
+      if (storeData?.data?.items) {
+        const item = storeData.data.items.find((item: any) => item.variant_id === variantId);
+        return item?.qty || 0;
+      }
+    }
+    
+    return 0;
   };
 
-  // New function to handle inventory adjustments
-  const adjustInventory = async (variantId: string, storeId: string, newQuantity: number, reason: "PURCHASE" | "ADJUSTMENT" = "ADJUSTMENT") => {
-    const currentQuantity = getStoreInventory(variantId, storeId);
-    const delta = newQuantity - currentQuantity;
-    
+  // Helper functions for variant selection
+  const getUniqueColors = () => {
+    const colors = variants
+      .map(v => v.attrs?.color)
+      .filter(color => color && color.trim() !== "")
+      .filter((color, index, arr) => arr.indexOf(color) === index);
+    return colors;
+  };
+
+  const getUniqueSizes = () => {
+    const sizes = variants
+      .map(v => v.attrs?.size)
+      .filter(size => size && size.trim() !== "")
+      .filter((size, index, arr) => arr.indexOf(size) === index);
+    return sizes;
+  };
+
+  const getAvailableSizesForColor = (color: string) => {
+    return variants
+      .filter(v => v.attrs?.color === color)
+      .map(v => v.attrs?.size)
+      .filter(size => size && size.trim() !== "");
+  };
+
+  const getSelectedVariant = () => {
+    return variants.find(v => 
+      v.attrs?.color === selectedColor && v.attrs?.size === selectedSize
+    );
+  };
+
+  const isColorHexCode = (color: string) => {
+    return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
+  };
+
+  // Initialize selection when variants load
+  useEffect(() => {
+    if (variants.length > 0 && !selectedColor && !selectedSize) {
+      const firstVariant = variants[0];
+      if (firstVariant.attrs?.color) setSelectedColor(firstVariant.attrs.color);
+      if (firstVariant.attrs?.size) setSelectedSize(firstVariant.attrs.size);
+    }
+  }, [variants, selectedColor, selectedSize]);
+
+  // New function to handle inventory adjustments with delta
+  const adjustInventoryByDelta = async (variantId: string, storeId: string, delta: number, reason: "PURCHASE" | "ADJUSTMENT" = "ADJUSTMENT") => {
     if (delta === 0) return;
 
     const adjustKey = `${variantId}-${storeId}`;
@@ -487,6 +596,8 @@ export default function ProductDetailPage() {
       });
 
       // Update local state
+      const currentQuantity = getStoreInventory(variantId, storeId);
+      const newQuantity = currentQuantity + delta;
       updateStoreInventory(variantId, storeId, newQuantity);
       
       // Update variant total quantity
@@ -647,9 +758,6 @@ export default function ProductDetailPage() {
                   <h1 className="text-2xl font-bold text-white">
                     Барааны дэлгэрэнгүй
                   </h1>
-                  <p className="text-blue-100 text-sm font-mono mt-1">
-                    ID: {id}
-                  </p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -1022,9 +1130,12 @@ export default function ProductDetailPage() {
                         <div className="flex gap-3">
                           <button
                             onClick={addVariant}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium shadow-sm"
+                            className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
                           >
-                            + Хувилбар нэмэх
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                            🆕 Шинэ хувилбар нэмэх
                           </button>
                         </div>
                       </div>
@@ -1040,609 +1151,593 @@ export default function ProductDetailPage() {
                       </div>
                     )}
 
-                    {/* Selected Variant Display */}
-                    {!isEditing &&
-                      selectedVariantIndex !== null &&
-                      variants[selectedVariantIndex] && (
-                        <div className="mb-4 bg-white border border-[#efefef] p-3 rounded-md">
-                          <div className="text-sm text-[#6b6b6b]">
-                            Сонгосон хувилбар:
-                          </div>
-                          <div className="mt-2 flex justify-between">
-                            <div>
-                              <div className="text-sm font-semibold">
-                                {variants[selectedVariantIndex].attrs?.color ||
-                                  "N/A"}{" "}
-                                /{" "}
-                                {variants[selectedVariantIndex].attrs?.size ||
-                                  "N/A"}
-                              </div>
-                              <div className="text-xs text-[#6b6b6b] mt-1">
-                                SKU:{" "}
-                                {variants[selectedVariantIndex].sku || "N/A"}
-                              </div>
-                            </div>
-                            <div className="text-sm text-[#6b6b6b]">
-                              Нийт үлдэгдэл:{" "}
-                              <span className={`font-semibold ${
-                                (variants[selectedVariantIndex].qty || 0) > 0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                              }`}>
-                                {variants[selectedVariantIndex].qty || 0}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Store Inventory */}
-                          <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[#444]">
-                            {stores.map((store) => {
-                              const qty = getStoreInventory(variants[selectedVariantIndex].id, store.id);
-                              return (
-                                <div key={store.id} className="flex justify-between">
-                                  <span>{store.name}:</span>
-                                  <span className={`font-semibold ${
-                                    qty > 0 ? "text-green-600" : "text-gray-400"
-                                  }`}>
-                                    {qty}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Product Variant Selection (View Mode Only) */}
+                    {/* Variants Display (View Mode) */}
                     {!isEditing && variants.length > 0 && (
-                      <div className="mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 p-6 rounded-xl">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">
-                          Хувилбар сонгох
-                        </h3>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="mb-6">
+                        <div className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm">
                           {/* Color Selection */}
-                          <div>
-                            <div className="text-base font-semibold mb-3 text-gray-800">
-                              Өнгө
-                            </div>
-                            <div className="flex items-center gap-3 flex-wrap">
-                              {[
-                                ...new Set(
-                                  variants
-                                    .map((v) => v.attrs?.color)
-                                    .filter(Boolean)
-                                ),
-                              ].map((color) => (
-                                <button
-                                  key={color}
-                                  onClick={() => {
-                                    const variantIndex = variants.findIndex(
-                                      (v) =>
-                                        v.attrs?.color === color &&
-                                        (selectedVariantIndex === null ||
-                                          variants[selectedVariantIndex]?.attrs
-                                            ?.size === v.attrs?.size)
+                          {getUniqueColors().length > 0 && (
+                            <div className="mb-6">
+                              <div className="text-sm font-medium text-gray-600 mb-3">Өнгө:</div>
+                              <div className="flex flex-wrap gap-3">
+                                {getUniqueColors().map((color) => {
+                                  // Calculate total stock for this color across all sizes
+                                  const colorStock = variants
+                                    .filter(v => v.attrs?.color === color)
+                                    .reduce((total, variant) => 
+                                      total + stores.reduce((storeTotal, store) => 
+                                        storeTotal + getStoreInventory(variant.id, store.id), 0
+                                      ), 0
                                     );
-                                    setSelectedVariantIndex(
-                                      variantIndex >= 0 ? variantIndex : 0
-                                    );
-                                  }}
-                                  className={`px-4 py-2 rounded-lg border-2 transition-all duration-200 ${
-                                    selectedVariantIndex !== null &&
-                                    variants[selectedVariantIndex]?.attrs
-                                      ?.color === color
-                                      ? "border-blue-600 bg-blue-50 text-blue-800 font-semibold"
-                                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-                                  }`}
-                                >
-                                  {color}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Size Selection */}
-                          <div>
-                            <div className="text-base font-semibold mb-3 text-gray-800">
-                              Хэмжээ
-                            </div>
-                            <div className="flex items-center gap-3 flex-wrap">
-                              {[
-                                ...new Set(
-                                  variants
-                                    .map((v) => v.attrs?.size)
-                                    .filter(Boolean)
-                                ),
-                              ].map((size) => (
-                                <button
-                                  key={size}
-                                  onClick={() => {
-                                    const variantIndex = variants.findIndex(
-                                      (v) =>
-                                        v.attrs?.size === size &&
-                                        (selectedVariantIndex === null ||
-                                          variants[selectedVariantIndex].attrs
-                                            ?.color === v.attrs?.color)
-                                    );
-                                    setSelectedVariantIndex(
-                                      variantIndex >= 0 ? variantIndex : 0
-                                    );
-                                  }}
-                                  className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
-                                    selectedVariantIndex !== null &&
-                                    variants[selectedVariantIndex]?.attrs
-                                      ?.size === size
-                                      ? "border-green-600 bg-green-50 text-green-800 font-semibold"
-                                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-                                  }`}
-                                >
-                                  {size}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Selected Variant Details */}
-                        {selectedVariantIndex !== null &&
-                          variants[selectedVariantIndex] && (
-                            <div className="mt-6 pt-6 border-t border-blue-200">
-                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                  <div className="text-sm font-medium text-gray-600 mb-1">
-                                    SKU
-                                  </div>
-                                  <div className="font-mono text-gray-900 font-semibold">
-                                    {variants[selectedVariantIndex].sku ||
-                                      "SKU байхгүй"}
-                                  </div>
-                                </div>
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                  <div className="text-sm font-medium text-gray-600 mb-1">
-                                    Үнэ
-                                  </div>
-                                  <div className="text-lg font-bold text-green-600">
-                                    ₮
-                                    {variants[
-                                      selectedVariantIndex
-                                    ].price.toLocaleString()}
-                                  </div>
-                                </div>
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                  <div className="text-sm font-medium text-gray-600 mb-1">
-                                    Өртөг
-                                  </div>
-                                  <div className="text-gray-700 font-semibold">
-                                    {variants[selectedVariantIndex].cost !==
-                                    null
-                                      ? `₮${variants[
-                                          selectedVariantIndex
-                                        ].cost.toLocaleString()}`
-                                      : "Өртөг байхгүй"}
-                                  </div>
-                                </div>
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                  <div className="text-sm font-medium text-gray-600 mb-1">
-                                    Үлдэгдэл
-                                  </div>
-                                  <div
-                                    className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
-                                      (variants[selectedVariantIndex].qty ||
-                                        0) > 0
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-red-100 text-red-800"
-                                    }`}
-                                  >
-                                    {variants[selectedVariantIndex].qty || 0}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Store Inventory */}
-                              <div className="mt-6 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                                <div className="text-sm font-medium text-gray-600 mb-3">
-                                  Салбарын үлдэгдэл
-                                </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {stores.map((store) => (
-                                    <div
-                                      key={store.id}
-                                      className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                                  
+                                  return (
+                                    <button
+                                      key={color}
+                                      onClick={() => {
+                                        setSelectedColor(color);
+                                        // Reset size selection to first available size for this color
+                                        const availableSizes = getAvailableSizesForColor(color);
+                                        if (availableSizes.length > 0) {
+                                          setSelectedSize(availableSizes[0]);
+                                        }
+                                      }}
+                                      className={`relative flex items-center gap-2 px-3 py-3 rounded-lg border transition-all ${
+                                        selectedColor === color
+                                          ? 'border-blue-500 bg-blue-50 shadow-md'
+                                          : 'border-gray-300 hover:border-gray-400 hover:shadow-sm'
+                                      }`}
                                     >
-                                      <span className="text-gray-700 font-medium">
-                                        {store.name}
-                                      </span>
-                                      <span className="font-bold text-gray-900 bg-white px-2 py-1 rounded">
-                                        {getStoreInventory(variants[selectedVariantIndex].id, store.id)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
+                                      <div 
+                                        className="w-8 h-8 rounded-full border-2 border-white shadow-md flex-shrink-0" 
+                                        style={{ backgroundColor: color }}
+                                      ></div>
+                                      <div className="text-left">
+                                        {!isColorHexCode(color) && (
+                                          <div className="text-sm font-medium text-gray-700">
+                                            {color}
+                                          </div>
+                                        )}
+                                        <div className={`text-xs ${
+                                          colorStock > 0 ? 'text-green-600' : 'text-red-500'
+                                        }`}>
+                                          {colorStock > 0 ? `${colorStock} ширхэг` : 'Дууссан'}
+                                        </div>
+                                      </div>
+                                      {/* Stock indicator dot */}
+                                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                                        colorStock > 10 
+                                          ? 'bg-green-500' 
+                                          : colorStock > 0 
+                                          ? 'bg-yellow-500'
+                                          : 'bg-red-500'
+                                      }`}></div>
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
+
+                          {/* Size Selection */}
+                          {getUniqueSizes().length > 0 && (
+                            <div className="mb-6">
+                              <div className="text-sm font-medium text-gray-600 mb-3">Хэмжээ:</div>
+                              <div className="flex flex-wrap gap-3">
+                                {getUniqueSizes().map((size) => {
+                                  const isAvailable = selectedColor ? getAvailableSizesForColor(selectedColor).includes(size) : true;
+                                  const sizeVariant = variants.find(v => 
+                                    v.attrs?.color === selectedColor && v.attrs?.size === size
+                                  );
+                                  const sizeStock = sizeVariant ? stores.reduce((total, store) => 
+                                    total + getStoreInventory(sizeVariant.id, store.id), 0
+                                  ) : 0;
+                                  
+                                  return (
+                                    <button
+                                      key={size}
+                                      onClick={() => isAvailable && setSelectedSize(size)}
+                                      disabled={!isAvailable}
+                                      className={`relative px-4 py-3 text-sm rounded-lg border transition-all ${
+                                        selectedSize === size
+                                          ? 'bg-blue-500 text-white border-blue-500 shadow-md'
+                                          : isAvailable
+                                          ? 'bg-gray-100 text-gray-700 border-gray-300 hover:border-gray-400 hover:shadow-sm'
+                                          : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'
+                                      }`}
+                                    >
+                                      <div className="font-medium">{size}</div>
+                                      {isAvailable && sizeVariant && (
+                                        <div className={`text-xs mt-1 ${
+                                          selectedSize === size ? 'text-blue-100' : 'text-gray-500'
+                                        }`}>
+                                          {sizeStock > 0 ? `${sizeStock} ширхэг` : 'Дууссан'}
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Store Inventory for Selected Variant */}
+                          {selectedColor && selectedSize && stores.length > 0 && (() => {
+                            const selectedVariant = getSelectedVariant();
+                            return selectedVariant ? (
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="text-sm font-medium text-gray-600">Салбарын үлдэгдэл:</div>
+                                  <div className="flex items-center gap-3 text-sm">
+                                    <span className="text-gray-600">
+                                      {!isColorHexCode(selectedColor) && selectedColor} / {selectedSize}
+                                    </span>
+                                    <span className="font-medium text-green-600">
+                                      ₮{selectedVariant.price.toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  {stores.map((store, storeIndex) => {
+                                    const qty = getStoreInventory(selectedVariant.id, store.id);
+                                    const storeDisplayName = store.name === "Төв салбар" ? "Төв салбар" : `${store.name || `Салбар-${storeIndex + 1}`}`;
+                                    
+                                    return (
+                                      <div key={store.id} className="flex items-center justify-between py-2">
+                                        <div className="flex items-center gap-2">
+                                          <div className={`w-3 h-3 rounded-full ${
+                                            qty > 0 ? "bg-green-500" : "bg-gray-400"
+                                          }`}></div>
+                                          <span className="text-sm font-medium text-gray-700">
+                                            {storeDisplayName}:
+                                          </span>
+                                        </div>
+                                        <div className="text-right">
+                                          <span className={`text-lg font-bold ${
+                                            qty > 0 ? "text-blue-600" : "text-gray-400"
+                                          }`}>
+                                            {qty}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
                       </div>
                     )}
 
+
+
                     {/* Edit Mode - Variant Management */}
                     {isEditing && (
-                      <div className="space-y-3">
-                        {variants.map((variant, index) => (
+                      <div className="space-y-6">
+                        {variants.map((variant, index) => {
+                          const isNewVariant = variant.id.startsWith("temp-");
+                          return (
                           <div
                             key={variant.id}
-                            className="bg-white border border-[#efefef] p-3 rounded-md"
+                            className={`${
+                              isNewVariant 
+                                ? "bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 shadow-lg" 
+                                : "bg-gradient-to-br from-white to-gray-50 border border-gray-200 shadow-sm"
+                            } rounded-xl p-6 hover:shadow-md transition-all duration-200 relative`}
                           >
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                              {/* Color Input */}
-                              <div>
-                                <div className="text-xs text-[#6b6b6b] mb-1">
-                                  Өнгө:
-                                </div>
-                                <input
-                                  type="text"
-                                  value={variant.attrs?.color || ""}
-                                  onChange={(e) =>
-                                    updateVariantAttr(
-                                      index,
-                                      "color",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                  placeholder="Өнгө оруулах"
-                                />
+                            {/* New Variant Badge */}
+                            {isNewVariant && (
+                              <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md animate-pulse">
+                                ШИНЭ
                               </div>
-
-                              {/* Size Input */}
-                              <div>
-                                <div className="text-xs text-[#6b6b6b] mb-1">
-                                  Хэмжээ:
+                            )}
+                            
+                            {/* Variant Header */}
+                            <div className="flex items-center justify-between mb-6">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                  isNewVariant 
+                                    ? "bg-green-100 animate-pulse" 
+                                    : "bg-blue-100"
+                                }`}>
+                                  <span className={`font-bold text-sm ${
+                                    isNewVariant ? "text-green-600" : "text-blue-600"
+                                  }`}>
+                                    {isNewVariant ? "★" : index + 1}
+                                  </span>
                                 </div>
-                                <input
-                                  type="text"
-                                  value={variant.attrs?.size || ""}
-                                  onChange={(e) =>
-                                    updateVariantAttr(
-                                      index,
-                                      "size",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                  placeholder="Хэмжээ оруулах"
-                                />
+                                <div>
+                                  <h4 className={`text-lg font-semibold ${
+                                    isNewVariant ? "text-green-800" : "text-gray-800"
+                                  }`}>
+                                    {isNewVariant && "🆕 "}
+                                    {variant.attrs?.color && variant.attrs?.size 
+                                      ? `${variant.attrs.color} / ${variant.attrs.size}`
+                                      : variant.name || `Хувилбар ${index + 1}`
+                                    }
+                                  </h4>
+                                  <div className={`text-sm ${
+                                    isNewVariant ? "text-green-600 font-medium" : "text-gray-500"
+                                  }`}>
+                                    {isNewVariant 
+                                      ? "Шинэ хувилбар - хадгалахгүй бол устана" 
+                                      : new Date(variant.created_at).toLocaleDateString("mn-MN")
+                                    }
+                                  </div>
+                                </div>
                               </div>
+                              <button
+                                onClick={() => removeVariant(index)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors group"
+                                aria-label="Хувилбар устгах"
+                              >
+                                <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
 
-                              {/* SKU */}
-                              <div>
-                                <div className="text-xs text-[#6b6b6b] mb-1">
-                                  SKU:
+                            {/* Basic Information */}
+                            <div className="bg-white rounded-lg p-4 mb-6 border border-gray-100">
+                              <h5 className="text-sm font-medium text-gray-700 mb-4 flex items-center gap-2">
+                                <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Үндсэн мэдээлэл
+                              </h5>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* Color Input */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    Өнгө
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.attrs?.color || ""}
+                                    onChange={(e) =>
+                                      updateVariantAttr(
+                                        index,
+                                        "color",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    placeholder="Жишээ: Улаан"
+                                  />
                                 </div>
-                                <input
-                                  type="text"
-                                  value={variant.sku || ""}
-                                  onChange={(e) =>
-                                    updateVariant(index, "sku", e.target.value)
-                                  }
-                                  className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                  placeholder="SKU код"
-                                />
-                              </div>
 
-                              {/* Price */}
-                              <div>
-                                <div className="text-xs text-[#6b6b6b] mb-1">
-                                  Үнэ:
+                                {/* Size Input */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    Хэмжээ
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.attrs?.size || ""}
+                                    onChange={(e) =>
+                                      updateVariantAttr(
+                                        index,
+                                        "size",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    placeholder="Жишээ: XL"
+                                  />
                                 </div>
-                                <input
-                                  type="number"
-                                  value={variant.price}
-                                  onChange={(e) =>
-                                    updateVariant(
-                                      index,
-                                      "price",
-                                      Number(e.target.value)
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                  placeholder="0"
-                                  min="0"
-                                  step="0.01"
-                                />
+
+                                {/* SKU */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    SKU код
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.sku || ""}
+                                    onChange={(e) =>
+                                      updateVariant(index, "sku", e.target.value)
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    placeholder="Жишээ: TSH-RED-XL"
+                                  />
+                                </div>
+
+                                {/* Variant Name */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    Хувилбарын нэр
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={variant.name || ""}
+                                    onChange={(e) =>
+                                      updateVariant(index, "name", e.target.value)
+                                    }
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    placeholder="Автоматаар үүсгэгдэнэ"
+                                  />
+                                </div>
                               </div>
                             </div>
 
-                            {/* Second row - Cost, Stock, Actions */}
-                            <div className="mt-3 pt-2 border-t border-[#f0f0f0] grid grid-cols-1 md:grid-cols-3 gap-3">
-                              {/* Cost */}
-                              <div>
-                                <div className="text-xs text-[#6b6b6b] mb-1">
-                                  Өртөг:
-                                </div>
-                                <input
-                                  type="number"
-                                  value={variant.cost || ""}
-                                  onChange={(e) =>
-                                    updateVariant(
-                                      index,
-                                      "cost",
-                                      e.target.value
-                                        ? Number(e.target.value)
-                                        : null
-                                    )
-                                  }
-                                  className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                  placeholder="0"
-                                  min="0"
-                                  step="0.01"
-                                />
-                              </div>
-
-                              {/* Total Stock */}
-                              <div>
-                                <div className="text-xs text-[#6b6b6b] mb-1">
-                                  Нийт үлдэгдэл:
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={`inline-block px-2 py-1 rounded text-sm font-semibold ${
-                                      (variant.qty || 0) > 0
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-red-100 text-red-800"
-                                    }`}
-                                  >
-                                    {variant.qty || 0}
+                            {/* Pricing Information */}
+                            <div className="bg-white rounded-lg p-4 mb-6 border border-gray-100">
+                              <h5 className="text-sm font-medium text-gray-700 mb-4 flex items-center gap-2">
+                                <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                                </svg>
+                                Үнийн мэдээлэл
+                              </h5>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Price */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    Борлуулалтын үнэ
+                                  </label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₮</span>
+                                    <input
+                                      type="number"
+                                      value={variant.price}
+                                      onChange={(e) =>
+                                        updateVariant(
+                                          index,
+                                          "price",
+                                          Number(e.target.value)
+                                        )
+                                      }
+                                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                      placeholder="0"
+                                      min="0"
+                                      step="0.01"
+                                    />
                                   </div>
-                                  {inventoryLoading && (
-                                    <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                  )}
                                 </div>
-                              </div>
 
-                              {/* Actions */}
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => {
-                                    // Auto-generate name and SKU from color/size
-                                    const color = variant.attrs?.color || "";
-                                    const size = variant.attrs?.size || "";
-                                    if (color && size) {
-                                      updateVariant(
-                                        index,
-                                        "name",
-                                        `${color} / ${size}`
-                                      );
-                                      updateVariant(
-                                        index,
-                                        "sku",
-                                        `${
-                                          data?.product.name
-                                            ?.substring(0, 3)
-                                            .toUpperCase() || "PRD"
-                                        }-${color
-                                          .substring(0, 2)
-                                          .toUpperCase()}-${size}`
-                                      );
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs border border-blue-200 hover:bg-blue-200 transition-colors"
-                                  title="Өнгө/хэмжээнээс нэр болон SKU автомат үүсгэх"
-                                >
-                                  🔄 Auto
-                                </button>
-                                <button
-                                  onClick={() => removeVariant(index)}
-                                  className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors"
-                                  aria-label="Хувилбар устгах"
-                                >
-                                  ×
-                                </button>
+                                {/* Cost */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    Өртөг
+                                  </label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₮</span>
+                                    <input
+                                      type="number"
+                                      value={variant.cost || ""}
+                                      onChange={(e) =>
+                                        updateVariant(
+                                          index,
+                                          "cost",
+                                          e.target.value
+                                            ? Number(e.target.value)
+                                            : null
+                                        )
+                                      }
+                                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                      placeholder="Заавал биш"
+                                      min="0"
+                                      step="0.01"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Total Stock Display */}
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                                    Нийт үлдэгдэл
+                                  </label>
+                                  <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                                    <div
+                                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                        (variant.qty || 0) > 0
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
+                                      {variant.qty || 0} ширхэг
+                                    </div>
+                                    {inventoryLoading && (
+                                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
 
                             {/* Store Inventory Management */}
-                            <div className="mt-3 pt-2 border-t border-[#f0f0f0]">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="text-xs text-[#6b6b6b]">
-                                  Салбар тус бүрийн үлдэгдэл:
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    const adjustments: Record<string, number> = {};
-                                    stores.forEach(store => {
-                                      const currentQty = getStoreInventory(variant.id, store.id);
-                                      const newQty = prompt(`${store.name}-ийн үлдэгдэл:`, currentQty.toString());
-                                      if (newQty !== null && !isNaN(parseInt(newQty))) {
-                                        adjustments[store.id] = parseInt(newQty);
+                            {stores.length > 0 && (
+                              <div className="bg-white rounded-lg p-4 border border-gray-100">
+                                <div className="flex items-center justify-between mb-4">
+                                  <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    Салбарын үлдэгдэл
+                                  </h5>
+                                  <button
+                                    onClick={() => {
+                                      const deltaAdjustments: Record<string, number> = {};
+                                      stores.forEach(store => {
+                                        const currentQty = getStoreInventory(variant.id, store.id);
+                                        const deltaStr = prompt(`${store.name} (одоо ${currentQty} ширхэг)\nНэмэх/Хасах утга (жишээ: +5, -3):`, "0");
+                                        if (deltaStr !== null) {
+                                          const delta = parseInt(deltaStr);
+                                          if (!isNaN(delta) && delta !== 0) {
+                                            deltaAdjustments[store.id] = delta;
+                                          }
+                                        }
+                                      });
+                                      if (Object.keys(deltaAdjustments).length > 0) {
+                                        Object.entries(deltaAdjustments).forEach(([storeId, delta]) => {
+                                          adjustInventoryByDelta(variant.id, storeId, delta);
+                                        });
                                       }
-                                    });
-                                    if (Object.keys(adjustments).length > 0) {
-                                      bulkAdjustInventory(variant.id, adjustments);
-                                    }
-                                  }}
-                                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 transition-colors"
-                                  disabled={inventoryLoading}
-                                >
-                                  Бүгдийг засах
-                                </button>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {stores.map((store) => {
-                                  const qty = getStoreInventory(variant.id, store.id);
-                                  const adjustKey = `${variant.id}-${store.id}`;
-                                  const isAdjusting = adjustingInventory[adjustKey];
-                                  
-                                  return (
-                                    <div
-                                      key={store.id}
-                                      className="flex items-center gap-2 p-2 bg-gray-50 rounded border"
-                                    >
-                                      <span className="text-xs text-[#6b6b6b] flex-1 font-medium">
-                                        {store.name}:
-                                      </span>
-                                      <div className="flex items-center gap-1">
-                                        <input
-                                          type="number"
-                                          value={qty}
-                                          onChange={(e) => {
-                                            const newQty = parseInt(e.target.value) || 0;
-                                            updateStoreInventory(variant.id, store.id, newQty);
-                                          }}
-                                          onBlur={(e) => {
-                                            const newQty = parseInt(e.target.value) || 0;
-                                            const currentQty = getStoreInventory(variant.id, store.id);
-                                            if (newQty !== currentQty) {
-                                              adjustInventory(variant.id, store.id, newQty);
-                                            }
-                                          }}
-                                          onKeyPress={(e) => {
-                                            if (e.key === 'Enter') {
-                                              const newQty = parseInt((e.target as HTMLInputElement).value) || 0;
-                                              const currentQty = getStoreInventory(variant.id, store.id);
-                                              if (newQty !== currentQty) {
-                                                adjustInventory(variant.id, store.id, newQty);
-                                              }
-                                              (e.target as HTMLInputElement).blur();
-                                            }
-                                          }}
-                                          className="w-16 px-2 py-1 border border-[#e6e6e6] rounded text-xs text-center focus:outline-none focus:border-[#bcd0ff] bg-white"
-                                          min="0"
-                                          placeholder="0"
-                                          disabled={isAdjusting || inventoryLoading}
-                                        />
-                                        {isAdjusting && (
-                                          <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                        )}
-                                        {!isAdjusting && qty > 0 && (
-                                          <span className="text-xs text-green-600">✓</span>
-                                        )}
-                                        <div className="flex flex-col gap-1">
-                                          <button
-                                            onClick={() => adjustInventory(variant.id, store.id, qty + 1)}
-                                            className="w-5 h-5 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 transition-colors flex items-center justify-center font-bold"
-                                            disabled={isAdjusting || inventoryLoading}
-                                            title="Нэмэх"
-                                          >
-                                            +
-                                          </button>
-                                          <button
-                                            onClick={() => adjustInventory(variant.id, store.id, Math.max(0, qty - 1))}
-                                            className="w-5 h-5 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 transition-colors flex items-center justify-center font-bold"
-                                            disabled={isAdjusting || inventoryLoading || qty <= 0}
-                                            title="Хасах"
-                                          >
-                                            -
-                                          </button>
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-lg border border-blue-200 hover:bg-blue-200 transition-colors disabled:opacity-50"
+                                    disabled={inventoryLoading}
+                                  >
+                                    Бүгдийг засах
+                                  </button>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {stores.map((store) => {
+                                    const qty = getStoreInventory(variant.id, store.id);
+                                    const adjustKey = `${variant.id}-${store.id}`;
+                                    const isAdjusting = adjustingInventory[adjustKey];
+                                    const deltaValue = deltaInputs[adjustKey] || 0;
+                                    
+                                    return (
+                                      <div
+                                        key={store.id}
+                                        className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm"
+                                      >
+                                        {/* Store Name and Current Inventory */}
+                                        <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-2">
+                                            <div className={`w-3 h-3 rounded-full ${qty > 0 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                            <span className="text-sm font-medium text-gray-700">
+                                              {store.name}
+                                            </span>
+                                          </div>
+                                          <div className="text-right">
+                                            <div className="text-lg font-bold text-gray-900">
+                                              {qty} ширхэг
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              Одоогийн үлдэгдэл
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Delta Input Section */}
+                                        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                          <div className="text-xs font-medium text-gray-600 mb-2">
+                                            Нэмэх/Хасах утга
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {/* Delta input */}
+                                            <input
+                                              type="number"
+                                              value={deltaValue === 0 ? "" : deltaValue}
+                                              onChange={(e) => {
+                                                const value = e.target.value;
+                                                const delta = value === "" ? 0 : parseInt(value) || 0;
+                                                setDeltaInputs(prev => ({...prev, [adjustKey]: delta}));
+                                              }}
+                                              className={`w-full px-3 py-2 border rounded text-center focus:outline-none focus:ring-2 focus:border-transparent ${
+                                                Math.abs(deltaValue) > qty && deltaValue !== 0
+                                                  ? "border-red-300 focus:ring-red-500 bg-red-50"
+                                                  : "border-gray-300 focus:ring-blue-500"
+                                              }`}
+                                              placeholder="0"
+                                              disabled={isAdjusting}
+                                            />
+                                            {/* Warning message */}
+                                            {Math.abs(deltaValue) > qty && deltaValue !== 0 && (
+                                              <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                </svg>
+                                                Хасах тоо үлдэгдлээс их байна (Үлдэгдэл: {qty} ширхэг)
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          {/* Apply buttons */}
+                                          <div className="flex items-center justify-between mt-3">
+                                            <div className="text-xs text-gray-600">
+                                              {deltaValue !== 0 && (
+                                                <>
+                                                  <span>Нэмэх: <span className="font-medium text-green-600">{qty + Math.abs(deltaValue)} ширхэг</span></span>
+                                                  <span className="mx-2">|</span>
+                                                  <span>Хасах: 
+                                                    <span className={`font-medium ${Math.abs(deltaValue) > qty ? "text-red-600" : "text-orange-600"}`}>
+                                                      {Math.abs(deltaValue) > qty 
+                                                        ? `Боломжгүй (${Math.abs(deltaValue) - qty} дутагдах)` 
+                                                        : `${qty - Math.abs(deltaValue)} ширхэг`
+                                                      }
+                                                    </span>
+                                                  </span>
+                                                </>
+                                              )}
+                                              {deltaValue === 0 && (
+                                                <span>Одоогийн үлдэгдэл: <span className="font-medium">{qty} ширхэг</span></span>
+                                              )}
+                                            </div>
+                                            <div className="flex gap-2">
+                                              {/* Add button - always show if deltaValue is not 0 */}
+                                              {deltaValue !== 0 && (
+                                                <button
+                                                  onClick={() => {
+                                                    // Use the absolute value as positive delta for adding
+                                                    adjustInventoryByDelta(variant.id, store.id, Math.abs(deltaValue));
+                                                    setDeltaInputs(prev => ({...prev, [adjustKey]: 0}));
+                                                  }}
+                                                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                  disabled={isAdjusting}
+                                                >
+                                                  {isAdjusting ? (
+                                                    <div className="flex items-center gap-1">
+                                                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                                      Нэмж байна...
+                                                    </div>
+                                                  ) : (
+                                                    "Нэмэх"
+                                                  )}
+                                                </button>
+                                              )}
+                                              {/* Subtract button - always show if deltaValue is not 0 */}
+                                              {deltaValue !== 0 && (
+                                                <button
+                                                  onClick={() => {
+                                                    const subtractAmount = Math.abs(deltaValue);
+                                                    if (subtractAmount > qty) {
+                                                      alert(`Алдаа: Хасах тоо (${subtractAmount}) нь одоогийн үлдэгдлээс (${qty}) их байна. Хамгийн ихдээ ${qty} ширхэг хасч болно.`);
+                                                      return;
+                                                    }
+                                                    // Use the absolute value as negative delta for subtracting
+                                                    adjustInventoryByDelta(variant.id, store.id, -subtractAmount);
+                                                    setDeltaInputs(prev => ({...prev, [adjustKey]: 0}));
+                                                  }}
+                                                  className={`px-3 py-1 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                                                    Math.abs(deltaValue) > qty 
+                                                      ? "bg-gray-400 cursor-not-allowed" 
+                                                      : "bg-red-600 hover:bg-red-700"
+                                                  }`}
+                                                  disabled={isAdjusting || Math.abs(deltaValue) > qty}
+                                                >
+                                                  {isAdjusting ? (
+                                                    <div className="flex items-center gap-1">
+                                                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                                      Хасч байна...
+                                                    </div>
+                                                  ) : (
+                                                    Math.abs(deltaValue) > qty ? "Үлдэгдэл хүрэхгүй" : "Хасах"
+                                                  )}
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
                                       </div>
+                                    );
+                                  })}
+                                </div>
+                                
+                                {(inventoryLoading || Object.values(adjustingInventory).some(Boolean)) && (
+                                  <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                      Үлдэгдлийн мэдээлэл шинэчлэж байна...
                                     </div>
-                                  );
-                                })}
+                                  </div>
+                                )}
                               </div>
-                              {(inventoryLoading || Object.values(adjustingInventory).some(Boolean)) && (
-                                <div className="mt-2 text-xs text-blue-600 flex items-center gap-2">
-                                  <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                  Үлдэгдлийн мэдээлэл шинэчлэж байна...
-                                </div>
-                              )}
-                              
-                              {/* Quick Actions */}
-                              <div className="mt-3 pt-2 border-t border-[#f5f5f5]">
-                                <div className="text-xs text-[#6b6b6b] mb-2">Хурдан үйлдэл:</div>
-                                <div className="flex gap-2 flex-wrap">
-                                  <button
-                                    onClick={() => {
-                                      const amount = prompt('Бүх салбарт нэмэх тоо:', '10');
-                                      if (amount && !isNaN(parseInt(amount))) {
-                                        const adjustments: Record<string, number> = {};
-                                        stores.forEach(store => {
-                                          adjustments[store.id] = getStoreInventory(variant.id, store.id) + parseInt(amount);
-                                        });
-                                        bulkAdjustInventory(variant.id, adjustments);
-                                      }
-                                    }}
-                                    className="text-xs px-3 py-1 bg-green-100 text-green-700 rounded border border-green-200 hover:bg-green-200 transition-colors font-medium"
-                                    disabled={inventoryLoading}
-                                  >
-                                    + Бүгдэд нэмэх
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const amount = prompt('Бүх салбараас хасах тоо:', '1');
-                                      if (amount && !isNaN(parseInt(amount))) {
-                                        const adjustments: Record<string, number> = {};
-                                        stores.forEach(store => {
-                                          const current = getStoreInventory(variant.id, store.id);
-                                          adjustments[store.id] = Math.max(0, current - parseInt(amount));
-                                        });
-                                        bulkAdjustInventory(variant.id, adjustments);
-                                      }
-                                    }}
-                                    className="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded border border-orange-200 hover:bg-orange-200 transition-colors font-medium"
-                                    disabled={inventoryLoading}
-                                  >
-                                    - Бүгдээс хасах
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm('Бүх салбарын үлдэгдлийг 0 болгох уу?')) {
-                                        const adjustments: Record<string, number> = {};
-                                        stores.forEach(store => {
-                                          adjustments[store.id] = 0;
-                                        });
-                                        bulkAdjustInventory(variant.id, adjustments);
-                                      }
-                                    }}
-                                    className="text-xs px-3 py-1 bg-red-100 text-red-700 rounded border border-red-200 hover:bg-red-200 transition-colors font-medium"
-                                    disabled={inventoryLoading}
-                                  >
-                                    Бүгдийг 0 болгох
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const amount = prompt('Бүх салбарт тохируулах тоо:', '50');
-                                      if (amount && !isNaN(parseInt(amount))) {
-                                        const adjustments: Record<string, number> = {};
-                                        stores.forEach(store => {
-                                          adjustments[store.id] = parseInt(amount);
-                                        });
-                                        bulkAdjustInventory(variant.id, adjustments);
-                                      }
-                                    }}
-                                    className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded border border-blue-200 hover:bg-blue-200 transition-colors font-medium"
-                                    disabled={inventoryLoading}
-                                  >
-                                    = Бүгдийг тохируулах
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                            {/* Variant Name (auto-generated or manual) */}
-                            <div className="mt-3 pt-2 border-t border-[#f0f0f0]">
-                              <div className="text-xs text-[#6b6b6b] mb-1">
-                                Хувилбарын нэр:
-                              </div>
-                              <input
-                                type="text"
-                                value={variant.name || ""}
-                                onChange={(e) =>
-                                  updateVariant(index, "name", e.target.value)
-                                }
-                                className="w-full px-2 py-1 border border-[#e6e6e6] rounded text-sm bg-white focus:outline-none focus:border-[#bcd0ff]"
-                                placeholder="Хувилбарын нэр (жишээ: Хар / XL)"
-                              />
-                            </div>
-
-                            {/* Creation date */}
-                            <div className="mt-2 pt-2 border-t border-[#f0f0f0] text-xs text-[#9aa0a6]">
-                              Үүсгэсэн:{" "}
-                              {new Date(variant.created_at).toLocaleDateString(
-                                "mn-MN"
-                              )}
-                            </div>
+                            )}
                           </div>
-                        ))}
+                        );
+                        })}
                       </div>
                     )}
                   </section>
@@ -1650,10 +1745,10 @@ export default function ProductDetailPage() {
 
                 {/* Add Variant Button (when no variants exist) */}
                 {variants.length === 0 && isEditing && (
-                  <section className="bg-white rounded-xl shadow-sm p-8 border border-gray-200 text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+                  <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg p-8 border-2 border-dashed border-green-300 text-center">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center animate-pulse">
                       <svg
-                        className="w-8 h-8 text-blue-600"
+                        className="w-10 h-10 text-green-600"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1666,56 +1761,25 @@ export default function ProductDetailPage() {
                         />
                       </svg>
                     </div>
-                    <div className="text-lg font-medium text-gray-600 mb-4">
-                      Хувилбар байхгүй байна
+                    <div className="text-xl font-semibold text-green-800 mb-2">
+                      🆕 Анхны хувилбар үүсгэх
+                    </div>
+                    <div className="text-green-600 mb-6">
+                      Энэ барааны анхны хувилбарыг үүсгэн эхлүүлэх
                     </div>
                     <button
                       onClick={addVariant}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium shadow-sm"
+                      className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 mx-auto"
                     >
-                      Анхны хувилбар үүсгэх
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      ⭐ Анхны хувилбар үүсгэх
                     </button>
                   </section>
                 )}
 
-                {/* Debug Section - Collapsible */}
-                {data && (
-                  <details className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <summary className="cursor-pointer p-4 text-base font-medium text-gray-700 hover:text-gray-900 transition-colors bg-gray-50 hover:bg-gray-100">
-                      🔍 Debug: API Response (Click to expand)
-                    </summary>
-                    <div className="p-4 border-t border-gray-200">
-                      <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-4">
-                        <div className="font-semibold mb-3 text-gray-800">
-                          Product Data:
-                        </div>
-                        <pre className="text-gray-600 overflow-auto max-h-40 text-sm font-mono bg-white p-3 rounded border">
-                          {JSON.stringify(data, null, 2)}
-                        </pre>
-                      </div>
-                      {categories.length > 0 && (
-                        <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg mb-4">
-                          <div className="font-semibold mb-3 text-gray-800">
-                            Categories:
-                          </div>
-                          <pre className="text-gray-600 overflow-auto max-h-32 text-sm font-mono bg-white p-3 rounded border">
-                            {JSON.stringify(categories, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                      {inventoryData.length > 0 && (
-                        <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
-                          <div className="font-semibold mb-3 text-gray-800">
-                            Inventory Data:
-                          </div>
-                          <pre className="text-gray-600 overflow-auto max-h-32 text-sm font-mono bg-white p-3 rounded border">
-                            {JSON.stringify(inventoryData, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </details>
-                )}
+
               </div>
             )}
           </main>

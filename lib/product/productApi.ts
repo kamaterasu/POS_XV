@@ -1,8 +1,3 @@
-// =============================================
-// FILE: lib/product/productApi.ts
-// Product/Inventory Edge Function helpers (Supabase)
-// =============================================
-
 import { jwtDecode } from "jwt-decode";
 
 export type VariantInput = {
@@ -61,7 +56,6 @@ export async function getProductByStore(
   url.searchParams.set("tenant_id", tenant_id);
   url.searchParams.set("scope", "store");
   url.searchParams.set("store_id", storeId);
-  url.searchParams.set("limit", String(limit));
   const res = await fetch(url.toString(), {
     method: "GET",
     headers: {
@@ -70,6 +64,7 @@ export async function getProductByStore(
     },
   });
   assertOk(res);
+  console.log("Store inventory response:", res);
   return res.json();
 }
 
@@ -79,7 +74,7 @@ export async function getInventoryGlobal(token: string, limit = 500) {
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/inventory`
   );
   url.searchParams.set("tenant_id", tenant_id);
-  url.searchParams.set("scope", "global");
+  url.searchParams.set("scope", "store");
   url.searchParams.set("limit", String(limit));
   const res = await fetch(url.toString(), {
     method: "GET",
