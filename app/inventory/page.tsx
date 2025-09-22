@@ -11,7 +11,11 @@ import ProductCreateForm, {
 } from "@/components/inventoryComponents/ProductCreateForm";
 import { getAccessToken } from "@/lib/helper/getAccessToken";
 import { getTenantId } from "@/lib/helper/getTenantId";
-import { getUserRole, canAccessFeature, type Role } from "@/lib/helper/getUserRole";
+import {
+  getUserRole,
+  canAccessFeature,
+  type Role,
+} from "@/lib/helper/getUserRole";
 import { productAddToInventory } from "@/lib/inventory/inventoryApi";
 import {
   getProductByStore,
@@ -19,6 +23,7 @@ import {
   getInventoryGlobal,
   updateProduct,
   getProductsForModal,
+  getProduct,
 } from "@/lib/product/productApi";
 import { getStore } from "@/lib/store/storeApi";
 import { getImageShowUrl } from "@/lib/product/productImages";
@@ -169,9 +174,9 @@ async function resolveImageUrl(raw?: string): Promise<string | undefined> {
   if (imgUrlCache.has(path)) return imgUrlCache.get(path)!;
 
   try {
-    const signed = await getImageShowUrl(path, { 
+    const signed = await getImageShowUrl(path, {
       fallback: "/default.png", // Default зураг
-      preferPublic: true 
+      preferPublic: true,
     });
     imgUrlCache.set(path, signed);
     return signed;
@@ -349,6 +354,12 @@ export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showOutOfStock, setShowOutOfStock] = useState(false);
   const [showReturned, setShowReturned] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [itemsPerPage] = useState(50); // Fixed items per page
 
   // Edit modal state
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -447,140 +458,226 @@ export default function InventoryPage() {
   }, []);
 
   // 3) Бараа (+ зураг бүрийн signed URL)
-  useEffect(() => {
-    let alive = true;
+  const loadProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      const token = await getAccessToken();
+      if (!token) {
+        addToast("error", "Алдаа", "Нэвтрэх эрх шаардлагатай");
+        throw new Error("no token");
+      }
 
-    (async () => {
-      try {
-        setLoadingProducts(true);
-        const token = await getAccessToken();
-        if (!token) throw new Error("no token");
+      let arr: Product[] = [];
 
-        let arr: Product[] = [];
-        if (selectedCat?.id) {
-          // Категори сонгосон үед: тухайн категорийн (subtree=true) барааг API-аас авч үзүүлнэ
-          const raw = await getProductByCategory(token, selectedCat.id);
+      if (selectedCat?.id) {
+        // Category selected: fetch products in that category (with subtree)
+        const raw = await getProductByCategory(token, selectedCat.id);
+        const rawProducts = toArray(raw, ["items", "products", "data"]);
 
-          arr = toArray(raw, ["items", "products", "data"])
-            .map(mapCategoryProduct) // Use category product mapper
-            .filter(Boolean) as Product[];
-        } else if (storeId === "all") {
-          // For "all" stores, we can either:
-          // 1. Use global scope (if user is OWNER) - aggregated inventory
-          // 2. Fetch from each store individually
-          try {
-            // Try global scope first
-            const globalRaw = await getInventoryGlobal(token);
-            const globalItems = toArray(globalRaw, ["items", "data"])
-              .map(mapInventoryItem)
-              .filter(Boolean) as Product[];
-            arr = globalItems;
-          } catch (globalError) {
-
-            // Fallback: fetch from each store individually
-            const merged: Product[] = [];
-            for (const s of stores) {
-              if (s.id === "all") continue;
-              try {
-                const raw = await getProductByStore(token, s.id);
-                const items = toArray(raw, ["items", "data"])
-                  .map(mapInventoryItem)
-                  .filter(Boolean) as Product[];
-                merged.push(...items);
-              } catch (storeError) {
-                console.error(
-                  `Failed to fetch inventory for store ${s.id}:`,
-                  storeError
-                );
-              }
-            }
-            arr = merged;
-          }
-        } else {
-          // Single store
-          const raw = await getProductByStore(token, storeId);
-          arr = toArray(raw, ["items", "data"])
-            .map(mapInventoryItem)
-            .filter(Boolean) as Product[];
+        if (rawProducts.length === 0) {
+          addToast(
+            "info",
+            "Мэдээлэл",
+            `"${selectedCat.name}" ангилалд бараа олдсонгүй`
+          );
         }
 
-        // signed URL-уудаа тооцоолж products-д шингээнэ
-        const withUrls = await Promise.all(
-          arr.map(async (p) => ({
-            ...p,
-            imgUrl: await resolveImageUrl(p.img),
-          }))
-        );
+        arr = rawProducts.map(mapCategoryProduct).filter(Boolean) as Product[];
+      } else {
+        // Use the product API to get all products directly
+        const params = {
+          search: searchQuery.trim() || undefined,
+          limit: itemsPerPage,
+          offset: (currentPage - 1) * itemsPerPage
+        };
+        
+        const raw = await getProduct(token, params);
+        const rawProducts = toArray(raw, ["items", "products", "data"]);
+        
+        // Update total count for pagination
+        const count = raw?.count ?? rawProducts.length;
+        setTotalCount(count);
 
-        if (!alive) return;
-        setProducts(withUrls);
-      } catch (e) {
-        console.error("Failed to fetch inventory:", e);
-        setProducts([]);
-      } finally {
-        if (alive) setLoadingProducts(false);
+        // Map products from product API - handle both single products and products with variants
+        arr = rawProducts.map((product: any): Product | null => {
+          if (!product?.id) return null;
+
+          // Check if this is a direct product or product with variants
+          const isDirectProduct = !product.variants || product.variants.length === 0;
+          
+          if (isDirectProduct) {
+            return {
+              id: String(product.id),
+              variantId: String(product.id), // Use product ID as variant ID for products without variants
+              name: product.name || "(нэргүй)",
+              variantName: undefined,
+              qty: product.qty ?? 0, // Use qty if provided
+              code: product.sku || undefined,
+              storeId: product.store_id ? String(product.store_id) : undefined,
+              img: product.img || undefined,
+              price: product.price || 0,
+            };
+          } else {
+            // For products with variants, create entries for each variant
+            // For now, we'll just show the main product - variants can be handled in detail view
+            return {
+              id: String(product.id),
+              variantId: String(product.id),
+              name: product.name || "(нэргүй)",
+              variantName: `${product.variants.length} хувилбартай`,
+              qty: product.variants.reduce((sum: number, v: any) => sum + (v.qty || 0), 0),
+              code: product.variants[0]?.sku || undefined, // Show first variant's SKU
+              storeId: product.store_id ? String(product.store_id) : undefined,
+              img: product.img || undefined,
+              price: product.variants[0]?.price || 0, // Show first variant's price
+            };
+          }
+        }).filter(Boolean) as Product[];
+
+        if (arr.length === 0 && searchQuery.trim()) {
+          addToast(
+            "info",
+            "Мэдээлэл",
+            `"${searchQuery}" хайлтад тохирох бараа олдсонгүй`
+          );
+        }
       }
-    })();
-    return () => {
-      alive = false;
+
+      // Load image URLs efficiently
+      const withUrls = await Promise.all(
+        arr.map(async (p) => ({
+          ...p,
+          imgUrl: await resolveImageUrl(p.img),
+        }))
+      );
+
+      setProducts(withUrls);
+
+      // Show success message for large datasets
+      if (withUrls.length > 50) {
+        addToast(
+          "success",
+          "Амжилт",
+          `${withUrls.length} бараа амжилттай ачааллаа`
+        );
+      }
+    } catch (e) {
+      console.error("Failed to fetch products:", e);
+      const errorMsg = e instanceof Error ? e.message : "Тодорхойгүй алдаа";
+      addToast(
+        "error",
+        "Алдаа",
+        `Барааны мэдээлэл татахад алдаа гарлаа: ${errorMsg}`
+      );
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, [storeId, stores, selectedCat?.id, searchQuery, currentPage]);
+
+  // Reset page when search or category changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCat?.id]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    
+    setSearchLoading(true);
+    const timeoutId = setTimeout(() => {
+      setSearchLoading(false);
+    }, 1000); // Show loading for 1 second after search
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // Keyboard shortcuts for better user experience
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      // Escape key to clear filters
+      if (e.key === "Escape") {
+        if (searchQuery || selectedCat || showOutOfStock || showReturned) {
+          setSearchQuery("");
+          setSelectedCat(null);
+          setShowOutOfStock(false);
+          setShowReturned(false);
+          addToast("info", "Мэдээлэл", "Бүх шүүлт арилгагдлаа");
+        }
+      }
+      // Ctrl+K or Cmd+K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        const searchInput = document.querySelector(
+          'input[placeholder*="Бараа хайх"]'
+        ) as HTMLInputElement;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
     };
-  }, [storeId, stores, selectedCat?.id]);
+
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  }, [searchQuery, selectedCat, showOutOfStock, showReturned]);
 
   const mergedProducts = useMemo(() => {
+    if (products.length === 0) return [];
+
     let filtered = products;
 
-    // Filter by store
+    // Filter by store first (most selective)
     if (storeId !== "all") {
       filtered = filtered.filter((p) => String(p.storeId) === storeId);
     } else {
-      // For "all" stores, we need to handle variants properly
-      const map = new Map<string, Product & { qty: number }>();
+      // For "all" stores, merge variants by ID to avoid duplicates
+      const variantMap = new Map<string, Product & { qty: number }>();
 
       for (const p of filtered) {
         if (!p.variantId) continue;
 
         const key = p.variantId;
-        const prev = map.get(key);
+        const existing = variantMap.get(key);
 
-        if (prev) {
+        if (existing) {
           // Same variant from different stores - sum quantities
-          map.set(key, {
-            ...prev,
-            qty: (prev.qty ?? 0) + (p.qty ?? 0),
-          });
+          existing.qty = (existing.qty ?? 0) + (p.qty ?? 0);
         } else {
           // New variant
-          map.set(key, {
-            ...p,
-            qty: p.qty ?? 0,
-          });
+          variantMap.set(key, { ...p, qty: p.qty ?? 0 });
         }
       }
-      filtered = Array.from(map.values());
+      filtered = Array.from(variantMap.values());
     }
 
-    // Filter by search query
+    // Apply search filter (case-insensitive, multiple fields)
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query) ||
-          p.code?.toLowerCase().includes(query) ||
-          p.variantName?.toLowerCase().includes(query)
-      );
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((p) => {
+        const nameMatch = p.name.toLowerCase().includes(query);
+        const codeMatch = p.code?.toLowerCase().includes(query);
+        const variantMatch = p.variantName?.toLowerCase().includes(query);
+        return nameMatch || codeMatch || variantMatch;
+      });
     }
 
-    // Filter by stock status
+    // Apply stock status filter
     if (showOutOfStock) {
       filtered = filtered.filter((p) => (p.qty ?? 0) === 0);
     }
 
-    // Filter by return status
+    // Apply return status filter
     if (showReturned) {
       filtered = filtered.filter((p) => (p.returnCount ?? 0) > 0);
     }
 
-    return filtered;
+    // Sort by name for consistent ordering
+    return filtered.sort((a, b) => a.name.localeCompare(b.name, "mn-MN"));
   }, [products, storeId, searchQuery, showOutOfStock, showReturned]);
 
   const handleBack = () => router.back();
@@ -597,11 +694,28 @@ export default function InventoryPage() {
 
     // Check user permission
     if (!canAccessFeature(userRole, "createProduct")) {
-      addToast("error", "Хандалт хориглогдсон", "Таны эрх бараа нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай.");
+      addToast(
+        "error",
+        "Хандалт хориглогдсон",
+        "Таны эрх бараа нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай."
+      );
       return;
     }
 
     setShowCreate(true);
+  };
+
+  const handleProductCreated = () => {
+    console.log("handleProductCreated called - refreshing product list");
+    // Close the modal
+    setShowCreate(false);
+    // Show success message immediately
+    addToast("success", "Амжилт", "Бүтээгдэхүүн амжилттай нэмэгдлээ");
+    // Refresh the product list with a delay to ensure backend consistency
+    setTimeout(() => {
+      console.log("Refreshing product list after product creation...");
+      loadProducts();
+    }, 2000); // Increased to 2 seconds to allow for backend processing
   };
 
   // --------- Create Category/Subcategory handlers ----------
@@ -612,8 +726,6 @@ export default function InventoryPage() {
   };
 
   const handleOpenAddSub = () => {
-
-
     setCatsOpen(true);
     setShowAddSub(true);
     setShowAddCat(false);
@@ -630,7 +742,11 @@ export default function InventoryPage() {
 
     // Check user permission
     if (!canAccessFeature(userRole, "createCategory")) {
-      addToast("error", "Хандалт хориглогдсон", "Таны эрх ангилал нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай.");
+      addToast(
+        "error",
+        "Хандалт хориглогдсон",
+        "Таны эрх ангилал нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай."
+      );
       return;
     }
 
@@ -669,7 +785,11 @@ export default function InventoryPage() {
 
     // Check user permission
     if (!canAccessFeature(userRole, "createCategory")) {
-      addToast("error", "Хандалт хориглогдсон", "Таны эрх дэд ангилал нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай.");
+      addToast(
+        "error",
+        "Хандалт хориглогдсон",
+        "Таны эрх дэд ангилал нэмэх боломжийг олгохгүй байна. Admin эсвэл Manager эрх шаардлагатай."
+      );
       return;
     }
     try {
@@ -728,7 +848,7 @@ export default function InventoryPage() {
 
       const products = Array.isArray(response?.items) ? response.items : [];
       const product = products.find((p: any) => p.id === productId);
-      
+
       if (product?.variants) {
         setProductVariants(product.variants);
       } else {
@@ -770,16 +890,19 @@ export default function InventoryPage() {
       const token = await getAccessToken();
 
       // Get the target variant
-      const targetVariantId = editForm.selectedVariantId || editingProduct.variantId;
+      const targetVariantId =
+        editForm.selectedVariantId || editingProduct.variantId;
       if (!targetVariantId) {
         addToast("error", "Алдаа", "Хувилбар сонгоно уу!");
         return;
       }
 
       // Get current quantity for the selected variant
-      const currentQty = productVariants.length > 1 && editForm.selectedVariantId
-        ? productVariants.find(v => v.id === editForm.selectedVariantId)?.qty || 0
-        : editingProduct.qty || 0;
+      const currentQty =
+        productVariants.length > 1 && editForm.selectedVariantId
+          ? productVariants.find((v) => v.id === editForm.selectedVariantId)
+              ?.qty || 0
+          : editingProduct.qty || 0;
 
       // Add inventory
       const response = await productAddToInventory(token, {
@@ -787,38 +910,44 @@ export default function InventoryPage() {
         variant_id: targetVariantId,
         delta: addQuantity,
         reason: "ADJUSTMENT",
-        note: `Бараа нэмэх: ${addQuantity} ширхэг`
+        note: `Бараа нэмэх: ${addQuantity} ширхэг`,
       });
 
       if (response.movement) {
         // Update local state
         const newQty = currentQty + addQuantity;
-        
+
         if (productVariants.length > 1 && editForm.selectedVariantId) {
           // Update the specific variant in productVariants
-          setProductVariants(prev => 
-            prev.map(v => 
-              v.id === editForm.selectedVariantId 
-                ? { ...v, qty: newQty }
-                : v
+          setProductVariants((prev) =>
+            prev.map((v) =>
+              v.id === editForm.selectedVariantId ? { ...v, qty: newQty } : v
             )
           );
         }
 
         // Update the edit form
-        setEditForm(prev => ({
+        setEditForm((prev) => ({
           ...prev,
-          quantity: newQty
+          quantity: newQty,
         }));
 
         // Show success message
-        const selectedVariant = productVariants.find(v => v.id === editForm.selectedVariantId);
-        const variantInfo = selectedVariant 
-          ? `(${selectedVariant.attrs?.color || ''} ${selectedVariant.attrs?.size || ''})`.trim()
-          : '';
-        
-        addToast("success", "Амжилттай", `${addQuantity} ширхэг бараа нэмэгдлээ ${variantInfo}`);
-        
+        const selectedVariant = productVariants.find(
+          (v) => v.id === editForm.selectedVariantId
+        );
+        const variantInfo = selectedVariant
+          ? `(${selectedVariant.attrs?.color || ""} ${
+              selectedVariant.attrs?.size || ""
+            })`.trim()
+          : "";
+
+        addToast(
+          "success",
+          "Амжилттай",
+          `${addQuantity} ширхэг бараа нэмэгдлээ ${variantInfo}`
+        );
+
         // Refresh products list
         window.location.reload();
       } else {
@@ -840,23 +969,38 @@ export default function InventoryPage() {
       const token = await getAccessToken();
 
       // Determine which variant to use for inventory adjustment
-      const targetVariantId = editForm.selectedVariantId || editingProduct.variantId;
-      const currentQty = productVariants.length > 1 && editForm.selectedVariantId
-        ? productVariants.find(v => v.id === editForm.selectedVariantId)?.qty || 0
-        : editingProduct.qty || 0;
+      const targetVariantId =
+        editForm.selectedVariantId || editingProduct.variantId;
+      const currentQty =
+        productVariants.length > 1 && editForm.selectedVariantId
+          ? productVariants.find((v) => v.id === editForm.selectedVariantId)
+              ?.qty || 0
+          : editingProduct.qty || 0;
 
       // Check if quantity has changed and user has permission
       const quantityChanged = editForm.quantity !== currentQty;
       const canEditQuantity = canAccessFeature(userRole, "inventory");
-      
+
       if (quantityChanged && !canEditQuantity) {
-        addToast("error", "Хандалт хориглогдсон", "Таны эрх үлдэгдэл өөрчлөх боломжийг олгохгүй байна.");
+        addToast(
+          "error",
+          "Хандалт хориглогдсон",
+          "Таны эрх үлдэгдэл өөрчлөх боломжийг олгохгүй байна."
+        );
         return;
       }
 
       // Validate variant selection for multi-variant products
-      if (productVariants.length > 1 && quantityChanged && !editForm.selectedVariantId) {
-        addToast("error", "Алдаа", "Олон хувилбартай бараанд хувилбар сонгоно уу");
+      if (
+        productVariants.length > 1 &&
+        quantityChanged &&
+        !editForm.selectedVariantId
+      ) {
+        addToast(
+          "error",
+          "Алдаа",
+          "Олон хувилбартай бараанд хувилбар сонгоно уу"
+        );
         return;
       }
 
@@ -892,15 +1036,24 @@ export default function InventoryPage() {
         if (delta !== 0) {
           try {
             // Use current selected store or default to the product's store
-            const adjustmentStoreId = storeId !== "all" ? storeId : editingProduct.storeId;
-            
+            const adjustmentStoreId =
+              storeId !== "all" ? storeId : editingProduct.storeId;
+
             if (!adjustmentStoreId) {
-              addToast("warning", "Анхaaруулга", "Бараа шинэчлэгдсэн боловч үлдэгдэл өөрчлөгдөөгүй. Салбар тодорхойгүй.");
+              addToast(
+                "warning",
+                "Анхaaруулга",
+                "Бараа шинэчлэгдсэн боловч үлдэгдэл өөрчлөгдөөгүй. Салбар тодорхойгүй."
+              );
             } else {
-              const selectedVariant = productVariants.find(v => v.id === editForm.selectedVariantId);
-              const variantInfo = selectedVariant 
-                ? `(${selectedVariant.attrs?.color || ''} ${selectedVariant.attrs?.size || ''})`.trim()
-                : '';
+              const selectedVariant = productVariants.find(
+                (v) => v.id === editForm.selectedVariantId
+              );
+              const variantInfo = selectedVariant
+                ? `(${selectedVariant.attrs?.color || ""} ${
+                    selectedVariant.attrs?.size || ""
+                  })`.trim()
+                : "";
 
               await productAddToInventory(token, {
                 variant_id: targetVariantId,
@@ -909,11 +1062,23 @@ export default function InventoryPage() {
                 reason: "ADJUSTMENT",
                 note: `Manual inventory adjustment via product edit ${variantInfo}. Changed from ${currentQty} to ${newQty}`,
               });
-              
-              addToast("success", "Амжилттай", `Бараа болон үлдэгдэл амжилттай шинэчлэгдлээ! ${variantInfo} (${delta > 0 ? '+' : ''}${delta})`);
+
+              addToast(
+                "success",
+                "Амжилттай",
+                `Бараа болон үлдэгдэл амжилттай шинэчлэгдлээ! ${variantInfo} (${
+                  delta > 0 ? "+" : ""
+                }${delta})`
+              );
             }
           } catch (inventoryError: any) {
-            addToast("warning", "Анхааруулга", `Бараа шинэчлэгдсэн боловч үлдэгдэл өөрчлөгдөөгүй: ${inventoryError?.message || inventoryError}`);
+            addToast(
+              "warning",
+              "Анхааруулга",
+              `Бараа шинэчлэгдсэн боловч үлдэгдэл өөрчлөгдөөгүй: ${
+                inventoryError?.message || inventoryError
+              }`
+            );
           }
         } else {
           addToast("success", "Амжилттай", "Амжилттай шинэчлэгдлээ!");
@@ -925,10 +1090,9 @@ export default function InventoryPage() {
       setEditingProduct(null);
       setProductVariants([]);
       setLoadingVariants(false);
-      
+
       // Refresh products
       window.location.reload();
-      
     } catch (e: any) {
       addToast("error", "Алдаа", `Алдаа гарлаа: ${e?.message ?? e}`);
     } finally {
@@ -1000,6 +1164,32 @@ export default function InventoryPage() {
 
             {/* Primary Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Refresh Button */}
+              <button
+                onClick={() => {
+                  console.log("Manual refresh triggered");
+                  loadProducts();
+                }}
+                disabled={loadingProducts}
+                className="h-11 px-3 sm:px-4 rounded-xl bg-white border border-slate-200 text-sm shadow-sm hover:shadow-md hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium text-slate-700 disabled:opacity-50"
+                title="Жагсаалтыг шинэчлэх"
+              >
+                <svg
+                  className={`w-4 h-4 ${loadingProducts ? "animate-spin" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Шинэчлэх</span>
+              </button>
+
               {canAccessFeature(userRole, "createProduct") && (
                 <button
                   onClick={handleAddProduct}
@@ -1070,28 +1260,35 @@ export default function InventoryPage() {
                 placeholder="Бараа хайх... (нэр, код, SKU)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 w-full pl-10 pr-10 rounded-xl border border-slate-200 bg-white text-sm shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
+                className="h-12 w-full pl-12 pr-12 rounded-xl border border-slate-200 bg-white text-sm shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
+                autoComplete="off"
               />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                {searchLoading && (
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                )}
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all duration-200"
+                    title="Хайлт арилгах"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              )}
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Quick Filters - Responsive */}
@@ -1202,29 +1399,12 @@ export default function InventoryPage() {
           </div>
 
           {/* Active Filters Display */}
-          {(selectedCat || searchQuery) && (
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-              <span className="text-sm text-slate-500">Идэвхтэй шүүлт:</span>
-              {selectedCat && (
-                <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                    />
-                  </svg>
-                  {selectedCat.name}
-                  <button
-                    onClick={() => setSelectedCat(null)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
+          {(selectedCat || searchQuery || showOutOfStock || showReturned) && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-slate-500">Идэвхтэй шүүлт:</span>
+                {selectedCat && (
+                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
                     <svg
                       className="w-3 h-3"
                       fill="none"
@@ -1235,32 +1415,32 @@ export default function InventoryPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
+                        d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
                       />
                     </svg>
-                  </button>
-                </div>
-              )}
-              {searchQuery && (
-                <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                  "{searchQuery}"
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="text-green-600 hover:text-green-800"
-                  >
+                    {selectedCat.name}
+                    <button
+                      onClick={() => setSelectedCat(null)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {searchQuery && (
+                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                     <svg
                       className="w-3 h-3"
                       fill="none"
@@ -1271,12 +1451,87 @@ export default function InventoryPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                       />
                     </svg>
-                  </button>
-                </div>
-              )}
+                    "{searchQuery}"
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="text-green-600 hover:text-green-800"
+                    >
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {showOutOfStock && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                    Дууссан бараа
+                    <button
+                      onClick={() => setShowOutOfStock(false)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                {showReturned && (
+                  <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                    Буцаалттай бараа
+                    <button
+                      onClick={() => setShowReturned(false)}
+                      className="text-orange-600 hover:text-orange-800"
+                    >
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Results Summary */}
+              <div className="text-sm text-slate-500 font-medium">
+                {totalCount > 0 && (
+                  <span>
+                    {totalCount} барааны {mergedProducts.length} харуулж байна
+                    {currentPage > 1 && ` (хуудас ${currentPage})`}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1584,36 +1839,6 @@ export default function InventoryPage() {
               {/* Modal Body - Scrollable */}
               <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
                 <div className="p-6">
-                  {/* Info Banner */}
-                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                        <svg
-                          className="w-4 h-4 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-blue-900">
-                          Хурдан бараа нэмэх
-                        </h4>
-                        <p className="text-sm text-blue-700">
-                          Зөвхөн үндсэн мэдээлэл оруулж бараа нэмэх боломжтой.
-                          Дэлгэрэнгүй мэдээллийг дараа засах боломжтой.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Embedded Form */}
                   <div className="space-y-6">
                     <ProductCreateForm
@@ -1623,6 +1848,8 @@ export default function InventoryPage() {
                       qty={
                         products.find((p) => p.storeId === storeId)?.qty ?? 1
                       }
+                      onSuccess={handleProductCreated}
+                      currentStoreId={storeId}
                     />
                   </div>
                 </div>
@@ -1636,9 +1863,6 @@ export default function InventoryPage() {
                 >
                   Цуцлах
                 </button>
-                <div className="text-sm text-slate-500 flex items-center px-3">
-                  Хадгалах товчийг формын доор дарна уу
-                </div>
               </div>
             </div>
           </div>
@@ -1663,9 +1887,11 @@ export default function InventoryPage() {
               </svg>
             </div>
             <div className="text-3xl font-bold text-slate-800 mb-1">
-              {mergedProducts.length}
+              {totalCount > 0 ? totalCount : mergedProducts.length}
             </div>
-            <div className="text-sm text-slate-500 font-medium">Нийт бараа</div>
+            <div className="text-sm text-slate-500 font-medium">
+              {totalCount > itemsPerPage ? `Нийт бараа (${mergedProducts.length} харуулж байна)` : "Нийт бараа"}
+            </div>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-lg shadow-slate-100/50 hover:shadow-xl hover:shadow-slate-100/60 transition-all duration-300">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center mx-auto mb-3">
@@ -1737,6 +1963,52 @@ export default function InventoryPage() {
             <div className="text-sm text-slate-500 font-medium">Дууссан</div>
           </div>
         </div>
+
+        {/* Quick Actions Bar */}
+        {!loadingProducts && mergedProducts.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <h3 className="font-medium text-slate-700">Хурдан үйлдлүүд:</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedCat(null);
+                      setShowOutOfStock(false);
+                      setShowReturned(false);
+                    }}
+                    className="px-3 py-1.5 text-xs bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                  >
+                    Бүх шүүлт арилгах
+                  </button>
+                  <button
+                    onClick={() => setShowOutOfStock(true)}
+                    className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                  >
+                    Дууссан бараа
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  >
+                    Хэвлэх
+                  </button>
+                </div>
+              </div>
+              <div className="text-sm text-slate-500">
+                <kbd className="px-2 py-1 text-xs bg-slate-100 rounded">
+                  Ctrl+K
+                </kbd>{" "}
+                хайлт,
+                <kbd className="px-2 py-1 text-xs bg-slate-100 rounded ml-1">
+                  Esc
+                </kbd>{" "}
+                арилгах
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Enhanced Product List */}
         <div className="rounded-2xl bg-white border border-slate-200 shadow-lg shadow-slate-100/50 overflow-hidden">
@@ -1823,23 +2095,39 @@ export default function InventoryPage() {
           {/* Product List */}
           <div className="divide-y divide-slate-100">
             {loadingProducts ? (
-              <div className="p-6 space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-slate-50"
-                  >
-                    <Skeleton className="h-16 w-16 rounded-xl" />
-                    <div className="flex-1 space-y-3">
-                      <Skeleton className="h-5 w-3/4" />
-                      <div className="flex gap-4">
-                        <Skeleton className="h-4 w-20" />
-                        <Skeleton className="h-4 w-24" />
+              <div className="p-6">
+                {/* Loading header */}
+                <div className="flex items-center gap-3 mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+                  <span className="text-blue-700 font-medium">
+                    Барааны мэдээлэл ачааллаж байна...
+                  </span>
+                </div>
+
+                {/* Loading skeleton items */}
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 animate-pulse"
+                    >
+                      <Skeleton className="h-16 w-16 rounded-xl" />
+                      <div className="flex-1 space-y-3">
+                        <Skeleton className="h-5 w-3/4" />
+                        <div className="flex gap-4">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-16" />
+                        </div>
                       </div>
+                      <div className="text-right space-y-2">
+                        <Skeleton className="h-6 w-16 rounded-lg" />
+                        <Skeleton className="h-4 w-12 rounded" />
+                      </div>
+                      <Skeleton className="h-10 w-20 rounded-lg" />
                     </div>
-                    <Skeleton className="h-10 w-20 rounded-lg" />
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ) : mergedProducts.length === 0 ? (
               <div className="px-6 py-16 text-center">
@@ -2086,6 +2374,73 @@ export default function InventoryPage() {
               ))
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {totalCount > itemsPerPage && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+              <div className="text-sm text-slate-600">
+                <span className="font-medium">
+                  {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalCount)}
+                </span>
+                {' '}ийн <span className="font-medium">{totalCount}</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Өмнөх
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, Math.ceil(totalCount / itemsPerPage)) }, (_, i) => {
+                    const totalPages = Math.ceil(totalCount / itemsPerPage);
+                    let pageNum;
+                    
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`h-9 w-9 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          currentPage === pageNum
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(Math.min(Math.ceil(totalCount / itemsPerPage), currentPage + 1))}
+                  disabled={currentPage === Math.ceil(totalCount / itemsPerPage)}
+                  className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
+                >
+                  Дараах
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Enhanced Edit Modal */}
@@ -2290,86 +2645,101 @@ export default function InventoryPage() {
                   </div>
 
                   {/* Variant Selection - Only for Admin/Owner */}
-                  {canAccessFeature(userRole, "inventory") && productVariants.length > 1 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <span className="flex items-center gap-2">
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM7 21a4 4 0 004-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4"
-                            />
-                          </svg>
-                          Хувилбар сонгох
-                          <span className="text-yellow-600 text-xs">Admin/Owner</span>
-                        </span>
-                      </label>
-                      {loadingVariants ? (
-                        <div className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg">
-                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-sm text-gray-500">Хувилбарууд ачаалж байна...</span>
-                        </div>
-                      ) : (
-                        <select
-                          value={editForm.selectedVariantId}
-                          onChange={(e) => {
-                            const selectedVariant = productVariants.find(v => v.id === e.target.value);
-                            setEditForm((prev) => ({
-                              ...prev,
-                              selectedVariantId: e.target.value,
-                              quantity: selectedVariant?.qty || 0,
-                              price: selectedVariant?.price || prev.price,
-                              code: selectedVariant?.sku || prev.code,
-                            }));
-                          }}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                        >
-                          <option value="">Хувилбар сонгоно уу</option>
-                          {productVariants.map((variant) => {
-                            const variantLabel = [
-                              variant.attrs?.color && `Өнгө: ${variant.attrs.color}`,
-                              variant.attrs?.size && `Хэмжээ: ${variant.attrs.size}`,
-                              variant.sku && `SKU: ${variant.sku}`,
-                            ].filter(Boolean).join(", ") || `Хувилбар ${variant.id}`;
-                            
-                            return (
-                              <option key={variant.id} value={variant.id}>
-                                {variantLabel} (Үлдэгдэл: {variant.qty || 0})
-                              </option>
-                            );
-                          })}
-                        </select>
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        Олон хувилбартай бараанд тодорхой хувилбарын үлдэгдэл өөрчилнө
-                      </p>
-
-                      {/* Quick Add Buttons */}
-                      {editForm.selectedVariantId && (
-                        <div className="mt-3 flex gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-gray-700">Хурдан нэмэх:</span>
-                          {[1, 5, 10, 20, 50].map(qty => (
-                            <button
-                              key={qty}
-                              type="button"
-                              onClick={() => handleAddToVariant(qty)}
-                              disabled={updating}
-                              className="px-3 py-1 text-sm bg-green-100 text-green-700 border border-green-300 rounded-md hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  {canAccessFeature(userRole, "inventory") &&
+                    productVariants.length > 1 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          <span className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
                             >
-                              +{qty}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM7 21a4 4 0 004-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4"
+                              />
+                            </svg>
+                            Хувилбар сонгох
+                            <span className="text-yellow-600 text-xs">
+                              Admin/Owner
+                            </span>
+                          </span>
+                        </label>
+                        {loadingVariants ? (
+                          <div className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg">
+                            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-sm text-gray-500">
+                              Хувилбарууд ачаалж байна...
+                            </span>
+                          </div>
+                        ) : (
+                          <select
+                            value={editForm.selectedVariantId}
+                            onChange={(e) => {
+                              const selectedVariant = productVariants.find(
+                                (v) => v.id === e.target.value
+                              );
+                              setEditForm((prev) => ({
+                                ...prev,
+                                selectedVariantId: e.target.value,
+                                quantity: selectedVariant?.qty || 0,
+                                price: selectedVariant?.price || prev.price,
+                                code: selectedVariant?.sku || prev.code,
+                              }));
+                            }}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                          >
+                            <option value="">Хувилбар сонгоно уу</option>
+                            {productVariants.map((variant) => {
+                              const variantLabel =
+                                [
+                                  variant.attrs?.color &&
+                                    `Өнгө: ${variant.attrs.color}`,
+                                  variant.attrs?.size &&
+                                    `Хэмжээ: ${variant.attrs.size}`,
+                                  variant.sku && `SKU: ${variant.sku}`,
+                                ]
+                                  .filter(Boolean)
+                                  .join(", ") || `Хувилбар ${variant.id}`;
+
+                              return (
+                                <option key={variant.id} value={variant.id}>
+                                  {variantLabel} (Үлдэгдэл: {variant.qty || 0})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Олон хувилбартай бараанд тодорхой хувилбарын үлдэгдэл
+                          өөрчилнө
+                        </p>
+
+                        {/* Quick Add Buttons */}
+                        {editForm.selectedVariantId && (
+                          <div className="mt-3 flex gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-700">
+                              Хурдан нэмэх:
+                            </span>
+                            {[1, 5, 10, 20, 50].map((qty) => (
+                              <button
+                                key={qty}
+                                type="button"
+                                onClick={() => handleAddToVariant(qty)}
+                                disabled={updating}
+                                className="px-3 py-1 text-sm bg-green-100 text-green-700 border border-green-300 rounded-md hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                +{qty}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                   {/* Inventory Quantity - Only for Admin/Owner */}
                   {canAccessFeature(userRole, "inventory") && (
@@ -2389,8 +2759,14 @@ export default function InventoryPage() {
                               d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                             />
                           </svg>
-                          Үлдэгдэл ({storeId !== "all" ? stores.find(s => s.id === storeId)?.name : "Бүх салбар"})
-                          <span className="text-yellow-600 text-xs">Admin/Owner</span>
+                          Үлдэгдэл (
+                          {storeId !== "all"
+                            ? stores.find((s) => s.id === storeId)?.name
+                            : "Бүх салбар"}
+                          )
+                          <span className="text-yellow-600 text-xs">
+                            Admin/Owner
+                          </span>
                         </span>
                       </label>
                       <div className="flex items-center gap-2">
@@ -2407,16 +2783,24 @@ export default function InventoryPage() {
                           placeholder="0"
                           min="0"
                           step="1"
-                          disabled={productVariants.length > 1 && !editForm.selectedVariantId}
+                          disabled={
+                            productVariants.length > 1 &&
+                            !editForm.selectedVariantId
+                          }
                         />
                         <div className="text-sm text-gray-500">
-                          Одоо: {productVariants.length > 1 && editForm.selectedVariantId 
-                            ? productVariants.find(v => v.id === editForm.selectedVariantId)?.qty || 0
+                          Одоо:{" "}
+                          {productVariants.length > 1 &&
+                          editForm.selectedVariantId
+                            ? productVariants.find(
+                                (v) => v.id === editForm.selectedVariantId
+                              )?.qty || 0
                             : editingProduct?.qty || 0}
                         </div>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {productVariants.length > 1 && !editForm.selectedVariantId 
+                        {productVariants.length > 1 &&
+                        !editForm.selectedVariantId
                           ? "Эхлээд хувилбар сонгоно уу"
                           : "Зөвхөн Admin болон Owner эрхтэй хүмүүс үлдэгдэл өөрчилж болно"}
                       </p>

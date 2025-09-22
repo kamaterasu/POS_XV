@@ -61,6 +61,7 @@ export async function getProductByStore(
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
     },
   });
   assertOk(res);
@@ -81,6 +82,7 @@ export async function getInventoryGlobal(token: string, limit = 500) {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
     },
   });
   assertOk(res);
@@ -101,7 +103,10 @@ export async function getProduct(
   url.searchParams.set("search", params?.search ?? "");
   const res = await fetch(url.toString(), {
     method: "GET",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+    },
   });
   assertOk(res);
   return res.json();
@@ -144,6 +149,7 @@ export async function getProductByCategory(token: string, category_id: string) {
   url.searchParams.set("tenant_id", tenant_id);
   url.searchParams.set("category_id", category_id);
   url.searchParams.set("subtree", "true");
+  url.searchParams.set("limit", "500"); // Explicitly set high limit to show all products
   const res = await fetch(url.toString(), {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
@@ -519,7 +525,6 @@ export async function getProductVariantsByStore(
       firstProduct.variants &&
       Array.isArray(firstProduct.variants)
     ) {
-
       for (const product of data.items) {
         if (product.variants && Array.isArray(product.variants)) {
           for (const variant of product.variants) {

@@ -212,7 +212,6 @@ export default function CheckoutHistoryDialog({
               )}
             </div>
           )}
-
         </div>
 
         {/* Clean Content */}
