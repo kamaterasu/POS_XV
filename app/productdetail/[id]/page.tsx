@@ -219,9 +219,13 @@ export default function ProductDetailPage() {
               img: productResult.product.img || "",
             });
 
-            // Initialize variants
+            // Initialize variants with safe attrs handling
             if (productResult.variants) {
-              setVariants(productResult.variants);
+              const safeVariants = productResult.variants.map((variant: any) => ({
+                ...variant,
+                attrs: variant.attrs && typeof variant.attrs === 'object' ? variant.attrs : {},
+              }));
+              setVariants(safeVariants);
               
               // Fetch inventory data for this product
               setInventoryLoading(true);
@@ -239,9 +243,10 @@ export default function ProductDetailPage() {
                 });
                 setStoreInventory(inventoryMap);
                 
-                // Update variants with total qty
+                // Update variants with total qty and safe attrs
                 const updatedVariants = productResult.variants.map((variant: any) => ({
                   ...variant,
+                  attrs: variant.attrs && typeof variant.attrs === 'object' ? variant.attrs : {},
                   qty: inventoryItems
                     .filter(item => item.variant_id === variant.id)
                     .reduce((total, item) => total + item.qty, 0)
@@ -470,6 +475,8 @@ export default function ProductDetailPage() {
     setVariants([...variants, newVariant]);
   };
 
+
+
   const updateVariant = (
     index: number,
     field: keyof ProductVariant,
@@ -485,10 +492,17 @@ export default function ProductDetailPage() {
 
   const updateVariantAttr = (index: number, attrKey: string, value: string) => {
     const updatedVariants = [...variants];
+    const currentVariant = updatedVariants[index];
+    
+    // Ensure attrs object exists
+    if (!currentVariant.attrs || typeof currentVariant.attrs !== 'object') {
+      currentVariant.attrs = {};
+    }
+    
     updatedVariants[index] = {
-      ...updatedVariants[index],
+      ...currentVariant,
       attrs: {
-        ...updatedVariants[index].attrs,
+        ...currentVariant.attrs,
         [attrKey]: value,
       },
     };
@@ -519,6 +533,7 @@ export default function ProductDetailPage() {
     // First check the existing storeInventory state
     const existingQty = storeInventory[variantId]?.[storeId];
     if (existingQty !== undefined) {
+      console.log(`Store inventory found in state for ${variantId} at ${storeId}:`, existingQty);
       return existingQty;
     }
     
@@ -527,17 +542,20 @@ export default function ProductDetailPage() {
       const storeData = storeProductData.find(store => store.storeId === storeId);
       if (storeData?.data?.items) {
         const item = storeData.data.items.find((item: any) => item.variant_id === variantId);
-        return item?.qty || 0;
+        const qty = item?.qty || 0;
+        console.log(`Store inventory found in productData for ${variantId} at ${storeId}:`, qty);
+        return qty;
       }
     }
     
+    console.log(`No store inventory found for ${variantId} at ${storeId}`);
     return 0;
   };
 
   // Helper functions for variant selection
   const getUniqueColors = () => {
     const colors = variants
-      .map(v => v.attrs?.color)
+      .map(v => v.attrs?.color || "")
       .filter(color => color && color.trim() !== "")
       .filter((color, index, arr) => arr.indexOf(color) === index);
     return colors;
@@ -545,7 +563,7 @@ export default function ProductDetailPage() {
 
   const getUniqueSizes = () => {
     const sizes = variants
-      .map(v => v.attrs?.size)
+      .map(v => v.attrs?.size || "")
       .filter(size => size && size.trim() !== "")
       .filter((size, index, arr) => arr.indexOf(size) === index);
     return sizes;
@@ -553,15 +571,20 @@ export default function ProductDetailPage() {
 
   const getAvailableSizesForColor = (color: string) => {
     return variants
-      .filter(v => v.attrs?.color === color)
-      .map(v => v.attrs?.size)
+      .filter(v => (v.attrs?.color || "") === color)
+      .map(v => v.attrs?.size || "")
       .filter(size => size && size.trim() !== "");
   };
 
   const getSelectedVariant = () => {
+    // If no color/size attributes exist, return first variant
+    if (getUniqueColors().length === 0 && getUniqueSizes().length === 0) {
+      return variants[0] || null;
+    }
+    
     return variants.find(v => 
-      v.attrs?.color === selectedColor && v.attrs?.size === selectedSize
-    );
+      (v.attrs?.color || "") === selectedColor && (v.attrs?.size || "") === selectedSize
+    ) || null;
   };
 
   const isColorHexCode = (color: string) => {
@@ -572,8 +595,13 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (variants.length > 0 && !selectedColor && !selectedSize) {
       const firstVariant = variants[0];
-      if (firstVariant.attrs?.color) setSelectedColor(firstVariant.attrs.color);
-      if (firstVariant.attrs?.size) setSelectedSize(firstVariant.attrs.size);
+      // Only set if attributes exist and are not empty
+      if (firstVariant?.attrs?.color && firstVariant.attrs.color.trim() !== "") {
+        setSelectedColor(firstVariant.attrs.color);
+      }
+      if (firstVariant?.attrs?.size && firstVariant.attrs.size.trim() !== "") {
+        setSelectedSize(firstVariant.attrs.size);
+      }
     }
   }, [variants, selectedColor, selectedSize]);
 
@@ -1261,16 +1289,26 @@ export default function ProductDetailPage() {
                           )}
 
                           {/* Store Inventory for Selected Variant */}
-                          {selectedColor && selectedSize && stores.length > 0 && (() => {
+                          {(() => {
                             const selectedVariant = getSelectedVariant();
-                            return selectedVariant ? (
+                            const hasColorAndSize = getUniqueColors().length > 0 && getUniqueSizes().length > 0;
+                            
+                            // Show inventory if we have a selected variant OR if there's only one variant without color/size
+                            const shouldShowInventory = selectedVariant && stores.length > 0 && (
+                              (hasColorAndSize && selectedColor && selectedSize) || 
+                              (!hasColorAndSize && variants.length > 0)
+                            );
+                            
+                            return shouldShowInventory ? (
                               <div className="mt-4 pt-4 border-t border-gray-200">
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="text-sm font-medium text-gray-600">Салбарын үлдэгдэл:</div>
                                   <div className="flex items-center gap-3 text-sm">
-                                    <span className="text-gray-600">
-                                      {!isColorHexCode(selectedColor) && selectedColor} / {selectedSize}
-                                    </span>
+                                    {hasColorAndSize && selectedColor && selectedSize && (
+                                      <span className="text-gray-600">
+                                        {!isColorHexCode(selectedColor) && selectedColor} / {selectedSize}
+                                      </span>
+                                    )}
                                     <span className="font-medium text-green-600">
                                       ₮{selectedVariant.price.toLocaleString()}
                                     </span>
@@ -1282,20 +1320,20 @@ export default function ProductDetailPage() {
                                     const storeDisplayName = store.name === "Төв салбар" ? "Төв салбар" : `${store.name || `Салбар-${storeIndex + 1}`}`;
                                     
                                     return (
-                                      <div key={store.id} className="flex items-center justify-between py-2">
+                                      <div key={store.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
                                         <div className="flex items-center gap-2">
                                           <div className={`w-3 h-3 rounded-full ${
                                             qty > 0 ? "bg-green-500" : "bg-gray-400"
                                           }`}></div>
                                           <span className="text-sm font-medium text-gray-700">
-                                            {storeDisplayName}:
+                                            {storeDisplayName}
                                           </span>
                                         </div>
                                         <div className="text-right">
                                           <span className={`text-lg font-bold ${
                                             qty > 0 ? "text-blue-600" : "text-gray-400"
                                           }`}>
-                                            {qty}
+                                            {qty} ширхэг
                                           </span>
                                         </div>
                                       </div>
