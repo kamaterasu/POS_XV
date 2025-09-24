@@ -232,47 +232,59 @@ function CategoryNode({
   onSelect: (n: any) => void;
   selectedId?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true); // Дэд ангилалууд анхнаасаа нээлттэй харагдана
   const hasChildren = Array.isArray(node?.children) && node.children.length > 0;
   const selected = selectedId === node?.id;
 
   return (
     <li>
-      <div className="flex items-center gap-2 text-sm py-1">
+      <div className="flex items-center gap-3 text-sm py-2 px-2 rounded-lg hover:bg-slate-50 transition-colors">
         {hasChildren ? (
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="inline-flex w-5 justify-center select-none text-neutral-600 hover:text-neutral-900"
+            className="inline-flex w-5 h-5 items-center justify-center rounded hover:bg-slate-200 transition-colors text-slate-600 hover:text-slate-900"
             aria-label={open ? "Collapse" : "Expand"}
             aria-expanded={open}
           >
-            <span className={`transition-transform ${open ? "rotate-90" : ""}`}>
-              ▶
-            </span>
+            <svg 
+              className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         ) : (
-          <span
-            className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-300 ml-1"
-            aria-hidden
-          />
+          <div className="w-5 h-5 flex items-center justify-center">
+            <div className="w-2 h-2 rounded-full bg-slate-300" />
+          </div>
         )}
         <button
           type="button"
           onClick={() => {
+            console.log('Category selected:', node?.name, node?.id); // Debug log
             onSelect(node);
           }}
-          className={`text-left hover:underline ${
-            selected ? "text-blue-600 font-medium" : ""
+          className={`flex-1 text-left py-1 px-2 rounded hover:bg-blue-50 transition-colors ${
+            selected 
+              ? "text-blue-700 font-semibold bg-blue-100" 
+              : "text-slate-700 hover:text-blue-600"
           }`}
-          title="Энэ ангиллаар шүүх"
+          title={`${node?.name} ангиллаар шүүх`}
         >
           {node?.name}
+          {hasChildren && (
+            <span className="ml-2 text-xs text-slate-500">
+              ({node.children.length})
+            </span>
+          )}
         </button>
       </div>
 
       {hasChildren && open && (
-        <ul className="pl-4 ml-2 border-l border-neutral-200 space-y-1">
+        <ul className="ml-6 mt-1 space-y-1 border-l-2 border-slate-100 pl-4">
           {node.children.map((child: any) => (
             <CategoryNode
               key={child.id}
@@ -296,18 +308,29 @@ function CategoryTree({
   onSelect: (n: any) => void;
   selectedId?: string | null;
 }) {
-  if (!nodes?.length) return null;
+  if (!nodes?.length) {
+    return (
+      <div className="text-sm text-slate-500 py-4 text-center">
+        Ангилал олдсонгүй
+      </div>
+    );
+  }
+  
+  console.log('CategoryTree nodes:', nodes); // Debug log
+  
   return (
-    <ul className="space-y-1">
-      {nodes.map((n: any) => (
-        <CategoryNode
-          key={n.id}
-          node={n}
-          onSelect={onSelect}
-          selectedId={selectedId}
-        />
-      ))}
-    </ul>
+    <div className="max-h-96 overflow-y-auto">
+      <ul className="space-y-1">
+        {nodes.map((n: any) => (
+          <CategoryNode
+            key={n.id}
+            node={n}
+            onSelect={onSelect}
+            selectedId={selectedId}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -431,10 +454,13 @@ export default function InventoryPage() {
     const tk = token ?? (await getAccessToken());
     if (!tk) throw new Error("no token");
     const raw = await getCategories(tk);
+    console.log('Categories API response:', raw); // Debug log
     const treeRaw = Array.isArray(raw?.tree)
       ? raw.tree
       : toArray(raw, ["categories", "data", "items"]);
+    console.log('Tree raw data:', treeRaw); // Debug log
     const tree = normalizeTree(treeRaw);
+    console.log('Normalized tree:', tree); // Debug log
     setCats(tree as unknown as Category[]);
   }
 
