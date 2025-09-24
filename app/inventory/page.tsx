@@ -555,34 +555,57 @@ export default function InventoryPage() {
   const mergedProducts = useMemo(() => {
     let filtered = products;
 
-    // Filter by store
+    // Always group by product ID to show each product only once
+    const productMap = new Map<string, Product & { qty: number }>();
+
+    for (const p of filtered) {
+      // Use product ID as the key to group all variants of the same product
+      const productId = p.id;
+      const prev = productMap.get(productId);
+
+      if (prev) {
+        // Same product - sum quantities from all variants/stores
+        productMap.set(productId, {
+          ...prev,
+          qty: (prev.qty ?? 0) + (p.qty ?? 0),
+          // Keep the variant info if there are multiple variants
+          variantName: prev.variantName || p.variantName,
+        });
+      } else {
+        // New product
+        productMap.set(productId, {
+          ...p,
+          qty: p.qty ?? 0,
+        });
+      }
+    }
+
+    // Filter by store after grouping
     if (storeId !== "all") {
-      filtered = filtered.filter((p) => String(p.storeId) === storeId);
-    } else {
-      // For "all" stores, we need to handle variants properly
-      const map = new Map<string, Product & { qty: number }>();
-
-      for (const p of filtered) {
-        if (!p.variantId) continue;
-
-        const key = p.variantId;
-        const prev = map.get(key);
+      // For specific store, we need to recalculate quantities for that store only
+      const storeFiltered = new Map<string, Product & { qty: number }>();
+      
+      for (const p of products) {
+        if (String(p.storeId) !== storeId) continue;
+        
+        const productId = p.id;
+        const prev = storeFiltered.get(productId);
 
         if (prev) {
-          // Same variant from different stores - sum quantities
-          map.set(key, {
+          storeFiltered.set(productId, {
             ...prev,
             qty: (prev.qty ?? 0) + (p.qty ?? 0),
           });
         } else {
-          // New variant
-          map.set(key, {
+          storeFiltered.set(productId, {
             ...p,
             qty: p.qty ?? 0,
           });
         }
       }
-      filtered = Array.from(map.values());
+      filtered = Array.from(storeFiltered.values());
+    } else {
+      filtered = Array.from(productMap.values());
     }
 
     // Filter by search query
