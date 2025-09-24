@@ -564,7 +564,7 @@ export default function AddItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 overscroll-contain text-black animate-in fade-in duration-300"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overscroll-contain text-black animate-in fade-in duration-300"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -572,20 +572,20 @@ export default function AddItemModal({
       <div
         className="
           w-full max-w-7xl bg-white
-          h-[98vh] md:h-[92vh] md:max-h-[90vh]
-          rounded-2xl md:rounded-3xl
+          h-[95vh] sm:h-[92vh] max-h-[95vh] sm:max-h-[90vh]
+          rounded-xl sm:rounded-2xl lg:rounded-3xl
           shadow-xl border border-gray-200 flex flex-col overflow-hidden
           animate-in slide-in-from-bottom duration-400 ease-out
         "
         onClick={(e) => e.stopPropagation()}
       >
         {/* Clean Modern Header */}
-        <div className="relative p-6 md:p-8 border-b border-gray-200 shrink-0 bg-white">
+        <div className="relative p-3 sm:p-6 lg:p-8 border-b border-gray-200 shrink-0 bg-white">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-600 flex items-center justify-center shadow-lg">
                 <svg
-                  className="w-6 h-6 text-white"
+                  className="w-5 h-5 sm:w-6 sm:h-6 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -598,21 +598,21 @@ export default function AddItemModal({
                   />
                 </svg>
               </div>
-              <div className="flex flex-col">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">
+              <div className="flex flex-col min-w-0">
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 tracking-tight truncate">
                   Бүтээгдэхүүн сонгох
                 </h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1 hidden sm:block">
                   Дэлгүүрээс бүтээгдэхүүн хайж, сагсанд нэмэх
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="group w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200"
+              className="group w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg sm:rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 hover:border-gray-300 flex items-center justify-center transition-all duration-200 touch-manipulation"
             >
               <svg
-                className="w-5 h-5 md:w-6 md:h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
+                className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-gray-600 group-hover:text-gray-800 transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -629,21 +629,21 @@ export default function AddItemModal({
         </div>
 
         {/* Clean Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 bg-gray-50">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
             {/* Clean Product Search & Selection */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
-              <div className="p-4 md:p-6 border-b border-gray-200 shrink-0 bg-white">
+            <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
+              <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200 shrink-0 bg-white">
                 {/* Search Bar */}
-                <div className="relative group mb-4">
+                <div className="relative group mb-3 sm:mb-4">
                   <input
-                    className="h-12 w-full border border-gray-300 rounded-lg px-4 pl-12 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white placeholder:text-gray-500"
+                    className="h-10 sm:h-12 w-full border border-gray-300 rounded-lg px-3 sm:px-4 pl-9 sm:pl-12 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 bg-white placeholder:text-gray-500 text-sm sm:text-base"
                     placeholder="🔍 Хайх: нэр, код, бренд..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
                   <svg
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors"
+                    className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -659,10 +659,10 @@ export default function AddItemModal({
                   {query && (
                     <button
                       onClick={() => setQuery("")}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                      className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors touch-manipulation"
                     >
                       <svg
-                        className="w-4 h-4 text-gray-600"
+                        className="w-3 h-3 sm:w-4 sm:h-4 text-gray-600"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -679,11 +679,11 @@ export default function AddItemModal({
                 </div>
 
                 {/* Store Selector */}
-                <div className="mb-4 p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg sm:rounded-xl border border-purple-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <svg
-                        className="w-4 h-4 text-purple-600"
+                        className="w-3 h-3 sm:w-4 sm:h-4 text-purple-600"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -695,7 +695,7 @@ export default function AddItemModal({
                           d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
                         />
                       </svg>
-                      <label className="text-sm font-semibold text-purple-800">
+                      <label className="text-xs sm:text-sm font-semibold text-purple-800">
                         Дэлгүүр:
                       </label>
                     </div>
@@ -711,7 +711,7 @@ export default function AddItemModal({
                       }
                     }}
                     disabled={loadingStores}
-                    className="mt-2 w-full px-3 py-2 rounded-lg bg-white border border-purple-200 shadow-sm text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="mt-1 sm:mt-2 w-full px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white border border-purple-200 shadow-sm text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     {loadingStores ? (
                       <option>Ачааллаж байна...</option>
@@ -727,9 +727,9 @@ export default function AddItemModal({
                     )}
                   </select>
                   {storeId === "all" && (
-                    <div className="mt-2 text-xs text-purple-700 flex items-center gap-1">
+                    <div className="mt-1 sm:mt-2 text-xs text-purple-700 flex items-center gap-1">
                       <svg
-                        className="w-3 h-3"
+                        className="w-2 h-2 sm:w-3 sm:h-3 flex-shrink-0"
                         fill="currentColor"
                         viewBox="0 0 20 20"
                       >
@@ -745,9 +745,9 @@ export default function AddItemModal({
                   {storeId &&
                     storeId !== "all" &&
                     stores.find((s) => s.id === storeId) && (
-                      <div className="mt-2 text-xs text-purple-700 flex items-center gap-1">
+                      <div className="mt-1 sm:mt-2 text-xs text-purple-700 flex items-center gap-1">
                         <svg
-                          className="w-3 h-3"
+                          className="w-2 h-2 sm:w-3 sm:h-3 flex-shrink-0"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -757,28 +757,30 @@ export default function AddItemModal({
                             clipRule="evenodd"
                           />
                         </svg>
-                        Сонгосон: {stores.find((s) => s.id === storeId)?.name}
+                        <span className="truncate">
+                          Сонгосон: {stores.find((s) => s.id === storeId)?.name}
+                        </span>
                       </div>
                     )}
                 </div>
 
                 {/* View Toggle */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-700">
+                    <span className="text-xs sm:text-sm font-semibold text-gray-700">
                       Харах:
                     </span>
-                    <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                    <div className="flex items-center bg-gray-100 rounded-lg sm:rounded-xl p-0.5 sm:p-1">
                       <button
                         onClick={() => setViewMode("table")}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 touch-manipulation ${
                           viewMode === "table"
                             ? "bg-white text-blue-600 shadow-sm"
                             : "text-gray-600 hover:text-gray-800"
                         }`}
                       >
                         <svg
-                          className="w-4 h-4"
+                          className="w-3 h-3 sm:w-4 sm:h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -790,18 +792,18 @@ export default function AddItemModal({
                             d="M3 10h18M3 6h18M3 14h18M3 18h18"
                           />
                         </svg>
-                        Жагсаалт
+                        <span className="hidden sm:inline">Жагсаалт</span>
                       </button>
                       <button
                         onClick={() => setViewMode("grid")}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 touch-manipulation ${
                           viewMode === "grid"
                             ? "bg-white text-blue-600 shadow-sm"
                             : "text-gray-600 hover:text-gray-800"
                         }`}
                       >
                         <svg
-                          className="w-4 h-4"
+                          className="w-3 h-3 sm:w-4 sm:h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -813,29 +815,29 @@ export default function AddItemModal({
                             d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
                           />
                         </svg>
-                        График
+                        <span className="hidden sm:inline">График</span>
                       </button>
                     </div>
                   </div>
-                  <div className="text-sm text-gray-600 whitespace-nowrap">
+                  <div className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
                     {!storeId ? (
                       "Дэлгүүр сонгоно уу"
                     ) : loading ? (
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                        Ачааллаж...
+                        <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="hidden sm:inline">Ачааллаж...</span>
                       </div>
                     ) : (
                       `${catalog.length} олдлоо`
                     )}
                   </div>
                 </div>
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-3">
+                <div className="mt-3 sm:mt-4">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <span className="text-xs sm:text-sm font-semibold text-gray-800 flex items-center gap-1 sm:gap-2">
                         <svg
-                          className="w-4 h-4 text-blue-500"
+                          className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -850,7 +852,7 @@ export default function AddItemModal({
                         Ангилал
                       </span>
                       {selectedCat && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                        <span className="px-2 py-0.5 sm:py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium truncate max-w-20 sm:max-w-none">
                           {selectedCat.name}
                         </span>
                       )}
@@ -858,10 +860,10 @@ export default function AddItemModal({
                     {selectedCat && (
                       <button
                         onClick={() => setSelectedCat(null)}
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-full transition-colors duration-200"
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full transition-colors duration-200 touch-manipulation"
                       >
                         <svg
-                          className="w-3 h-3"
+                          className="w-2 h-2 sm:w-3 sm:h-3"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -873,32 +875,32 @@ export default function AddItemModal({
                             d="M6 18L18 6M6 6l12 12"
                           />
                         </svg>
-                        Бүгдийг харах
+                        <span className="hidden sm:inline">Бүгдийг харах</span>
                       </button>
                     )}
                   </div>
-                  <div className="max-h-40 overflow-y-auto bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-gray-200 shadow-inner">
+                  <div className="max-h-32 sm:max-h-40 overflow-y-auto bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg sm:rounded-xl border border-gray-200 shadow-inner">
                     {categories.length === 0 ? (
-                      <div className="flex items-center justify-center p-6">
+                      <div className="flex items-center justify-center p-4 sm:p-6">
                         <div className="text-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                          <div className="text-sm text-gray-500">
+                          <div className="animate-spin rounded-full h-4 w-4 sm:h-6 sm:w-6 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                          <div className="text-xs sm:text-sm text-gray-500">
                             Ангилал ачаалж байна...
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="p-3">
+                      <div className="p-2 sm:p-3">
                         <button
                           onClick={() => setSelectedCat(null)}
-                          className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg mb-2 transition-all duration-200 flex items-center gap-2 ${
+                          className={`w-full text-left px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg mb-1 sm:mb-2 transition-all duration-200 flex items-center gap-1 sm:gap-2 touch-manipulation ${
                             !selectedCat
                               ? "bg-blue-100 text-blue-700 border border-blue-200"
                               : "text-gray-700 hover:bg-white hover:text-blue-600 bg-white/50"
                           }`}
                         >
                           <svg
-                            className="w-4 h-4 text-blue-500"
+                            className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 flex-shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -910,7 +912,9 @@ export default function AddItemModal({
                               d="M19 11H5m14-7l-7 7 7 7M5 4l7 7-7 7"
                             />
                           </svg>
-                          Бүгд ({catalog.length})
+                          <span className="truncate">
+                            Бүгд ({catalog.length})
+                          </span>
                         </button>
                         <CategoryTree
                           nodes={categories}
@@ -1028,12 +1032,12 @@ export default function AddItemModal({
                   </table>
                 ) : (
                   // Grid View (from checkout page)
-                  <div className="p-4">
+                  <div className="p-2 sm:p-4">
                     {/* Grid View Instructions */}
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                      <div className="flex items-center gap-2 text-sm text-blue-800">
+                    <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-lg sm:rounded-xl">
+                      <div className="flex items-start gap-2 text-xs sm:text-sm text-blue-800">
                         <svg
-                          className="w-4 h-4 text-blue-600"
+                          className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0 mt-0.5"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1045,15 +1049,17 @@ export default function AddItemModal({
                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
-                        <span className="font-medium">График харах:</span>
-                        <span>
-                          Бүтээгдэхүүн сонгоод баруун талд өнгө/хэмжээ сонгоно
-                          уу эсвэл "Түргэн нэмэх" товчийг дарна уу
-                        </span>
+                        <div>
+                          <span className="font-medium">График харах:</span>
+                          <span className="block sm:inline sm:ml-1">
+                            Бүтээгдэхүүн сонгоод баруун талд өнгө/хэмжээ сонгоно
+                            уу эсвэл "Түргэн нэмэх" товчийг дарна уу
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                       {filtered.map((p) => {
                         const totalStock = p.variants.reduce(
                           (s, v) => s + v.stock,
@@ -1067,7 +1073,7 @@ export default function AddItemModal({
                           <button
                             key={p.id}
                             onClick={() => selectProduct(p.id)}
-                            className={`group text-left p-3 rounded-2xl border shadow-sm transition-all duration-200 ${
+                            className={`group text-left p-2 sm:p-3 rounded-lg sm:rounded-2xl border shadow-sm transition-all duration-200 touch-manipulation ${
                               totalStock <= 0
                                 ? "bg-gray-50 border-gray-200 cursor-not-allowed opacity-60"
                                 : p.id === active?.id
@@ -1077,18 +1083,18 @@ export default function AddItemModal({
                             disabled={totalStock <= 0}
                             title={totalStock <= 0 ? "Нөөц дууссан" : "Сонгох"}
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3">
                               <div className="relative">
                                 <Image
                                   src={p.img || "/default.png"}
                                   alt={p.name}
-                                  width={56}
-                                  height={56}
-                                  className="w-14 h-14 rounded-xl object-cover bg-gray-100"
+                                  width={48}
+                                  height={48}
+                                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg sm:rounded-xl object-cover bg-gray-100"
                                   unoptimized
                                 />
                                 {totalStock <= 0 && (
-                                  <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
+                                  <div className="absolute inset-0 bg-black/20 rounded-lg sm:rounded-xl flex items-center justify-center">
                                     <span className="text-xs text-white font-medium">
                                       Дууссан
                                     </span>
@@ -1096,7 +1102,7 @@ export default function AddItemModal({
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="text-sm font-semibold text-gray-900 truncate">
+                                <div className="text-xs sm:text-sm font-semibold text-gray-900 truncate">
                                   {p.name}
                                 </div>
                                 <div className="text-xs text-gray-500">
@@ -1115,7 +1121,7 @@ export default function AddItemModal({
                               {totalStock > 0 && (
                                 <div className="flex-shrink-0">
                                   <div
-                                    className={`w-6 h-6 text-white rounded-full flex items-center justify-center text-xs transition-all duration-200 ${
+                                    className={`w-5 h-5 sm:w-6 sm:h-6 text-white rounded-full flex items-center justify-center text-xs transition-all duration-200 ${
                                       p.id === active?.id
                                         ? "bg-blue-500 opacity-100"
                                         : "bg-blue-500 opacity-0 group-hover:opacity-100"
@@ -1136,7 +1142,7 @@ export default function AddItemModal({
 
               {/* Quick Add Button for Grid View */}
               {viewMode === "grid" && (
-                <div className="p-4 shrink-0 flex justify-center">
+                <div className="p-3 sm:p-4 shrink-0 flex justify-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -1153,7 +1159,7 @@ export default function AddItemModal({
                     disabled={
                       !active || active.variants.every((v) => v.stock <= 0)
                     }
-                    className={`relative w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-200 ${
+                    className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl shadow-lg flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-200 touch-manipulation ${
                       active && active.variants.some((v) => v.stock > 0)
                         ? "bg-gradient-to-r from-green-500 to-emerald-600"
                         : "bg-gray-400 cursor-not-allowed"
@@ -1168,14 +1174,14 @@ export default function AddItemModal({
                   >
                     {active && active.variants.some((v) => v.stock > 0) ? (
                       <>
-                        <FaShoppingCart className="w-6 h-6 text-white" />
-                        <span className="absolute -top-2 -right-2 w-6 h-6 text-xs rounded-full bg-blue-500 text-white flex items-center justify-center font-bold shadow-lg">
+                        <FaShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                        <span className="absolute -top-1 sm:-top-2 -right-1 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 text-xs rounded-full bg-blue-500 text-white flex items-center justify-center font-bold shadow-lg">
                           +
                         </span>
                       </>
                     ) : (
                       <svg
-                        className="w-6 h-6 text-white"
+                        className="w-5 h-5 sm:w-6 sm:h-6 text-white"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1194,9 +1200,9 @@ export default function AddItemModal({
             </div>
 
             {/* RIGHT */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
-              <div className="p-4 md:p-6 border-b border-gray-200 shrink-0 flex items-start gap-4">
-                <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl bg-gray-100 flex items-center justify-center text-sm text-gray-500 overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
+              <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200 shrink-0 flex items-start gap-3 sm:gap-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-lg sm:rounded-xl bg-gray-100 flex items-center justify-center text-sm text-gray-500 overflow-hidden flex-shrink-0">
                   {active?.img ? (
                     <Image
                       src={active.img}
@@ -1207,7 +1213,7 @@ export default function AddItemModal({
                     />
                   ) : (
                     <svg
-                      className="w-6 h-6 md:w-8 md:h-8"
+                      className="w-4 h-4 sm:w-6 sm:h-6 lg:w-8 lg:h-8"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -1221,14 +1227,16 @@ export default function AddItemModal({
                     </svg>
                   )}
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg text-gray-900">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-base sm:text-lg text-gray-900 truncate">
                     {active?.name ?? "—"}
                   </h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm text-gray-600">Нөөц:</span>
+                    <span className="text-xs sm:text-sm text-gray-600">
+                      Нөөц:
+                    </span>
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      className={`px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${
                         (active
                           ? active.variants.reduce((s, v) => s + v.stock, 0)
                           : 0) > 0
@@ -1244,17 +1252,17 @@ export default function AddItemModal({
                 </div>
                 <button
                   type="button"
-                  className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gray-50 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-all duration-200 border border-gray-200"
+                  className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 rounded-lg bg-gray-50 hover:bg-red-50 hover:text-red-600 flex items-center justify-center transition-all duration-200 border border-gray-200 touch-manipulation"
                 >
-                  <FiHeart className="w-4 h-4 md:w-5 md:h-5" />
+                  <FiHeart className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
                 </button>
               </div>
 
-              <div className="p-4 md:p-6 border-b border-gray-200 shrink-0 bg-gray-50">
-                <div className="text-sm font-semibold mb-4 text-gray-900">
+              <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200 shrink-0 bg-gray-50">
+                <div className="text-xs sm:text-sm font-semibold mb-3 sm:mb-4 text-gray-900">
                   Өнгө:
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   {colors.map((c) => {
                     const activeChip = selColor === c;
                     return (
@@ -1263,7 +1271,7 @@ export default function AddItemModal({
                         key={c}
                         onClick={() => setSelColor(c)}
                         className={
-                          "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 " +
+                          "px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 touch-manipulation " +
                           (activeChip
                             ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg scale-105"
                             : "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200")
@@ -1274,18 +1282,18 @@ export default function AddItemModal({
                     );
                   })}
                   {colors.length === 0 && (
-                    <span className="text-sm text-gray-500 italic">
+                    <span className="text-xs sm:text-sm text-gray-500 italic">
                       Өнгө байхгүй
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="p-6 border-b border-gray-200/50 shrink-0">
-                <div className="text-sm font-semibold mb-4 text-gray-900">
+              <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200/50 shrink-0">
+                <div className="text-xs sm:text-sm font-semibold mb-3 sm:mb-4 text-gray-900">
                   Хэмжээ:
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   {sizes.map((s) => {
                     const v = active?.variants.find(
                       (v) => v.size === s && (!selColor || v.color === selColor)
@@ -1298,7 +1306,7 @@ export default function AddItemModal({
                         key={s}
                         onClick={() => !disabled && setSelSize(s)}
                         className={
-                          "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 " +
+                          "px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 touch-manipulation " +
                           (disabled
                             ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-50"
                             : activeChip
@@ -1312,27 +1320,27 @@ export default function AddItemModal({
                     );
                   })}
                   {sizes.length === 0 && (
-                    <span className="text-sm text-gray-500 italic">
+                    <span className="text-xs sm:text-sm text-gray-500 italic">
                       Хэмжээ байхгүй
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="p-6 border-b border-gray-200/50 shrink-0">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
-                  <div className="text-sm font-semibold text-gray-900 mb-2">
+              <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200/50 shrink-0">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-900 mb-2">
                     Сонгосон хувилбар:
                   </div>
-                  <div className="font-medium text-gray-800">
+                  <div className="font-medium text-gray-800 text-xs sm:text-sm">
                     {selColor && selSize
                       ? `${selColor} / ${selSize}`
                       : "Өнгө болон хэмжээ сонгоно уу"}
                   </div>
                   {selectedVariant && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-sm text-green-700 font-medium">
+                    <div className="mt-2 sm:mt-3 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                      <span className="text-xs sm:text-sm text-green-700 font-medium">
                         Боломжит: {remaining} ширхэг
                       </span>
                     </div>
@@ -1341,23 +1349,23 @@ export default function AddItemModal({
               </div>
 
               {/* optional scrollable middle segment */}
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
                 {/* энд хүсвэл урт тайлбар/metadata байрлуулж болно */}
               </div>
 
-              <div className="p-6 shrink-0 bg-gradient-to-r from-gray-50 to-gray-100">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="text-sm font-semibold text-gray-900">
+              <div className="p-3 sm:p-4 lg:p-6 shrink-0 bg-gradient-to-r from-gray-50 to-gray-100">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <div className="text-xs sm:text-sm font-semibold text-gray-900">
                     Тоо ширхэг
                   </div>
-                  <div className="flex items-center gap-3 bg-white rounded-full p-1 shadow-sm">
+                  <div className="flex items-center gap-2 sm:gap-3 bg-white rounded-full p-0.5 sm:p-1 shadow-sm">
                     <button
                       type="button"
-                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 flex items-center justify-center transition-colors duration-200"
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 flex items-center justify-center transition-colors duration-200 touch-manipulation"
                       onClick={() => setQty((q) => Math.max(1, q - 1))}
                     >
                       <svg
-                        className="w-4 h-4"
+                        className="w-3 h-3 sm:w-4 sm:h-4"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1370,17 +1378,17 @@ export default function AddItemModal({
                         />
                       </svg>
                     </button>
-                    <span className="min-w-12 text-center text-lg font-bold text-gray-900 px-3">
+                    <span className="min-w-8 sm:min-w-12 text-center text-base sm:text-lg font-bold text-gray-900 px-2 sm:px-3">
                       {qty}
                     </span>
                     <button
                       type="button"
-                      className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors duration-200"
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors duration-200 touch-manipulation"
                       onClick={() => setQty((q) => Math.min(9999, q + 1))}
                       disabled={!selectedVariant || qty >= remaining}
                     >
                       <svg
-                        className="w-4 h-4"
+                        className="w-3 h-3 sm:w-4 sm:h-4"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1396,11 +1404,11 @@ export default function AddItemModal({
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="flex-1 h-12 px-6 rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+                    className="flex-1 h-10 sm:h-12 px-4 sm:px-6 rounded-lg sm:rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-xs sm:text-sm touch-manipulation"
                   >
                     Болих
                   </button>
@@ -1412,7 +1420,7 @@ export default function AddItemModal({
                     }}
                     disabled={!canAdd}
                     className={
-                      "flex-1 h-12 px-6 rounded-xl font-semibold transition-all duration-200 " +
+                      "flex-1 h-10 sm:h-12 px-4 sm:px-6 rounded-lg sm:rounded-xl font-semibold transition-all duration-200 text-xs sm:text-sm touch-manipulation " +
                       (!canAdd
                         ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                         : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl active:scale-95")
@@ -1423,8 +1431,8 @@ export default function AddItemModal({
                 </div>
 
                 {canAdd && selColor && selSize && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
-                    <div className="text-sm text-blue-800">
+                  <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-blue-50 rounded-lg sm:rounded-xl border border-blue-200">
+                    <div className="text-xs sm:text-sm text-blue-800">
                       <span className="font-medium">{qty} ширхэг</span> •
                       <span className="ml-1">Хэмжээ: {selSize}</span> •
                       <span className="ml-1">Өнгө: {selColor}</span>

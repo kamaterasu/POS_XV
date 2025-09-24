@@ -988,41 +988,70 @@ export default function InventoryPage() {
   return (
     <div className="min-h-svh bg-gradient-to-br from-slate-50 via-white to-slate-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8 min-h-svh flex flex-col gap-6">
-        {/* Enhanced Header with Better Organization */}
-        <div className="sticky top-0 z-30 -mx-4 sm:mx-0 px-4 sm:px-0 pt-4 pb-4 bg-white/90 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
-          {/* Main Action Row - Responsive */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                onClick={handleBack}
-                className="h-11 px-3 sm:px-4 rounded-xl border border-slate-200 bg-white shadow-sm text-sm hover:shadow-md hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium text-slate-700"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+        {/* Mobile-First Responsive Header */}
+        <div className="sticky top-0 z-30 -mx-4 sm:mx-0 px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4 pb-3 sm:pb-4 bg-white/95 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+          {/* Mobile Header Layout */}
+          <div className="block sm:hidden">
+            {/* Top row - Back button, title, and primary action */}
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3 flex-1">
+                <button
+                  onClick={handleBack}
+                  className="h-10 w-10 rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 flex items-center justify-center text-slate-700"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Буцах</span>
-              </button>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                </button>
+                
+                <h1 className="text-lg font-semibold text-slate-800 flex-1">
+                  Агуулахын удирдлага
+                </h1>
+              </div>
 
-              {/* Store Selector */}
+              {canAccessFeature(userRole, "createProduct") && (
+                <button
+                  onClick={handleAddProduct}
+                  className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex items-center justify-center"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Store selector and category toggle */}
+            <div className="flex items-center gap-2 mb-3">
               {loadingStores ? (
-                <Skeleton className="h-11 w-full sm:w-48 rounded-xl" />
+                <Skeleton className="h-10 flex-1 rounded-xl" />
               ) : (
-                <div className="relative flex-1 sm:flex-none">
+                <div className="relative flex-1">
                   <select
                     id="branch"
                     value={storeId}
                     onChange={handleStoreChange}
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm shadow-sm hover:shadow-md transition-all duration-200 appearance-none font-medium text-slate-700 sm:min-w-[160px]"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 pr-10 text-sm shadow-sm hover:shadow-md transition-all duration-200 appearance-none font-medium text-slate-700"
                   >
                     {stores.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -1045,37 +1074,14 @@ export default function InventoryPage() {
                   </svg>
                 </div>
               )}
-            </div>
 
-            {/* Primary Actions */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {canAccessFeature(userRole, "createProduct") && (
-                <button
-                  onClick={handleAddProduct}
-                  className="h-11 px-4 sm:px-6 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium flex-1 sm:flex-none justify-center"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    />
-                  </svg>
-                  <span className="hidden xs:inline">Бараа нэмэх</span>
-                  <span className="xs:hidden">Нэмэх</span>
-                </button>
-              )}
-
-              {/* Categories Toggle */}
               <button
                 onClick={() => setCatsOpen((v) => !v)}
-                className="h-11 px-3 sm:px-4 rounded-xl bg-white border border-slate-200 text-sm shadow-sm hover:shadow-md hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium text-slate-700"
+                className={`h-10 px-3 rounded-xl text-sm shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium ${
+                  catsOpen 
+                    ? "bg-blue-600 text-white border-blue-600" 
+                    : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
               >
                 <svg
                   className="w-4 h-4"
@@ -1090,15 +1096,12 @@ export default function InventoryPage() {
                     d="M19 11H5m14-7l-7 7-7-7m14 18l-7-7-7 7"
                   />
                 </svg>
-                <span className="hidden sm:inline">Ангилал</span>
+                Ангилал
               </button>
             </div>
-          </div>
 
-          {/* Search and Filters Row */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Enhanced Search */}
-            <div className="relative flex-1 max-w-md">
+            {/* Mobile Search */}
+            <div className="relative mb-3">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg
                   className="h-5 w-5 text-slate-400"
@@ -1116,15 +1119,15 @@ export default function InventoryPage() {
               </div>
               <input
                 type="text"
-                placeholder="Бараа хайх... (нэр, код, SKU)"
+                placeholder="Бараа хайх..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-10 w-full pl-10 pr-10 rounded-xl border border-slate-200 bg-white text-sm shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
+                className="h-11 w-full pl-10 pr-10 rounded-xl border border-slate-200 bg-white text-sm shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
                 >
                   <svg
                     className="w-4 h-4"
@@ -1143,16 +1146,12 @@ export default function InventoryPage() {
               )}
             </div>
 
-            {/* Quick Filters - Responsive */}
-            <div className="flex flex-col xs:flex-row items-start xs:items-center gap-3 xs:gap-2">
-              <span className="text-sm text-slate-500 font-medium hidden xs:block">
-                Шүүлт:
-              </span>
-
-              <div className="flex items-center gap-2 flex-wrap">
+            {/* Mobile Filter Buttons */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1">
                 <button
                   onClick={() => setShowOutOfStock(!showOutOfStock)}
-                  className={`h-9 px-2 sm:px-3 rounded-lg border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                  className={`h-10 px-3 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center gap-2 flex-1 justify-center ${
                     showOutOfStock
                       ? "bg-red-500 border-red-500 text-white shadow-sm"
                       : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -1163,13 +1162,12 @@ export default function InventoryPage() {
                       showOutOfStock ? "bg-white" : "bg-red-500"
                     }`}
                   />
-                  <span className="hidden xs:inline">Дууссан</span>
-                  <span className="xs:hidden">Дууссан</span>
+                  Дууссан
                 </button>
 
                 <button
                   onClick={() => setShowReturned(!showReturned)}
-                  className={`h-9 px-2 sm:px-3 rounded-lg border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                  className={`h-10 px-3 rounded-xl border text-sm font-medium transition-all duration-200 flex items-center gap-2 flex-1 justify-center ${
                     showReturned
                       ? "bg-orange-500 border-orange-500 text-white shadow-sm"
                       : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -1180,15 +1178,237 @@ export default function InventoryPage() {
                       showReturned ? "bg-white" : "bg-orange-500"
                     }`}
                   />
-                  <span className="hidden xs:inline">Буцаалттай</span>
-                  <span className="xs:hidden">Буцаалт</span>
+                  Буцаалт
+                </button>
+              </div>
+
+              {/* Clear filters if any active */}
+              {(showOutOfStock ||
+                showReturned ||
+                selectedCat ||
+                searchQuery) && (
+                <button
+                  onClick={() => {
+                    setShowOutOfStock(false);
+                    setShowReturned(false);
+                    setSelectedCat(null);
+                    setSearchQuery("");
+                  }}
+                  className="h-10 w-10 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all duration-200 flex items-center justify-center"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Header Layout */}
+          <div className="hidden sm:block">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleBack}
+                  className="h-11 px-4 rounded-xl border border-slate-200 bg-white shadow-sm text-sm hover:shadow-md hover:bg-slate-50 active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium text-slate-700"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                  <span>Буцах</span>
                 </button>
 
-                {/* Clear filters if any active */}
-                {(showOutOfStock ||
-                  showReturned ||
-                  selectedCat ||
-                  searchQuery) && (
+                {/* Store Selector */}
+                {loadingStores ? (
+                  <Skeleton className="h-11 w-48 rounded-xl" />
+                ) : (
+                  <div className="relative">
+                    <select
+                      id="branch"
+                      value={storeId}
+                      onChange={handleStoreChange}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm shadow-sm hover:shadow-md transition-all duration-200 appearance-none font-medium text-slate-700 min-w-[180px]"
+                    >
+                      {stores.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                    <svg
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              {/* Primary Actions */}
+              <div className="flex items-center gap-3">
+                {canAccessFeature(userRole, "createProduct") && (
+                  <button
+                    onClick={handleAddProduct}
+                    className="h-11 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                      />
+                    </svg>
+                    Бараа нэмэх
+                  </button>
+                )}
+
+                {/* Categories Toggle */}
+                <button
+                  onClick={() => setCatsOpen((v) => !v)}
+                  className={`h-11 px-4 rounded-xl text-sm shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center gap-2 font-medium ${
+                    catsOpen 
+                      ? "bg-blue-600 text-white border-blue-600" 
+                      : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11H5m14-7l-7 7-7-7m14 18l-7-7-7 7"
+                    />
+                  </svg>
+                  Ангилал
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop Search and Filters */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Enhanced Search */}
+              <div className="relative flex-1 max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg
+                    className="h-5 w-5 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Бараа хайх... (нэр, код, SKU)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10 w-full pl-10 pr-10 rounded-xl border border-slate-200 bg-white text-sm shadow-sm hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 placeholder:text-slate-400"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Filters */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500 font-medium hidden lg:block">
+                  Шүүлт:
+                </span>
+                <button
+                  onClick={() => setShowOutOfStock(!showOutOfStock)}
+                  className={`h-9 px-3 rounded-lg border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                    showOutOfStock
+                      ? "bg-red-500 border-red-500 text-white shadow-sm"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      showOutOfStock ? "bg-white" : "bg-red-500"
+                    }`}
+                  />
+                  Дууссан
+                </button>
+
+                <button
+                  onClick={() => setShowReturned(!showReturned)}
+                  className={`h-9 px-3 rounded-lg border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                    showReturned
+                      ? "bg-orange-500 border-orange-500 text-white shadow-sm"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      showReturned ? "bg-white" : "bg-orange-500"
+                    }`}
+                  />
+                  Буцаалттай
+                </button>
+
+                {(showOutOfStock || showReturned || selectedCat || searchQuery) && (
                   <button
                     onClick={() => {
                       setShowOutOfStock(false);
@@ -1196,58 +1416,13 @@ export default function InventoryPage() {
                       setSelectedCat(null);
                       setSearchQuery("");
                     }}
-                    className="h-9 px-2 sm:px-3 rounded-lg bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-all duration-200"
+                    className="h-9 px-3 rounded-lg bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-all duration-200"
                   >
-                    <span className="hidden xs:inline">Цэвэрлэх</span>
-                    <span className="xs:hidden">×</span>
+                    Цэвэрлэх
                   </button>
                 )}
               </div>
             </div>
-
-            {/* Category Management Actions */}
-            {catsOpen && canAccessFeature(userRole, "createCategory") && (
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  onClick={handleOpenAddCat}
-                  className="h-9 px-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium hover:bg-emerald-100 transition-all duration-200 flex items-center gap-2"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    />
-                  </svg>
-                  Ангилал
-                </button>
-                <button
-                  onClick={handleOpenAddSub}
-                  className="h-9 px-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-all duration-200 flex items-center gap-2"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    />
-                  </svg>
-                  Дэд ангилал
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Active Filters Display */}

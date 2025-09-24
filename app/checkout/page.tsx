@@ -747,212 +747,46 @@ export default function CheckoutPage() {
 
   // ============================= UI =============================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 sm:p-6 flex flex-col gap-4">
-      <header className="flex items-center justify-between">
-        <button
-          onClick={goToDashboard}
-          className="group flex items-center gap-3 px-6 py-3 bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm rounded-xl hover:shadow-md hover:bg-white/90 transition-all duration-200 active:scale-95"
-        >
-          <svg
-            className="w-5 h-5 text-gray-600 group-hover:text-blue-600 transition-colors"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col">
+      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-white/40 px-3 py-2 sm:px-6 sm:py-4">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={goToDashboard}
+            className="group flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-6 sm:py-3 bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm rounded-lg sm:rounded-xl hover:shadow-md hover:bg-white/90 transition-all duration-200 active:scale-95 touch-manipulation"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          <span className="font-medium text-gray-900">Борлуулалт</span>
-        </button>
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 group-hover:text-blue-600 transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            <span className="font-medium text-gray-900 text-sm sm:text-base">
+              Борлуулалт
+            </span>
+          </button>
+        </div>
       </header>
 
-      <main className="flex-1 flex flex-col text-black">
-        {/* Search + grid */}
-        {/* <section className="mb-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex-1 relative">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Бүтээгдэхүүн хайх..."
-                className="w-full px-4 py-2 pl-10 rounded-xl bg-white/80 backdrop-blur-sm border border-white/40 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                disabled={!storeId}
-              />
-              <svg
-                className="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-3 top-2.5 w-4 h-4 text-gray-400 hover:text-gray-600"
-                >
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              )}
-            </div>
-            <div className="text-sm text-gray-600 whitespace-nowrap">
-              {!storeId ? (
-                "Store сонгоогүй"
-              ) : loadingProducts ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  Ачааллаж...
-                </div>
-              ) : (
-                `${productList.length} олдлоо`
-              )}
-            </div>
-          </div>
-
-          {!storeId ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <svg
-                className="w-16 h-16 mb-4 text-gray-300"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
-                />
-              </svg>
-              <p className="text-lg font-medium mb-2">Дэлгүүр сонгогдоогүй</p>
-              <p className="text-sm text-center">
-                Бүтээгдэхүүн харахын тулд дэлгүүр сонгоно уу
-              </p>
-            </div>
-          ) : productList.length === 0 && !loadingProducts ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <svg
-                className="w-16 h-16 mb-4 text-gray-300"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                />
-              </svg>
-              <p className="text-lg font-medium mb-2">Бүтээгдэхүүн олдсонгүй</p>
-              <p className="text-sm text-center">
-                {search
-                  ? "Хайлтын үр дүн олдсонгүй. Өөр түлхүүр үг ашиглана уу."
-                  : "Энэ дэлгүүрт бүтээгдэхүүн байхгүй байна."}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {(loadingProducts ? Array.from({ length: 8 }) : productList).map(
-                (p: any, idx: number) =>
-                  loadingProducts ? (
-                    <div
-                      key={`s-${idx}`}
-                      className="h-28 rounded-2xl bg-white/60 border border-white/40 animate-pulse"
-                    />
-                  ) : (
-                    <button
-                      key={p.id}
-                      onClick={() => openVariantPicker(p)}
-                      className={`group text-left p-3 rounded-2xl border shadow-sm transition-all duration-200 ${
-                        (p.qty ?? 0) <= 0
-                          ? "bg-gray-50 border-gray-200 cursor-not-allowed opacity-60"
-                          : "bg-white/70 hover:bg-white/90 border-white/40 hover:shadow-md"
-                      }`}
-                      disabled={(p.qty ?? 0) <= 0}
-                      title={(p.qty ?? 0) <= 0 ? "Нөөц дууссан" : "Сагслах"}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Image
-                            src={p.imgPath || "/default.png"}
-                            alt={p.name}
-                            width={56}
-                            height={56}
-                            className="w-14 h-14 rounded-xl object-cover bg-gray-100"
-                            unoptimized
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src = "/default.png";
-                            }}
-                          />
-                          {(p.qty ?? 0) <= 0 && (
-                            <div className="absolute inset-0 bg-black/20 rounded-xl flex items-center justify-center">
-                              <span className="text-xs text-white font-medium">
-                                Дууссан
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-gray-900 truncate">
-                            {p.name}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Үнэ: {fmt(p.price)}
-                          </div>
-                          <div
-                            className={`text-xs font-medium ${
-                              (p.qty ?? 0) <= 0
-                                ? "text-red-500"
-                                : "text-green-600"
-                            }`}
-                          >
-                            Үлд: {p.qty ?? 0}
-                          </div>
-                        </div>
-                        {(p.qty ?? 0) > 0 && (
-                          <div className="flex-shrink-0">
-                            <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                              +
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  )
-              )}
-            </div>
-          )}
-        </section> */}
-
+      <main className="flex-1 flex flex-col text-black px-3 py-4 sm:px-6 gap-3 sm:gap-4">
         {/* Cart header */}
-        <div className="flex flex-col gap-2 px-6 py-3 mb-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm">
+        <div className="flex flex-col gap-2 px-4 sm:px-6 py-3 bg-white/60 backdrop-blur-sm border border-white/40 rounded-lg sm:rounded-xl shadow-sm">
           <div className="flex items-center justify-between text-sm text-gray-900 font-medium">
             <div className="flex items-center gap-2">
-              <span>Сагс</span>
+              <span className="text-base sm:text-sm">Сагс</span>
               {items.length > 0 && (
                 <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
                   {items.length} зүйл
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {items.length > 0 && (
                 <>
                   <span className="text-xs text-gray-600">
@@ -966,7 +800,7 @@ export default function CheckoutPage() {
                       setItems([]);
                       showNotification("info", "Сагс цэвэрлэгдлээ");
                     }}
-                    className="px-3 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                    className="px-2 sm:px-3 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors touch-manipulation"
                     title="Сагс цэвэрлэх"
                   >
                     Цэвэрлэх
@@ -978,9 +812,9 @@ export default function CheckoutPage() {
 
           {/* Store selection status indicator */}
           {storeId === "all" && items.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
+            <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
               <svg
-                className="w-4 h-4 text-amber-600 flex-shrink-0"
+                className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -990,7 +824,7 @@ export default function CheckoutPage() {
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="text-amber-800 font-medium">
+              <span className="text-amber-800 font-medium flex-1">
                 Анхаар: "Бүх дэлгүүр" сонгосон тул төлбөр тооцох боломжгүй.
                 Тодорхой дэлгүүр сонгоно уу.
               </span>
@@ -1000,9 +834,9 @@ export default function CheckoutPage() {
           {storeId !== "all" &&
             items.length > 0 &&
             stores.find((s) => s.id === storeId) && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs">
+              <div className="flex items-start gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs">
                 <svg
-                  className="w-4 h-4 text-green-600 flex-shrink-0"
+                  className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -1012,7 +846,7 @@ export default function CheckoutPage() {
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="text-green-800 font-medium">
+                <span className="text-green-800 font-medium flex-1">
                   Дэлгүүр: {stores.find((s) => s.id === storeId)?.name} - Төлбөр
                   тооцоход бэлэн
                 </span>
@@ -1021,79 +855,100 @@ export default function CheckoutPage() {
         </div>
 
         {/* Cart list */}
-        <div className="flex-1 bg-white/70 backdrop-blur-sm border border-white/40 rounded-2xl shadow-sm overflow-y-auto p-4">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <svg
-                className="w-16 h-16 mb-4 text-gray-300"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                />
-              </svg>
-              <p className="text-lg font-medium mb-2">Сагс хоосон байна</p>
-              <p className="text-sm text-center">
-                Бүтээгдэхүүн сонгож сагсанд нэмнэ үү
-              </p>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {items.map((it, idx) => {
-                const line = it.qty * it.price;
-                return (
-                  <li
-                    key={it.id + "-" + (it as any).variant_id + "-" + idx}
-                    className="p-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-xl shadow-sm hover:shadow-md hover:bg-white/80 transition-all duration-200"
-                  >
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
-                      <div className="flex items-start gap-2 w-full">
-                        <Image
-                          src={it.imgPath || "/default.png"}
-                          alt={it.name}
-                          width={40}
-                          height={40}
-                          className="w-12 h-12 rounded-xl object-cover bg-gray-100 shadow-sm"
-                          unoptimized
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src =
-                              "/default.png";
-                          }}
-                        />
-                        <div className="leading-tight flex flex-col min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-gray-900 truncate">
-                            {idx + 1}. {it.name}
+        <div className="flex-1 bg-white/70 backdrop-blur-sm border border-white/40 rounded-lg sm:rounded-2xl shadow-sm overflow-hidden">
+          <div className="h-full overflow-y-auto p-3 sm:p-4">
+            {items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-gray-500">
+                <svg
+                  className="w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                  />
+                </svg>
+                <p className="text-base sm:text-lg font-medium mb-1 sm:mb-2">
+                  Сагс хоосон байна
+                </p>
+                <p className="text-sm text-center px-4">
+                  Бүтээгдэхүүн сонгож сагсанд нэмнэ үү
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-2 sm:space-y-3">
+                {items.map((it, idx) => {
+                  const line = it.qty * it.price;
+                  return (
+                    <li
+                      key={it.id + "-" + (it as any).variant_id + "-" + idx}
+                      className="p-3 sm:p-4 bg-white/60 backdrop-blur-sm border border-white/40 rounded-lg sm:rounded-xl shadow-sm hover:shadow-md hover:bg-white/80 transition-all duration-200"
+                    >
+                      {/* Mobile Layout (< 640px) */}
+                      <div className="block sm:hidden">
+                        <div className="flex gap-3 mb-3">
+                          <Image
+                            src={it.imgPath || "/default.png"}
+                            alt={it.name}
+                            width={60}
+                            height={60}
+                            className="w-15 h-15 rounded-xl object-cover bg-gray-100 shadow-sm flex-shrink-0"
+                            unoptimized
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src =
+                                "/default.png";
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-gray-900 mb-1 leading-tight">
+                              {idx + 1}. {it.name}
+                            </div>
+                            <div className="text-xs text-gray-600 mb-1">
+                              Хэмжээ: {(it as any).size || "—"} • Өнгө:{" "}
+                              {(it as any).color || "—"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {fmt(it.price)} × {it.qty}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-600">
-                            Хэмжээ: {(it as any).size || "—"} • Өнгө:{" "}
-                            {(it as any).color || "—"}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {fmt(it.price)} × {it.qty}
-                          </div>
+                          <button
+                            onClick={() => removeFromCart(it.variant_id!)}
+                            className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 flex items-center justify-center transition-colors duration-200 touch-manipulation flex-shrink-0"
+                            title="Сагснаас хасах"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
                         </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2 items-center">
-                        <div className="flex justify-center w-20">
-                          <div className="inline-flex items-center gap-1 bg-gray-50 rounded-full p-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1 bg-gray-50 rounded-full p-1">
                             <button
                               onClick={() =>
                                 updateItemQuantity(it.variant_id!, it.qty - 1)
                               }
-                              className="w-7 h-7 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 text-sm leading-none flex items-center justify-center transition-colors duration-200"
+                              className="w-10 h-10 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 text-lg leading-none flex items-center justify-center transition-colors duration-200 touch-manipulation"
                               title={
                                 it.qty === 1 ? "Сагснаас хасах" : "Тоог хасах"
                               }
                             >
                               –
                             </button>
-                            <span className="w-8 text-center text-sm font-medium text-gray-900 px-2">
+                            <span className="w-12 text-center text-base font-semibold text-gray-900 px-3">
                               {it.qty}
                             </span>
                             {(() => {
@@ -1112,7 +967,7 @@ export default function CheckoutPage() {
                                     )
                                   }
                                   disabled={isAtStockLimit}
-                                  className={`w-7 h-7 rounded-full text-white text-sm leading-none flex items-center justify-center transition-colors duration-200 ${
+                                  className={`w-10 h-10 rounded-full text-white text-lg leading-none flex items-center justify-center transition-colors duration-200 touch-manipulation ${
                                     isAtStockLimit
                                       ? "bg-gray-300 cursor-not-allowed"
                                       : "bg-blue-500 hover:bg-blue-600"
@@ -1130,42 +985,136 @@ export default function CheckoutPage() {
                               );
                             })()}
                           </div>
-                        </div>
-                        <div className="w-20 text-right font-semibold text-gray-900">
-                          {fmt(line)}
+                          <div className="text-base font-bold text-gray-900">
+                            {fmt(line)}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Delete button */}
-                      <button
-                        onClick={() => removeFromCart(it.variant_id!)}
-                        className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 flex items-center justify-center transition-colors duration-200"
-                        title="Сагснаас хасах"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                      {/* Desktop Layout (≥ 640px) */}
+                      <div className="hidden sm:block">
+                        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
+                          <div className="flex items-start gap-2 w-full">
+                            <Image
+                              src={it.imgPath || "/default.png"}
+                              alt={it.name}
+                              width={40}
+                              height={40}
+                              className="w-12 h-12 rounded-xl object-cover bg-gray-100 shadow-sm"
+                              unoptimized
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src =
+                                  "/default.png";
+                              }}
+                            />
+                            <div className="leading-tight flex flex-col min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-gray-900 truncate">
+                                {idx + 1}. {it.name}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                Хэмжээ: {(it as any).size || "—"} • Өнгө:{" "}
+                                {(it as any).color || "—"}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {fmt(it.price)} × {it.qty}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-2 items-center">
+                            <div className="flex justify-center w-20">
+                              <div className="inline-flex items-center gap-1 bg-gray-50 rounded-full p-1">
+                                <button
+                                  onClick={() =>
+                                    updateItemQuantity(
+                                      it.variant_id!,
+                                      it.qty - 1
+                                    )
+                                  }
+                                  className="w-7 h-7 rounded-full bg-gray-200 hover:bg-red-100 text-gray-700 hover:text-red-600 text-sm leading-none flex items-center justify-center transition-colors duration-200 touch-manipulation"
+                                  title={
+                                    it.qty === 1
+                                      ? "Сагснаас хасах"
+                                      : "Тоог хасах"
+                                  }
+                                >
+                                  –
+                                </button>
+                                <span className="w-8 text-center text-sm font-medium text-gray-900 px-2">
+                                  {it.qty}
+                                </span>
+                                {(() => {
+                                  const product = productList.find(
+                                    (p) => p.variantId === it.variant_id
+                                  );
+                                  const isAtStockLimit =
+                                    product && it.qty >= product.qty;
+
+                                  return (
+                                    <button
+                                      onClick={() =>
+                                        updateItemQuantity(
+                                          it.variant_id!,
+                                          it.qty + 1
+                                        )
+                                      }
+                                      disabled={isAtStockLimit}
+                                      className={`w-7 h-7 rounded-full text-white text-sm leading-none flex items-center justify-center transition-colors duration-200 touch-manipulation ${
+                                        isAtStockLimit
+                                          ? "bg-gray-300 cursor-not-allowed"
+                                          : "bg-blue-500 hover:bg-blue-600"
+                                      }`}
+                                      title={
+                                        isAtStockLimit
+                                          ? `Хангалттай нөөц байхгүй (үлдэгдэл: ${
+                                              product?.qty || 0
+                                            })`
+                                          : "Тоог нэмэх"
+                                      }
+                                    >
+                                      +
+                                    </button>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                            <div className="w-20 text-right font-semibold text-gray-900">
+                              {fmt(line)}
+                            </div>
+                          </div>
+
+                          {/* Delete button */}
+                          <button
+                            onClick={() => removeFromCart(it.variant_id!)}
+                            className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 flex items-center justify-center transition-colors duration-200 touch-manipulation"
+                            title="Сагснаас хасах"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
 
         {/* Totals */}
-        <div className="mt-4 bg-white/70 backdrop-blur-sm border border-white/40 rounded-2xl shadow-sm p-6 text-sm space-y-3">
+        <div className="bg-white/70 backdrop-blur-sm border border-white/40 rounded-lg sm:rounded-2xl shadow-sm p-4 sm:p-6 text-sm space-y-2 sm:space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-gray-700">Дүн</span>
             <span className="font-medium text-gray-900">{fmt(totalRaw)}</span>
@@ -1188,12 +1137,12 @@ export default function CheckoutPage() {
               <span className="font-medium">{fmt(totals.deliveryFee)}</span>
             </div>
           )}
-          <div className="border-t border-gray-200 pt-3">
+          <div className="border-t border-gray-200 pt-2 sm:pt-3">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-lg text-gray-900">
+              <span className="font-semibold text-base sm:text-lg text-gray-900">
                 Нийт төлөх
               </span>
-              <span className="font-bold text-xl text-blue-600">
+              <span className="font-bold text-lg sm:text-xl text-blue-600">
                 {fmt(totals.grand)}
               </span>
             </div>
@@ -1201,7 +1150,7 @@ export default function CheckoutPage() {
         </div>
       </main>
 
-      <footer>
+      <footer className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t border-white/40 px-3 py-2 sm:px-6 sm:py-4">
         <CartFooter
           onQuick={() => setOpenAdd(true)}
           onAdd={() => setOpenAdd(true)}
@@ -1503,9 +1452,9 @@ export default function CheckoutPage() {
 
       {/* Enhanced Notification Toast */}
       {notification && (
-        <div className="fixed top-4 right-4 z-[200] animate-in slide-in-from-right-full duration-300">
+        <div className="fixed top-4 right-2 left-2 sm:left-auto sm:right-4 sm:w-auto z-[200] animate-in slide-in-from-top sm:slide-in-from-right-full duration-300">
           <div
-            className={`px-6 py-4 rounded-lg shadow-xl backdrop-blur-sm border max-w-sm ${
+            className={`px-4 sm:px-6 py-3 sm:py-4 rounded-lg shadow-xl backdrop-blur-sm border max-w-sm mx-auto sm:mx-0 ${
               notification.type === "success"
                 ? "bg-green-50 text-green-800 border-green-200"
                 : notification.type === "error"
@@ -1566,7 +1515,7 @@ export default function CheckoutPage() {
               </div>
               <button
                 onClick={() => setNotification(null)}
-                className={`flex-shrink-0 p-1 rounded-full transition-colors ${
+                className={`flex-shrink-0 p-1 rounded-full transition-colors touch-manipulation ${
                   notification.type === "success"
                     ? "text-green-400 hover:text-green-600 hover:bg-green-100"
                     : notification.type === "error"

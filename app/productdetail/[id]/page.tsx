@@ -756,16 +756,16 @@ export default function ProductDetailPage() {
   if (loading) return <Loading open label="Ачаалж байна…" />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 p-2 sm:p-4 md:p-6">
       <div className="w-full max-w-6xl mx-auto">
         <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
           {/* Header */}
-          <header className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          <header className="bg-gradient-to-r from-blue-600 to-indigo-700 px-4 sm:px-6 py-4 sm:py-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <button
                   onClick={() => router.back()}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition-all duration-200 backdrop-blur-sm"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition-all duration-200 backdrop-blur-sm touch-manipulation"
                 >
                   <svg
                     className="w-4 h-4"
@@ -780,19 +780,19 @@ export default function ProductDetailPage() {
                       d="M10 19l-7-7m0 0l7-7m-7 7h18"
                     />
                   </svg>
-                  Буцах
+                  <span className="hidden sm:inline">Буцах</span>
                 </button>
                 <div>
-                  <h1 className="text-2xl font-bold text-white">
+                  <h1 className="text-lg sm:text-2xl font-bold text-white leading-tight">
                     Барааны дэлгэрэнгүй
                   </h1>
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
                 {!isEditing ? (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-white text-blue-600 rounded-lg hover:bg-blue-50 border border-transparent transition-all duration-200 font-medium shadow-sm"
+                    className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-white text-blue-600 rounded-lg hover:bg-blue-50 border border-transparent transition-all duration-200 font-medium shadow-sm flex-1 sm:flex-initial touch-manipulation"
                   >
                     <svg
                       className="w-4 h-4"
@@ -850,7 +850,7 @@ export default function ProductDetailPage() {
                           }
                         }
                       }}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition-all duration-200 font-medium backdrop-blur-sm"
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/20 transition-all duration-200 font-medium backdrop-blur-sm flex-1 sm:flex-initial touch-manipulation"
                     >
                       <svg
                         className="w-4 h-4"
@@ -865,17 +865,18 @@ export default function ProductDetailPage() {
                           d="M6 18L18 6M6 6l12 12"
                         />
                       </svg>
-                      Цуцлах
+                      <span className="hidden sm:inline">Цуцлах</span>
                     </button>
                     <button
                       onClick={handleSave}
                       disabled={saving}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-lg"
+                      className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-lg flex-1 sm:flex-initial touch-manipulation"
                     >
                       {saving ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Хадгалж байна...
+                          <span className="hidden sm:inline">Хадгалж байна...</span>
+                          <span className="sm:hidden">...</span>
                         </>
                       ) : (
                         <>
@@ -903,7 +904,7 @@ export default function ProductDetailPage() {
           </header>
 
           {/* Content */}
-          <main className="p-6">
+          <main className="p-3 sm:p-6">
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
                 <div className="flex items-center gap-3">
@@ -949,10 +950,10 @@ export default function ProductDetailPage() {
             ) : (
               <div className="space-y-6">
                 {/* Product Card */}
-                <section className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                  <div className="flex gap-6">
+                <section className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-200">
+                  <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                     {/* Product Image */}
-                    <div className="w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-inner">
+                    <div className="w-full sm:w-32 h-48 sm:h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center overflow-hidden border border-gray-200 shadow-inner mx-auto sm:mx-0 max-w-xs sm:max-w-none">
                       {imagePreviews.length > 0 &&
                       imagePreviews[0] &&
                       imagePreviews[0] !== "/default.png" &&
@@ -983,7 +984,7 @@ export default function ProductDetailPage() {
                       {isEditing && (
                         <button
                           onClick={() => imgInputRef.current?.click()}
-                          className="absolute top-0 right-0 p-2 rounded-full hover:bg-gray-100 border border-gray-200 bg-white shadow-sm transition-colors"
+                          className="absolute top-0 right-0 p-2 rounded-full hover:bg-gray-100 border border-gray-200 bg-white shadow-sm transition-colors touch-manipulation"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1011,11 +1012,11 @@ export default function ProductDetailPage() {
                                 name: e.target.value,
                               }))
                             }
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all touch-manipulation"
                             placeholder="Барааны нэр оруулна уу"
                           />
                         ) : (
-                          <div className="text-xl font-bold text-gray-900">
+                          <div className="text-lg sm:text-xl font-bold text-gray-900 leading-tight">
                             {data.product.name}
                           </div>
                         )}
@@ -1037,7 +1038,7 @@ export default function ProductDetailPage() {
                                 }))
                               }
                               rows={3}
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none touch-manipulation"
                               placeholder="Барааны тайлбар"
                             />
                           ) : (
@@ -1064,7 +1065,7 @@ export default function ProductDetailPage() {
                                   category_id: e.target.value,
                                 }))
                               }
-                              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all touch-manipulation"
                             >
                               <option value="">Ангилал сонгоно уу</option>
                               {flattenCategories(categories).map((category) => (
@@ -1115,7 +1116,7 @@ export default function ProductDetailPage() {
                       <div className="text-base font-medium mb-4 text-gray-700">
                         Зураг солих
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                         <input
                           type="url"
                           value={formData.img}
@@ -1125,18 +1126,20 @@ export default function ProductDetailPage() {
                               img: e.target.value,
                             }))
                           }
-                          className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all touch-manipulation"
                           placeholder="Зургийн холбоос оруулах"
                         />
-                        <span className="text-gray-500 font-medium">эсвэл</span>
-                        <button
-                          type="button"
-                          onClick={() => imgInputRef.current?.click()}
-                          className="px-6 py-2.5 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors shadow-sm"
-                          disabled={uploadingImages}
-                        >
-                          {uploadingImages ? "Ачаалж байна..." : "Файл сонгох"}
-                        </button>
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                          <span className="text-gray-500 font-medium text-sm sm:text-base">эсвэл</span>
+                          <button
+                            type="button"
+                            onClick={() => imgInputRef.current?.click()}
+                            className="px-4 sm:px-6 py-3 sm:py-2.5 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors shadow-sm flex-1 sm:flex-initial touch-manipulation"
+                            disabled={uploadingImages}
+                          >
+                            {uploadingImages ? "Ачаалж байна..." : "Файл сонгох"}
+                          </button>
+                        </div>
                       </div>
                       {imageError && (
                         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600">
@@ -1151,19 +1154,19 @@ export default function ProductDetailPage() {
                 {(variants.length > 0 || isEditing) && (
                   <section className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                     {isEditing && (
-                      <div className="flex items-center justify-between mb-6">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                         <h2 className="text-lg font-bold text-gray-900">
                           Хувилбар удирдлага
                         </h2>
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 w-full sm:w-auto">
                           <button
                             onClick={addVariant}
-                            className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-2"
+                            className="px-4 sm:px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2 flex-1 sm:flex-initial touch-manipulation"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
-                            🆕 Шинэ хувилбар нэмэх
+                            <span className="text-sm sm:text-base">🆕 Шинэ хувилбар нэмэх</span>
                           </button>
                         </div>
                       </div>
@@ -1187,7 +1190,7 @@ export default function ProductDetailPage() {
                           {getUniqueColors().length > 0 && (
                             <div className="mb-6">
                               <div className="text-sm font-medium text-gray-600 mb-3">Өнгө:</div>
-                              <div className="flex flex-wrap gap-3">
+                              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3">
                                 {getUniqueColors().map((color) => {
                                   // Calculate total stock for this color across all sizes
                                   const colorStock = variants
@@ -1209,19 +1212,19 @@ export default function ProductDetailPage() {
                                           setSelectedSize(availableSizes[0]);
                                         }
                                       }}
-                                      className={`relative flex items-center gap-2 px-3 py-3 rounded-lg border transition-all ${
+                                      className={`relative flex items-center gap-2 p-3 rounded-lg border transition-all touch-manipulation min-h-[60px] ${
                                         selectedColor === color
                                           ? 'border-blue-500 bg-blue-50 shadow-md'
                                           : 'border-gray-300 hover:border-gray-400 hover:shadow-sm'
                                       }`}
                                     >
                                       <div 
-                                        className="w-8 h-8 rounded-full border-2 border-white shadow-md flex-shrink-0" 
+                                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-white shadow-md flex-shrink-0" 
                                         style={{ backgroundColor: color }}
                                       ></div>
-                                      <div className="text-left">
+                                      <div className="text-left flex-1 min-w-0">
                                         {!isColorHexCode(color) && (
-                                          <div className="text-sm font-medium text-gray-700">
+                                          <div className="text-xs sm:text-sm font-medium text-gray-700 truncate">
                                             {color}
                                           </div>
                                         )}
@@ -1232,7 +1235,7 @@ export default function ProductDetailPage() {
                                         </div>
                                       </div>
                                       {/* Stock indicator dot */}
-                                      <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                                      <div className={`absolute -top-1 -right-1 w-2 h-2 sm:w-3 sm:h-3 rounded-full border-2 border-white ${
                                         colorStock > 10 
                                           ? 'bg-green-500' 
                                           : colorStock > 0 
@@ -1250,7 +1253,7 @@ export default function ProductDetailPage() {
                           {getUniqueSizes().length > 0 && (
                             <div className="mb-6">
                               <div className="text-sm font-medium text-gray-600 mb-3">Хэмжээ:</div>
-                              <div className="flex flex-wrap gap-3">
+                              <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 sm:gap-3">
                                 {getUniqueSizes().map((size) => {
                                   const isAvailable = selectedColor ? getAvailableSizesForColor(selectedColor).includes(size) : true;
                                   const sizeVariant = variants.find(v => 
@@ -1265,7 +1268,7 @@ export default function ProductDetailPage() {
                                       key={size}
                                       onClick={() => isAvailable && setSelectedSize(size)}
                                       disabled={!isAvailable}
-                                      className={`relative px-4 py-3 text-sm rounded-lg border transition-all ${
+                                      className={`relative px-3 py-3 text-sm rounded-lg border transition-all touch-manipulation min-h-[50px] ${
                                         selectedSize === size
                                           ? 'bg-blue-500 text-white border-blue-500 shadow-md'
                                           : isAvailable
@@ -1314,7 +1317,7 @@ export default function ProductDetailPage() {
                                     </span>
                                   </div>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-2 sm:space-y-2">
                                   {stores.map((store, storeIndex) => {
                                     const qty = getStoreInventory(selectedVariant.id, store.id);
                                     const storeDisplayName = store.name === "Төв салбар" ? "Төв салбар" : `${store.name || `Салбар-${storeIndex + 1}`}`;
@@ -1325,12 +1328,12 @@ export default function ProductDetailPage() {
                                           <div className={`w-3 h-3 rounded-full ${
                                             qty > 0 ? "bg-green-500" : "bg-gray-400"
                                           }`}></div>
-                                          <span className="text-sm font-medium text-gray-700">
+                                          <span className="text-sm font-medium text-gray-700 truncate">
                                             {storeDisplayName}
                                           </span>
                                         </div>
                                         <div className="text-right">
-                                          <span className={`text-lg font-bold ${
+                                          <span className={`text-base sm:text-lg font-bold ${
                                             qty > 0 ? "text-blue-600" : "text-gray-400"
                                           }`}>
                                             {qty} ширхэг
@@ -1585,7 +1588,7 @@ export default function ProductDetailPage() {
                             {/* Store Inventory Management */}
                             {stores.length > 0 && (
                               <div className="bg-white rounded-lg p-4 border border-gray-100">
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                                   <h5 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                                     <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -1611,14 +1614,14 @@ export default function ProductDetailPage() {
                                         });
                                       }
                                     }}
-                                    className="px-3 py-1.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-lg border border-blue-200 hover:bg-blue-200 transition-colors disabled:opacity-50"
+                                    className="px-3 py-2 text-xs font-medium bg-blue-100 text-blue-700 rounded-lg border border-blue-200 hover:bg-blue-200 transition-colors disabled:opacity-50 w-full sm:w-auto touch-manipulation"
                                     disabled={inventoryLoading}
                                   >
                                     Бүгдийг засах
                                   </button>
                                 </div>
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                   {stores.map((store) => {
                                     const qty = getStoreInventory(variant.id, store.id);
                                     const adjustKey = `${variant.id}-${store.id}`;
@@ -1634,7 +1637,7 @@ export default function ProductDetailPage() {
                                         <div className="flex items-center justify-between mb-3">
                                           <div className="flex items-center gap-2">
                                             <div className={`w-3 h-3 rounded-full ${qty > 0 ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                                            <span className="text-sm font-medium text-gray-700">
+                                            <span className="text-sm font-medium text-gray-700 truncate">
                                               {store.name}
                                             </span>
                                           </div>
@@ -1653,7 +1656,7 @@ export default function ProductDetailPage() {
                                           <div className="text-xs font-medium text-gray-600 mb-2">
                                             Нэмэх/Хасах утга
                                           </div>
-                                          <div className="flex items-center gap-2">
+                                          <div className="flex items-center gap-2 mb-3">
                                             {/* Delta input */}
                                             <input
                                               type="number"
@@ -1663,7 +1666,7 @@ export default function ProductDetailPage() {
                                                 const delta = value === "" ? 0 : parseInt(value) || 0;
                                                 setDeltaInputs(prev => ({...prev, [adjustKey]: delta}));
                                               }}
-                                              className={`w-full px-3 py-2 border rounded text-center focus:outline-none focus:ring-2 focus:border-transparent ${
+                                              className={`w-full px-3 py-2 border rounded text-center focus:outline-none focus:ring-2 focus:border-transparent touch-manipulation ${
                                                 Math.abs(deltaValue) > qty && deltaValue !== 0
                                                   ? "border-red-300 focus:ring-red-500 bg-red-50"
                                                   : "border-gray-300 focus:ring-blue-500"
@@ -1671,92 +1674,89 @@ export default function ProductDetailPage() {
                                               placeholder="0"
                                               disabled={isAdjusting}
                                             />
-                                            {/* Warning message */}
-                                            {Math.abs(deltaValue) > qty && deltaValue !== 0 && (
-                                              <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
-                                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                </svg>
-                                                Хасах тоо үлдэгдлээс их байна (Үлдэгдэл: {qty} ширхэг)
-                                              </div>
+                                          </div>
+                                          
+                                          {/* Warning message */}
+                                          {Math.abs(deltaValue) > qty && deltaValue !== 0 && (
+                                            <div className="mb-3 text-xs text-red-600 flex items-start gap-1">
+                                              <svg className="w-3 h-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                              </svg>
+                                              <span className="break-words">Хасах тоо үлдэгдлээс их байна (Үлдэгдэл: {qty} ширхэг)</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Status display */}
+                                          <div className="text-xs text-gray-600 mb-3 space-y-1">
+                                            {deltaValue !== 0 ? (
+                                              <>
+                                                <div>Нэмэх: <span className="font-medium text-green-600">{qty + Math.abs(deltaValue)} ширхэг</span></div>
+                                                <div>Хасах: 
+                                                  <span className={`font-medium ml-1 ${Math.abs(deltaValue) > qty ? "text-red-600" : "text-orange-600"}`}>
+                                                    {Math.abs(deltaValue) > qty 
+                                                      ? `Боломжгүй (${Math.abs(deltaValue) - qty} дутагдах)` 
+                                                      : `${qty - Math.abs(deltaValue)} ширхэг`
+                                                    }
+                                                  </span>
+                                                </div>
+                                              </>
+                                            ) : (
+                                              <span>Одоогийн үлдэгдэл: <span className="font-medium">{qty} ширхэг</span></span>
                                             )}
                                           </div>
                                           
                                           {/* Apply buttons */}
-                                          <div className="flex items-center justify-between mt-3">
-                                            <div className="text-xs text-gray-600">
-                                              {deltaValue !== 0 && (
-                                                <>
-                                                  <span>Нэмэх: <span className="font-medium text-green-600">{qty + Math.abs(deltaValue)} ширхэг</span></span>
-                                                  <span className="mx-2">|</span>
-                                                  <span>Хасах: 
-                                                    <span className={`font-medium ${Math.abs(deltaValue) > qty ? "text-red-600" : "text-orange-600"}`}>
-                                                      {Math.abs(deltaValue) > qty 
-                                                        ? `Боломжгүй (${Math.abs(deltaValue) - qty} дутагдах)` 
-                                                        : `${qty - Math.abs(deltaValue)} ширхэг`
-                                                      }
-                                                    </span>
-                                                  </span>
-                                                </>
-                                              )}
-                                              {deltaValue === 0 && (
-                                                <span>Одоогийн үлдэгдэл: <span className="font-medium">{qty} ширхэг</span></span>
-                                              )}
+                                          {deltaValue !== 0 && (
+                                            <div className="grid grid-cols-2 gap-2">
+                                              {/* Add button */}
+                                              <button
+                                                onClick={() => {
+                                                  // Use the absolute value as positive delta for adding
+                                                  adjustInventoryByDelta(variant.id, store.id, Math.abs(deltaValue));
+                                                  setDeltaInputs(prev => ({...prev, [adjustKey]: 0}));
+                                                }}
+                                                className="px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                                                disabled={isAdjusting}
+                                              >
+                                                {isAdjusting ? (
+                                                  <div className="flex items-center justify-center gap-1">
+                                                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                                    <span>Нэмж байна...</span>
+                                                  </div>
+                                                ) : (
+                                                  "Нэмэх"
+                                                )}
+                                              </button>
+                                              {/* Subtract button */}
+                                              <button
+                                                onClick={() => {
+                                                  const subtractAmount = Math.abs(deltaValue);
+                                                  if (subtractAmount > qty) {
+                                                    alert(`Алдаа: Хасах тоо (${subtractAmount}) нь одоогийн үлдэгдлээс (${qty}) их байна. Хамгийн ихдээ ${qty} ширхэг хасч болно.`);
+                                                    return;
+                                                  }
+                                                  // Use the absolute value as negative delta for subtracting
+                                                  adjustInventoryByDelta(variant.id, store.id, -subtractAmount);
+                                                  setDeltaInputs(prev => ({...prev, [adjustKey]: 0}));
+                                                }}
+                                                className={`px-3 py-2 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation ${
+                                                  Math.abs(deltaValue) > qty 
+                                                    ? "bg-gray-400 cursor-not-allowed" 
+                                                    : "bg-red-600 hover:bg-red-700"
+                                                }`}
+                                                disabled={isAdjusting || Math.abs(deltaValue) > qty}
+                                              >
+                                                {isAdjusting ? (
+                                                  <div className="flex items-center justify-center gap-1">
+                                                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                                                    <span>Хасч байна...</span>
+                                                  </div>
+                                                ) : (
+                                                  Math.abs(deltaValue) > qty ? "Үлдэгдэл хүрэхгүй" : "Хасах"
+                                                )}
+                                              </button>
                                             </div>
-                                            <div className="flex gap-2">
-                                              {/* Add button - always show if deltaValue is not 0 */}
-                                              {deltaValue !== 0 && (
-                                                <button
-                                                  onClick={() => {
-                                                    // Use the absolute value as positive delta for adding
-                                                    adjustInventoryByDelta(variant.id, store.id, Math.abs(deltaValue));
-                                                    setDeltaInputs(prev => ({...prev, [adjustKey]: 0}));
-                                                  }}
-                                                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                  disabled={isAdjusting}
-                                                >
-                                                  {isAdjusting ? (
-                                                    <div className="flex items-center gap-1">
-                                                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
-                                                      Нэмж байна...
-                                                    </div>
-                                                  ) : (
-                                                    "Нэмэх"
-                                                  )}
-                                                </button>
-                                              )}
-                                              {/* Subtract button - always show if deltaValue is not 0 */}
-                                              {deltaValue !== 0 && (
-                                                <button
-                                                  onClick={() => {
-                                                    const subtractAmount = Math.abs(deltaValue);
-                                                    if (subtractAmount > qty) {
-                                                      alert(`Алдаа: Хасах тоо (${subtractAmount}) нь одоогийн үлдэгдлээс (${qty}) их байна. Хамгийн ихдээ ${qty} ширхэг хасч болно.`);
-                                                      return;
-                                                    }
-                                                    // Use the absolute value as negative delta for subtracting
-                                                    adjustInventoryByDelta(variant.id, store.id, -subtractAmount);
-                                                    setDeltaInputs(prev => ({...prev, [adjustKey]: 0}));
-                                                  }}
-                                                  className={`px-3 py-1 text-white text-xs rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                                                    Math.abs(deltaValue) > qty 
-                                                      ? "bg-gray-400 cursor-not-allowed" 
-                                                      : "bg-red-600 hover:bg-red-700"
-                                                  }`}
-                                                  disabled={isAdjusting || Math.abs(deltaValue) > qty}
-                                                >
-                                                  {isAdjusting ? (
-                                                    <div className="flex items-center gap-1">
-                                                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
-                                                      Хасч байна...
-                                                    </div>
-                                                  ) : (
-                                                    Math.abs(deltaValue) > qty ? "Үлдэгдэл хүрэхгүй" : "Хасах"
-                                                  )}
-                                                </button>
-                                              )}
-                                            </div>
-                                          </div>
+                                          )}
                                         </div>
                                       </div>
                                     );
@@ -1783,10 +1783,10 @@ export default function ProductDetailPage() {
 
                 {/* Add Variant Button (when no variants exist) */}
                 {variants.length === 0 && isEditing && (
-                  <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg p-8 border-2 border-dashed border-green-300 text-center">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center animate-pulse">
+                  <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg p-6 sm:p-8 border-2 border-dashed border-green-300 text-center">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center animate-pulse">
                       <svg
-                        className="w-10 h-10 text-green-600"
+                        className="w-8 h-8 sm:w-10 sm:h-10 text-green-600"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1799,20 +1799,20 @@ export default function ProductDetailPage() {
                         />
                       </svg>
                     </div>
-                    <div className="text-xl font-semibold text-green-800 mb-2">
+                    <div className="text-lg sm:text-xl font-semibold text-green-800 mb-2">
                       🆕 Анхны хувилбар үүсгэх
                     </div>
-                    <div className="text-green-600 mb-6">
+                    <div className="text-sm sm:text-base text-green-600 mb-4 sm:mb-6">
                       Энэ барааны анхны хувилбарыг үүсгэн эхлүүлэх
                     </div>
                     <button
                       onClick={addVariant}
-                      className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center gap-3 mx-auto"
+                      className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2 sm:gap-3 mx-auto w-full sm:w-auto touch-manipulation"
                     >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
-                      ⭐ Анхны хувилбар үүсгэх
+                      <span className="text-sm sm:text-base">⭐ Анхны хувилбар үүсгэх</span>
                     </button>
                   </section>
                 )}
