@@ -544,8 +544,6 @@ export default function AddItemModal({
       return;
     }
 
-
-
     onAdd({
       id:
         crypto.randomUUID?.() ??
@@ -1408,7 +1406,10 @@ export default function AddItemModal({
                   </button>
                   <button
                     type="button"
-                    onClick={handleAdd}
+                    onClick={() => {
+                      handleAdd();
+                      if (canAdd) onClose();
+                    }}
                     disabled={!canAdd}
                     className={
                       "flex-1 h-12 px-6 rounded-xl font-semibold transition-all duration-200 " +

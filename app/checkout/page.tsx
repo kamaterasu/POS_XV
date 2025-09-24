@@ -689,7 +689,7 @@ export default function CheckoutPage() {
       }));
 
       console.log("🛒 Creating checkout order with store_id:", storeId);
-      
+
       const result = await createCheckoutOrder(
         items.map((it) => ({
           variantId: it.variant_id!,
@@ -768,64 +768,6 @@ export default function CheckoutPage() {
           </svg>
           <span className="font-medium text-gray-900">Борлуулалт</span>
         </button>
-
-        <div className="flex items-center gap-4">
-          {/* Store Filter for Order History */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">Дэлгүүрийн түүх:</label>
-            <select
-              value={storeId || "all"}
-              onChange={(e) => {
-                const newStoreId =
-                  e.target.value === "all" ? null : e.target.value;
-                setStoreId(newStoreId);
-                // Save to localStorage
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("storeId", newStoreId || "all");
-                }
-              }}
-              disabled={loadingStores}
-              className="px-2 py-1 rounded bg-white/80 border border-white/40 shadow-sm text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]"
-            >
-              {loadingStores ? (
-                <option>...</option>
-              ) : (
-                <>
-                  <option value="all">Бүх дэлгүүр</option>
-                  {stores
-                    .filter((s) => s.id !== "all")
-                    .map((store) => (
-                      <option key={store.id} value={store.id}>
-                        {store.name}
-                      </option>
-                    ))}
-                </>
-              )}
-            </select>
-          </div>
-
-          {/* Quick Order Stats */}
-          {orderHistory && (
-            <div className="flex items-center gap-2 text-xs text-gray-600">
-              <span>
-                Өнөөдөр:{" "}
-                {
-                  orderHistory.items.filter((o) => {
-                    const today = new Date().toDateString();
-                    const orderDate = new Date(o.created_at).toDateString();
-                    return today === orderDate;
-                  }).length
-                }{" "}
-                захиалга
-              </span>
-              {orderHistory.count > orderHistory.items.length && (
-                <span className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">
-                  +{orderHistory.count - orderHistory.items.length}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
       </header>
 
       <main className="flex-1 flex flex-col text-black">
@@ -1119,7 +1061,8 @@ export default function CheckoutPage() {
                           className="w-12 h-12 rounded-xl object-cover bg-gray-100 shadow-sm"
                           unoptimized
                           onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = "/default.png";
+                            (e.currentTarget as HTMLImageElement).src =
+                              "/default.png";
                           }}
                         />
                         <div className="leading-tight flex flex-col min-w-0 flex-1">
@@ -1157,12 +1100,16 @@ export default function CheckoutPage() {
                               const product = productList.find(
                                 (p) => p.variantId === it.variant_id
                               );
-                              const isAtStockLimit = product && it.qty >= product.qty;
-                              
+                              const isAtStockLimit =
+                                product && it.qty >= product.qty;
+
                               return (
                                 <button
                                   onClick={() =>
-                                    updateItemQuantity(it.variant_id!, it.qty + 1)
+                                    updateItemQuantity(
+                                      it.variant_id!,
+                                      it.qty + 1
+                                    )
                                   }
                                   disabled={isAtStockLimit}
                                   className={`w-7 h-7 rounded-full text-white text-sm leading-none flex items-center justify-center transition-colors duration-200 ${
@@ -1172,7 +1119,9 @@ export default function CheckoutPage() {
                                   }`}
                                   title={
                                     isAtStockLimit
-                                      ? `Хангалттай нөөц байхгүй (үлдэгдэл: ${product?.qty || 0})`
+                                      ? `Хангалттай нөөц байхгүй (үлдэгдэл: ${
+                                          product?.qty || 0
+                                        })`
                                       : "Тоог нэмэх"
                                   }
                                 >
@@ -1354,7 +1303,8 @@ export default function CheckoutPage() {
                     className="w-16 h-16 rounded-lg object-cover bg-gray-100"
                     unoptimized
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "/default.png";
+                      (e.currentTarget as HTMLImageElement).src =
+                        "/default.png";
                     }}
                   />
                   <div className="flex-1">
@@ -1544,50 +1494,6 @@ export default function CheckoutPage() {
           </div>
         </div>
       )}
-
-      {/* {showPrintConfirm && printPayload && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg">
-            <h2 className="text-lg font-bold mb-3">Баталгаажуулах</h2>
-            <div className="mb-4">
-              <div className="font-medium mb-2">
-                Та дараах барааг хэвлэх гэж байна:
-              </div>
-              <ul className="space-y-2 mb-2">
-                {printPayload.items.map((it, idx) => (
-                  <li
-                    key={it.id + "-" + (it as any).variant_id + "-" + idx}
-                    className="flex justify-between text-sm"
-                  >
-                    <span>
-                      {it.name} ({it.size || "—"}, {it.color || "—"}) × {it.qty}
-                    </span>
-                    <span>{fmt(it.price * it.qty)}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex justify-between font-semibold text-base border-t pt-2">
-                <span>Нийт:</span>
-                <span>{fmt(printPayload.total)}</span>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowPrintConfirm(false)}
-                className="px-4 py-2 rounded-lg border bg-gray-50"
-              >
-                Цуцлах
-              </button>
-              <button
-                onClick={confirmPrint}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium"
-              >
-                Баталгаажуулах
-              </button>
-            </div>
-          </div>
-        </div>
-      )} */}
 
       <DraftManagerDialog
         open={openDraftManager}

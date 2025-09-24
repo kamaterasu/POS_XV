@@ -136,7 +136,6 @@ export default function PayDialogMulti({
               </svg>
             </button>
           </div>
-
         </div>
 
         {/* Clean Payment Rows */}
